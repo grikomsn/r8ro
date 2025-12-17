@@ -1,0 +1,10 @@
+# Allow indexing of main pages
+User-agent: *
+Allow: /
+
+# Disallow indexing of retro boards (private sessions)
+Disallow: /retro/
+Disallow: /new
+
+# Sitemap
+Sitemap: https://r8ro.vercel.app/sitemap.xml
