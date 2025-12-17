@@ -179,15 +179,14 @@ export function useAuth() {
     }
 
     try {
-      let redirectUrl = "/auth/callback"
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL
+      const origin = typeof window !== "undefined" ? window.location.origin : ""
 
-      if (typeof window !== "undefined") {
-        // In production, use the current origin
-        // In development, prefer NEXT_PUBLIC_APP_URL if set, otherwise use current origin
-        const appUrl = process.env.NEXT_PUBLIC_APP_URL
-        const origin = appUrl || window.location.origin
-        redirectUrl = `${origin}/auth/callback`
-      }
+      // Use NEXT_PUBLIC_APP_URL if set (production), otherwise use current origin (development)
+      const baseUrl = appUrl || origin
+      const redirectUrl = `${baseUrl}/auth/callback`
+
+      console.log("[v0] GitHub OAuth redirect URL:", redirectUrl)
 
       const { data, error } = await supabaseRef.current.auth.linkIdentity({
         provider: "github",
@@ -201,6 +200,7 @@ export function useAuth() {
         return { success: false, error: error.message }
       }
 
+      console.log("[v0] GitHub OAuth initiated successfully")
       return { success: true, data }
     } catch (error: any) {
       console.error("Failed to link GitHub identity:", error)
