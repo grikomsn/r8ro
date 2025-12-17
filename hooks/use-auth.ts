@@ -179,7 +179,15 @@ export function useAuth() {
     }
 
     try {
-      const redirectUrl = typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : "/auth/callback"
+      let redirectUrl = "/auth/callback"
+
+      if (typeof window !== "undefined") {
+        // In production, use the current origin
+        // In development, prefer NEXT_PUBLIC_APP_URL if set, otherwise use current origin
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL
+        const origin = appUrl || window.location.origin
+        redirectUrl = `${origin}/auth/callback`
+      }
 
       const { data, error } = await supabaseRef.current.auth.linkIdentity({
         provider: "github",
