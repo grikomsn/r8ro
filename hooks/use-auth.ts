@@ -179,8 +179,13 @@ export function useAuth() {
     }
 
     try {
+      const redirectUrl = typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : "/auth/callback"
+
       const { data, error } = await supabaseRef.current.auth.linkIdentity({
         provider: "github",
+        options: {
+          redirectTo: redirectUrl,
+        },
       })
 
       if (error) {
