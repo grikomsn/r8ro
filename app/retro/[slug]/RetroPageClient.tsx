@@ -13,8 +13,6 @@ import { addRecentBoard } from "@/lib/utils/recent-boards"
 import { ChevronLeft, ChevronRight } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip"
 import { useAuth } from "@/hooks/use-auth"
-import { DatabaseError, NotFoundError, AuthenticationError, getErrorMessage } from "@/lib/utils/errors"
-import { SkeletonBoardHeader, SkeletonColumn } from "@/components/ui/skeleton-card"
 
 export default function RetroPageClient() {
   const params = useParams()
@@ -60,84 +58,41 @@ export default function RetroPageClient() {
   }, [authInitialized, displayName, userId])
 
   useEffect(() => {
+    if (!userId || !userName) return
+
     let cancelled = false
-    setLoading(true)
     const supabase = createClient()
 
     async function load() {
-      try {
-        if (!userId) {
-          throw new AuthenticationError("User not authenticated")
-        }
+      const { data: boardData } = await supabase.from("retro_boards").select("*").eq("slug", slug).single()
 
-        const { data: boardData, error: boardError } = await supabase
-          .from("retro_boards")
-          .select(
-            "id, slug, title, author_id, author_name, is_public, is_locked, timer_running, timer_seconds, timer_started_at",
-          )
-          .eq("slug", slug)
-          .single()
-
-        if (cancelled) return
-
-        if (boardError) {
-          if (boardError.code === "PGRST116") {
-            throw new NotFoundError("Board", { slug })
-          }
-          throw new DatabaseError("Failed to load board", { error: boardError })
-        }
-
-        if (!boardData) {
-          throw new NotFoundError("Board", { slug })
-        }
-
-        setBoard(boardData)
-        addRecentBoard(boardData.slug, boardData.title)
-
-        const [cardsRes, participantsRes] = await Promise.all([
-          supabase
-            .from("retro_cards")
-            .select("id, board_id, column_type, content, author_name, author_id, votes, created_at")
-            .eq("board_id", boardData.id)
-            .order("created_at", { ascending: true }),
-          supabase
-            .from("retro_participants")
-            .select("id, board_id, user_id, username, is_online, cursor_x, cursor_y, last_seen")
-            .eq("board_id", boardData.id),
-        ])
-
-        if (cancelled) return
-
-        if (cardsRes.error) {
-          throw new DatabaseError("Failed to load cards", { error: cardsRes.error })
-        }
-
-        if (participantsRes.error) {
-          throw new DatabaseError("Failed to load participants", { error: participantsRes.error })
-        }
-
-        setCards(cardsRes.data || [])
-        setParticipants(participantsRes.data || [])
-
-        const existing = participantsRes.data?.find((p) => p.user_id === userId)
-        if (!existing && userName) {
-          const { error: upsertError } = await supabase
-            .from("retro_participants")
-            .upsert({ board_id: boardData.id, user_id: userId, username: userName, is_online: true })
-
-          if (upsertError) {
-            console.error("Failed to join as participant:", upsertError)
-          }
-        }
-
-        if (!cancelled) setLoading(false)
-      } catch (err) {
-        if (!cancelled) {
-          const errorMessage = getErrorMessage(err)
-          setError(errorMessage)
-          setLoading(false)
-        }
+      if (cancelled) return
+      if (!boardData) {
+        setError("Board not found")
+        setLoading(false)
+        return
       }
+
+      setBoard(boardData)
+      addRecentBoard(boardData.slug, boardData.title)
+
+      const [cardsRes, participantsRes] = await Promise.all([
+        supabase.from("retro_cards").select("*").eq("board_id", boardData.id).order("created_at", { ascending: true }),
+        supabase.from("retro_participants").select("*").eq("board_id", boardData.id),
+      ])
+
+      if (cancelled) return
+      setCards(cardsRes.data || [])
+      setParticipants(participantsRes.data || [])
+
+      const existing = participantsRes.data?.find((p) => p.user_id === userId)
+      if (!existing) {
+        await supabase
+          .from("retro_participants")
+          .upsert({ board_id: boardData.id, user_id: userId, username: userName, is_online: true })
+      }
+
+      if (!cancelled) setLoading(false)
     }
 
     load()
@@ -145,135 +100,6 @@ export default function RetroPageClient() {
       cancelled = true
     }
   }, [slug, userId, userName])
-
-  useEffect(() => {
-    if (!board?.id) return
-
-    const supabase = createClient()
-
-    // Subscribe to cards changes
-    const cardsChannel = supabase
-      .channel(`retro_cards:board_id=eq.${board.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "retro_cards",
-          filter: `board_id=eq.${board.id}`,
-        },
-        (payload) => {
-          setCards((prev) => [...prev, payload.new as RetroCard])
-        },
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "retro_cards",
-          filter: `board_id=eq.${board.id}`,
-        },
-        (payload) => {
-          setCards((prev) => prev.map((card) => (card.id === payload.new.id ? (payload.new as RetroCard) : card)))
-        },
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "DELETE",
-          schema: "public",
-          table: "retro_cards",
-          filter: `board_id=eq.${board.id}`,
-        },
-        (payload) => {
-          setCards((prev) => prev.filter((card) => card.id !== payload.old.id))
-        },
-      )
-      .subscribe()
-
-    // Subscribe to participants changes
-    const participantsChannel = supabase
-      .channel(`retro_participants:board_id=eq.${board.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "retro_participants",
-          filter: `board_id=eq.${board.id}`,
-        },
-        (payload) => {
-          setParticipants((prev) => {
-            const exists = prev.find((p) => p.user_id === (payload.new as RetroParticipant).user_id)
-            if (exists) return prev
-            return [...prev, payload.new as RetroParticipant]
-          })
-        },
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "retro_participants",
-          filter: `board_id=eq.${board.id}`,
-        },
-        (payload) => {
-          setParticipants((prev) =>
-            prev.map((p) => (p.user_id === payload.new.user_id ? (payload.new as RetroParticipant) : p)),
-          )
-        },
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "DELETE",
-          schema: "public",
-          table: "retro_participants",
-          filter: `board_id=eq.${board.id}`,
-        },
-        (payload) => {
-          setParticipants((prev) => prev.filter((p) => p.user_id !== payload.old.user_id))
-        },
-      )
-      .subscribe()
-
-    // Subscribe to board changes (title, lock status, visibility, timer)
-    const boardChannel = supabase
-      .channel(`retro_boards:id=eq.${board.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "retro_boards",
-          filter: `id=eq.${board.id}`,
-        },
-        (payload) => {
-          setBoard(payload.new as RetroBoard)
-        },
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "DELETE",
-          schema: "public",
-          table: "retro_boards",
-          filter: `id=eq.${board.id}`,
-        },
-        () => {
-          router.push("/")
-        },
-      )
-      .subscribe()
-
-    return () => {
-      supabase.removeChannel(cardsChannel)
-      supabase.removeChannel(participantsChannel)
-      supabase.removeChannel(boardChannel)
-    }
-  }, [board?.id, router])
 
   const handleJoin = useCallback(
     (username: string) => {
@@ -285,37 +111,24 @@ export default function RetroPageClient() {
     [userId],
   )
 
-  const handleTogglePublic = useCallback(async () => {
+  const handleToggleVisibility = useCallback(async () => {
     const b = boardRef.current
     if (!b) return
     setBoard((p) => (p ? { ...p, is_public: !p.is_public } : null))
-    const { error } = await createClient().from("retro_boards").update({ is_public: !b.is_public }).eq("id", b.id)
-    if (error) {
-      console.error("Failed to toggle public status:", error)
-      // Revert optimistic update
-      setBoard((p) => (p ? { ...p, is_public: b.is_public } : null))
-    }
+    await createClient().from("retro_boards").update({ is_public: !b.is_public }).eq("id", b.id)
   }, [])
 
   const handleToggleLock = useCallback(async () => {
     const b = boardRef.current
     if (!b) return
     setBoard((p) => (p ? { ...p, is_locked: !p.is_locked } : null))
-    const { error } = await createClient().from("retro_boards").update({ is_locked: !b.is_locked }).eq("id", b.id)
-    if (error) {
-      console.error("Failed to toggle lock status:", error)
-      setBoard((p) => (p ? { ...p, is_locked: b.is_locked } : null))
-    }
+    await createClient().from("retro_boards").update({ is_locked: !b.is_locked }).eq("id", b.id)
   }, [])
 
   const handleAddCard = useCallback(
     async (columnType: ColumnType, content: string) => {
       const b = boardRef.current
-      if (!b || !userId || !userName) {
-        console.error("Missing required data for adding card")
-        return
-      }
-
+      if (!b || !userId || !userName) return
       const tempId = `temp-${Date.now()}`
       setCards((p) => [
         ...p,
@@ -330,145 +143,57 @@ export default function RetroPageClient() {
           created_at: new Date().toISOString(),
         },
       ])
-
-      try {
-        const { data, error } = await createClient()
-          .from("retro_cards")
-          .insert({
-            board_id: b.id,
-            column_type: columnType,
-            content,
-            author_name: userName,
-            author_id: userId,
-            votes: 0,
-          })
-          .select("id, board_id, column_type, content, author_name, author_id, votes, created_at")
-          .single()
-
-        if (error) {
-          throw new DatabaseError("Failed to add card", { error })
-        }
-
-        if (data) {
-          setCards((p) => p.map((c) => (c.id === tempId ? data : c)))
-        }
-      } catch (err) {
-        console.error("Failed to add card:", err)
-        // Remove optimistic card on error
-        setCards((p) => p.filter((c) => c.id !== tempId))
-      }
+      const { data } = await createClient()
+        .from("retro_cards")
+        .insert({
+          board_id: b.id,
+          column_type: columnType,
+          content,
+          author_name: userName,
+          author_id: userId,
+          votes: 0,
+        })
+        .select()
+        .single()
+      if (data) setCards((p) => p.map((c) => (c.id === tempId ? data : c)))
     },
     [userId, userName],
   )
 
   const handleVoteCard = useCallback(async (cardId: string, votes: number) => {
-    if (!cardId) {
-      console.error("Invalid card ID for voting")
-      return
-    }
-
-    const newVotes = votes + 1
-    setCards((p) => p.map((c) => (c.id === cardId ? { ...c, votes: newVotes } : c)))
-
-    try {
-      const { error } = await createClient().from("retro_cards").update({ votes: newVotes }).eq("id", cardId)
-
-      if (error) {
-        throw new DatabaseError("Failed to vote on card", { error })
-      }
-    } catch (err) {
-      console.error("Failed to vote card:", err)
-      // Revert optimistic update
-      setCards((p) => p.map((c) => (c.id === cardId ? { ...c, votes } : c)))
-    }
+    setCards((p) => p.map((c) => (c.id === cardId ? { ...c, votes: votes + 1 } : c)))
+    await createClient()
+      .from("retro_cards")
+      .update({ votes: votes + 1 })
+      .eq("id", cardId)
   }, [])
 
   const handleDeleteCard = useCallback(async (cardId: string) => {
-    if (!cardId) {
-      console.error("Invalid card ID for deletion")
-      return
-    }
-
-    // Store the card in case we need to restore it
-    const deletedCard = cardsRef.current.find((c) => c.id === cardId)
     setCards((p) => p.filter((c) => c.id !== cardId))
-
-    try {
-      const { error } = await createClient().from("retro_cards").delete().eq("id", cardId)
-
-      if (error) {
-        throw new DatabaseError("Failed to delete card", { error })
-      }
-    } catch (err) {
-      console.error("Failed to delete card:", err)
-      // Restore card on error
-      if (deletedCard) {
-        setCards((p) => [...p, deletedCard])
-      }
-    }
+    await createClient().from("retro_cards").delete().eq("id", cardId)
   }, [])
 
   const handleEditCard = useCallback(async (cardId: string, content: string) => {
-    if (!cardId || content === undefined) {
-      console.error("Invalid parameters for card edit")
-      return
-    }
-
-    const originalContent = cardsRef.current.find((c) => c.id === cardId)?.content
     setCards((p) => p.map((c) => (c.id === cardId ? { ...c, content } : c)))
-
-    try {
-      const { error } = await createClient().from("retro_cards").update({ content }).eq("id", cardId)
-
-      if (error) {
-        throw new DatabaseError("Failed to edit card", { error })
-      }
-    } catch (err) {
-      console.error("Failed to edit card:", err)
-      // Revert to original content
-      if (originalContent !== undefined) {
-        setCards((p) => p.map((c) => (c.id === cardId ? { ...c, content: originalContent } : c)))
-      }
-    }
+    await createClient().from("retro_cards").update({ content }).eq("id", cardId)
   }, [])
 
   const handleMoveCard = useCallback(async (cardId: string, columnType: ColumnType) => {
-    const originalColumn = cardsRef.current.find((c) => c.id === cardId)?.column_type
     setCards((p) => p.map((c) => (c.id === cardId ? { ...c, column_type: columnType } : c)))
-    const { error } = await createClient().from("retro_cards").update({ column_type: columnType }).eq("id", cardId)
-
-    if (error) {
-      console.error("Failed to move card:", error)
-      // Revert to original column
-      if (originalColumn) {
-        setCards((p) => p.map((c) => (c.id === cardId ? { ...c, column_type: originalColumn } : c)))
-      }
-    }
+    await createClient().from("retro_cards").update({ column_type: columnType }).eq("id", cardId)
   }, [])
 
   const handleEditBoardTitle = useCallback(async (title: string) => {
     const b = boardRef.current
     if (!b) return
-    const originalTitle = b.title
     setBoard((p) => (p ? { ...p, title } : null))
-    const { error } = await createClient().from("retro_boards").update({ title }).eq("id", b.id)
-
-    if (error) {
-      console.error("Failed to edit board title:", error)
-      setBoard((p) => (p ? { ...p, title: originalTitle } : null))
-    }
+    await createClient().from("retro_boards").update({ title }).eq("id", b.id)
   }, [])
 
   const handleDeleteBoard = useCallback(async () => {
     const b = boardRef.current
     if (!b) return
-    const { error } = await createClient().from("retro_boards").delete().eq("id", b.id)
-
-    if (error) {
-      console.error("Failed to delete board:", error)
-      return
-    }
-
+    await createClient().from("retro_boards").delete().eq("id", b.id)
     router.push("/")
   }, [router])
 
@@ -478,78 +203,36 @@ export default function RetroPageClient() {
     const running = !b.timer_running
     const startedAt = running ? new Date().toISOString() : null
     setBoard((p) => (p ? { ...p, timer_running: running, timer_started_at: startedAt } : null))
-    const { error } = await createClient()
+    await createClient()
       .from("retro_boards")
       .update({ timer_running: running, timer_started_at: startedAt })
       .eq("id", b.id)
-
-    if (error) {
-      console.error("Failed to toggle timer:", error)
-      setBoard((p) => (p ? { ...p, timer_running: b.timer_running, timer_started_at: b.timer_started_at } : null))
-    }
   }, [])
 
   const handleTimerReset = useCallback(async () => {
     const b = boardRef.current
     if (!b) return
     setBoard((p) => (p ? { ...p, timer_running: false, timer_seconds: 300, timer_started_at: null } : null))
-    const { error } = await createClient()
+    await createClient()
       .from("retro_boards")
       .update({ timer_running: false, timer_seconds: 300, timer_started_at: null })
       .eq("id", b.id)
-
-    if (error) {
-      console.error("Failed to reset timer:", error)
-      setBoard((p) =>
-        p
-          ? {
-              ...p,
-              timer_running: b.timer_running,
-              timer_seconds: b.timer_seconds,
-              timer_started_at: b.timer_started_at,
-            }
-          : null,
-      )
-    }
   }, [])
 
   const handleSetTimer = useCallback(async (seconds: number) => {
     const b = boardRef.current
     if (!b) return
-    const originalSeconds = b.timer_seconds
     setBoard((p) => (p ? { ...p, timer_seconds: seconds } : null))
-    const { error } = await createClient().from("retro_boards").update({ timer_seconds: seconds }).eq("id", b.id)
-
-    if (error) {
-      console.error("Failed to set timer:", error)
-      setBoard((p) => (p ? { ...p, timer_seconds: originalSeconds } : null))
-    }
+    await createClient().from("retro_boards").update({ timer_seconds: seconds }).eq("id", b.id)
   }, [])
 
   if (!authInitialized) {
     return (
-      <div className="flex min-h-screen flex-col bg-secondary">
-        <SkeletonBoardHeader />
-        <div className="flex-1 p-4 md:p-6">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <SkeletonColumn />
-            <SkeletonColumn />
-            <SkeletonColumn />
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  if (loading) {
-    return (
-      <div className="flex min-h-screen flex-col bg-secondary">
-        <SkeletonBoardHeader />
-        <div className="flex-1 p-4 md:p-6">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            <SkeletonColumn />
-            <SkeletonColumn />
-            <SkeletonColumn />
+      <div className="flex min-h-screen items-center justify-center bg-secondary">
+        <div className="border-2 border-border bg-background p-8 shadow-md rounded-2xl">
+          <div className="flex items-center gap-3">
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            <p className="text-xl font-bold">Loading...</p>
           </div>
         </div>
       </div>
@@ -557,6 +240,19 @@ export default function RetroPageClient() {
   }
 
   if (showJoinModal) return <JoinModal onJoin={handleJoin} />
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-secondary">
+        <div className="border-2 border-border bg-background p-8 shadow-md rounded-2xl">
+          <div className="flex items-center gap-3">
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+            <p className="text-xl font-bold">Loading...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   if (error || !board) {
     return (
@@ -578,7 +274,7 @@ export default function RetroPageClient() {
       <BoardHeader
         board={board}
         isAuthor={isAuthor || false}
-        onToggleVisibility={handleTogglePublic}
+        onToggleVisibility={handleToggleVisibility}
         onToggleLock={handleToggleLock}
         onDeleteBoard={handleDeleteBoard}
         onTimerToggle={handleTimerToggle}

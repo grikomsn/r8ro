@@ -1,8 +1,8 @@
 "use client"
 
-import { createClient } from "@/lib/supabase/client"
+import { createClient, clearSessionAndRecreateClient } from "@/lib/supabase/client"
 import type { User } from "@supabase/supabase-js"
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useState, useRef } from "react"
 
 interface AuthState {
   user: User | null
@@ -23,14 +23,16 @@ export function useAuth() {
     isAnonymous: true,
   })
 
+  const supabaseRef = useRef(createClient())
+  const isRecoveringRef = useRef(false)
+
   useEffect(() => {
-    const supabase = createClient()
     let mounted = true
 
-    async function signInAnonymously() {
+    async function signInAnonymously(client: ReturnType<typeof createClient>, isMounted: boolean) {
       const legacyName = typeof window !== "undefined" ? localStorage.getItem("retro_username") || "" : ""
 
-      const { data, error } = await supabase.auth.signInAnonymously({
+      const { data, error } = await client.auth.signInAnonymously({
         options: {
           data: {
             display_name: legacyName,
@@ -40,13 +42,13 @@ export function useAuth() {
 
       if (error) {
         console.error("Anonymous sign-in failed:", error)
-        if (mounted) {
+        if (isMounted) {
           setState((prev) => ({ ...prev, isLoading: false, isInitialized: true }))
         }
         return
       }
 
-      if (data.user && mounted) {
+      if (data.user && isMounted) {
         if (typeof window !== "undefined") {
           localStorage.removeItem("retro_username")
           localStorage.removeItem("retro_user_id")
@@ -63,29 +65,59 @@ export function useAuth() {
       }
     }
 
+    async function recoverFromCorruptedSession() {
+      if (isRecoveringRef.current) return
+      isRecoveringRef.current = true
+
+      // Clear tokens and get fresh client
+      const freshClient = clearSessionAndRecreateClient()
+      supabaseRef.current = freshClient
+
+      await signInAnonymously(freshClient, mounted)
+      isRecoveringRef.current = false
+    }
+
     async function initAuth() {
-      const {
-        data: { user },
-        error,
-      } = await supabase.auth.getUser()
+      const supabase = supabaseRef.current
 
-      if (error || !user) {
-        await signInAnonymously()
-        return
-      }
+      try {
+        const { data: userData, error: userError } = await supabase.auth.getUser()
 
-      const displayName = user.user_metadata?.display_name || ""
-      const isAnonymous = user.is_anonymous || false
+        if (userError) {
+          const errorMsg = userError.message || ""
+          if (errorMsg.includes("user_not_found") || errorMsg.includes("User from sub claim")) {
+            await recoverFromCorruptedSession()
+            return
+          }
+        }
 
-      if (mounted) {
-        setState({
-          user,
-          userId: user.id,
-          displayName,
-          isLoading: false,
-          isInitialized: true,
-          isAnonymous,
-        })
+        if (!userData?.user) {
+          await signInAnonymously(supabase, mounted)
+          return
+        }
+
+        const displayName = userData.user.user_metadata?.display_name || ""
+        const isAnonymous = userData.user.is_anonymous || false
+
+        if (mounted) {
+          setState({
+            user: userData.user,
+            userId: userData.user.id,
+            displayName,
+            isLoading: false,
+            isInitialized: true,
+            isAnonymous,
+          })
+        }
+      } catch (error: any) {
+        const errorMessage = error?.message || String(error)
+        if (errorMessage.includes("user_not_found") || errorMessage.includes("User from sub claim")) {
+          await recoverFromCorruptedSession()
+          return
+        }
+
+        console.error("Auth initialization error:", error)
+        await recoverFromCorruptedSession()
       }
     }
 
@@ -93,22 +125,17 @@ export function useAuth() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!mounted) return
+    } = supabaseRef.current.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted || isRecoveringRef.current) return
 
       if (event === "SIGNED_OUT") {
-        await signInAnonymously()
+        await signInAnonymously(supabaseRef.current, mounted)
       } else if (session?.user) {
-        const { data: userData } = await supabase.auth.getUser()
-        const user = userData.user || session.user
-
-        const isAnonymous = user.is_anonymous || false
-        const displayName = user.user_metadata?.display_name || ""
-
+        const isAnonymous = session.user.is_anonymous || false
         setState({
-          user,
-          userId: user.id,
-          displayName,
+          user: session.user,
+          userId: session.user.id,
+          displayName: session.user.user_metadata?.display_name || "",
           isLoading: false,
           isInitialized: true,
           isAnonymous,
@@ -123,10 +150,9 @@ export function useAuth() {
   }, [])
 
   const updateDisplayName = useCallback(async (newName: string) => {
-    const supabase = createClient()
     const trimmedName = newName.trim()
 
-    const { data, error } = await supabase.auth.updateUser({
+    const { data, error } = await supabaseRef.current.auth.updateUser({
       data: { display_name: trimmedName },
     })
 
@@ -148,34 +174,31 @@ export function useAuth() {
 
   const linkGitHubIdentity = useCallback(async () => {
     if (!state.isAnonymous) {
+      console.error("User is not anonymous")
       return { success: false, error: "User is not anonymous" }
     }
 
-    const supabase = createClient()
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
+    try {
+      const redirectUrl = typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : "/auth/callback"
 
-    if (typeof window !== "undefined" && state.userId) {
-      localStorage.setItem("pending_github_migration", state.userId)
-    }
+      const { data, error } = await supabaseRef.current.auth.linkIdentity({
+        provider: "github",
+        options: {
+          redirectTo: redirectUrl,
+        },
+      })
 
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: "github",
-      options: {
-        redirectTo: `${appUrl}/auth/callback`,
-        skipBrowserRedirect: false,
-      },
-    })
-
-    if (error) {
-      console.error("Failed to sign in with GitHub:", error)
-      if (typeof window !== "undefined") {
-        localStorage.removeItem("pending_github_migration")
+      if (error) {
+        console.error("Failed to link GitHub identity:", error)
+        return { success: false, error: error.message }
       }
-      return { success: false, error: error.message }
-    }
 
-    return { success: true, data }
-  }, [state.isAnonymous, state.userId])
+      return { success: true, data }
+    } catch (error: any) {
+      console.error("Failed to link GitHub identity:", error)
+      return { success: false, error: error.message || "Failed to link GitHub account" }
+    }
+  }, [state.isAnonymous])
 
   return {
     user: state.user,

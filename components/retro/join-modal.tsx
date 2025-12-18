@@ -48,11 +48,11 @@ export function JoinModal({ onJoin }: JoinModalProps) {
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-3">
               <Label htmlFor="username" className="text-sm font-bold uppercase">
-                Display Name
+                Your Name
               </Label>
               <Input
                 id="username"
-                placeholder="Enter your display name"
+                placeholder="Enter your name"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="h-12 rounded-xl border-2 border-border text-base shadow-sm"

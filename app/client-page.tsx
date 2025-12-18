@@ -14,7 +14,6 @@ import { Zap, Users, Clock, Shield, History, X } from "lucide-react"
 import { useAuth } from "@/hooks/use-auth"
 import { getRecentBoards, addRecentBoard, removeRecentBoard, type RecentBoard } from "@/lib/utils/recent-boards"
 import { UserAccountPopover } from "@/components/auth/user-account-popover"
-import { ValidationError, getErrorMessage } from "@/lib/utils/errors"
 
 export default function ClientPage() {
   const router = useRouter()
@@ -46,9 +45,8 @@ export default function ClientPage() {
 
   const handleCreateSession = async (e: React.FormEvent) => {
     e.preventDefault()
-
     if (!username.trim()) {
-      setError("Please enter your display name")
+      setError("Please enter your name")
       return
     }
     if (!userId) {
@@ -77,35 +75,37 @@ export default function ClientPage() {
         timer_seconds: 0,
       }
 
-      const { data: createdBoard, error: insertError } = await supabase
-        .from("retro_boards")
-        .insert(boardData)
-        .select("id, slug, title")
-        .single()
+      const { error: insertError } = await supabase.from("retro_boards").insert(boardData)
 
       if (insertError) {
-        throw new ValidationError("Failed to create board", { error: insertError })
+        throw new Error(insertError.message || "Failed to create board")
       }
 
-      if (!createdBoard) {
-        throw new ValidationError("Board creation returned no data")
+      const { data: boardDataResult, error: boardError } = await supabase
+        .from("retro_boards")
+        .select("id")
+        .eq("slug", slug)
+        .single()
+
+      if (boardError || !boardDataResult) {
+        throw new Error(boardError?.message || "Failed to fetch created board")
       }
 
       const { error: participantError } = await supabase.from("retro_participants").insert({
-        board_id: createdBoard.id,
+        board_id: boardDataResult.id,
         user_id: userId,
         username: username.trim(),
         is_online: true,
       })
 
       if (participantError) {
-        console.error("Failed to join as participant:", participantError)
+        throw new Error(participantError.message || "Failed to join as participant")
       }
 
-      addRecentBoard(slug, createdBoard.title)
+      addRecentBoard(slug, createForm.title.trim() || "Untitled Retro")
       router.push(`/retro/${slug}`)
     } catch (err) {
-      const errorMessage = getErrorMessage(err)
+      const errorMessage = err instanceof Error ? err.message : "Failed to create session. Please try again."
       setError(errorMessage)
     } finally {
       setIsCreating(false)
@@ -114,7 +114,6 @@ export default function ClientPage() {
 
   const handleJoinSession = async (e: React.FormEvent) => {
     e.preventDefault()
-
     if (!joinForm.slug.trim() || !username.trim()) {
       setError("Please fill in all fields")
       return
@@ -131,30 +130,24 @@ export default function ClientPage() {
       const supabase = createClient()
       const { data: board, error: fetchError } = await supabase
         .from("retro_boards")
-        .select("id, is_public, title, slug")
+        .select("id, is_public, title")
         .eq("slug", joinForm.slug.trim().toLowerCase())
         .single()
 
-      if (fetchError) {
-        if (fetchError.code === "PGRST116") {
-          throw new ValidationError("Session not found. Check the URL and try again.")
-        }
-        throw new ValidationError("Failed to find session", { error: fetchError })
-      }
-
-      if (!board) {
-        throw new ValidationError("Session not found. Check the URL and try again.")
+      if (fetchError || !board) {
+        setError("Session not found. Check the URL and try again.")
+        return
       }
 
       if (username.trim() !== displayName) {
         await updateDisplayName(username.trim())
       }
 
-      addRecentBoard(board.slug, board.title)
+      addRecentBoard(joinForm.slug.trim().toLowerCase(), board.title)
       router.push(`/retro/${joinForm.slug.trim().toLowerCase()}`)
     } catch (err) {
-      const errorMessage = getErrorMessage(err)
-      setError(errorMessage)
+      console.error(err)
+      setError("Failed to join session. Please try again.")
     } finally {
       setIsJoining(false)
     }
@@ -295,11 +288,11 @@ export default function ClientPage() {
                   <form onSubmit={handleCreateSession} className="space-y-6">
                     <div className="space-y-3">
                       <Label htmlFor="create-username" className="text-sm font-bold uppercase">
-                        Display Name *
+                        Your Name *
                       </Label>
                       <Input
                         id="create-username"
-                        placeholder="Enter your display name"
+                        placeholder="Enter your name"
                         value={username}
                         onChange={(e) => setUsername(e.target.value)}
                         className="h-12 rounded-xl border-2 border-border bg-background px-4 text-base shadow-sm"
@@ -332,11 +325,11 @@ export default function ClientPage() {
                   <form onSubmit={handleJoinSession} className="space-y-6">
                     <div className="space-y-3">
                       <Label htmlFor="join-username" className="text-sm font-bold uppercase">
-                        Display Name *
+                        Your Name *
                       </Label>
                       <Input
                         id="join-username"
-                        placeholder="Enter your display name"
+                        placeholder="Enter your name"
                         value={username}
                         onChange={(e) => setUsername(e.target.value)}
                         className="h-12 rounded-xl border-2 border-border bg-background px-4 text-base shadow-sm"
