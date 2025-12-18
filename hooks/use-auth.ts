@@ -99,11 +99,16 @@ export function useAuth() {
       if (event === "SIGNED_OUT") {
         await signInAnonymously()
       } else if (session?.user) {
-        const isAnonymous = session.user.is_anonymous || false
+        const { data: userData } = await supabase.auth.getUser()
+        const user = userData.user || session.user
+
+        const isAnonymous = user.is_anonymous || false
+        const displayName = user.user_metadata?.display_name || ""
+
         setState({
-          user: session.user,
-          userId: session.user.id,
-          displayName: session.user.user_metadata?.display_name || "",
+          user,
+          userId: user.id,
+          displayName,
           isLoading: false,
           isInitialized: true,
           isAnonymous,

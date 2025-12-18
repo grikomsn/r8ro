@@ -101,6 +101,135 @@ export default function RetroPageClient() {
     }
   }, [slug, userId, userName])
 
+  useEffect(() => {
+    if (!board?.id) return
+
+    const supabase = createClient()
+
+    // Subscribe to cards changes
+    const cardsChannel = supabase
+      .channel(`retro_cards:board_id=eq.${board.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "retro_cards",
+          filter: `board_id=eq.${board.id}`,
+        },
+        (payload) => {
+          setCards((prev) => [...prev, payload.new as RetroCard])
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "retro_cards",
+          filter: `board_id=eq.${board.id}`,
+        },
+        (payload) => {
+          setCards((prev) => prev.map((card) => (card.id === payload.new.id ? (payload.new as RetroCard) : card)))
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "retro_cards",
+          filter: `board_id=eq.${board.id}`,
+        },
+        (payload) => {
+          setCards((prev) => prev.filter((card) => card.id !== payload.old.id))
+        },
+      )
+      .subscribe()
+
+    // Subscribe to participants changes
+    const participantsChannel = supabase
+      .channel(`retro_participants:board_id=eq.${board.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "retro_participants",
+          filter: `board_id=eq.${board.id}`,
+        },
+        (payload) => {
+          setParticipants((prev) => {
+            const exists = prev.find((p) => p.user_id === (payload.new as RetroParticipant).user_id)
+            if (exists) return prev
+            return [...prev, payload.new as RetroParticipant]
+          })
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "retro_participants",
+          filter: `board_id=eq.${board.id}`,
+        },
+        (payload) => {
+          setParticipants((prev) =>
+            prev.map((p) => (p.user_id === payload.new.user_id ? (payload.new as RetroParticipant) : p)),
+          )
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "retro_participants",
+          filter: `board_id=eq.${board.id}`,
+        },
+        (payload) => {
+          setParticipants((prev) => prev.filter((p) => p.user_id !== payload.old.user_id))
+        },
+      )
+      .subscribe()
+
+    // Subscribe to board changes (title, lock status, visibility, timer)
+    const boardChannel = supabase
+      .channel(`retro_boards:id=eq.${board.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "retro_boards",
+          filter: `id=eq.${board.id}`,
+        },
+        (payload) => {
+          setBoard(payload.new as RetroBoard)
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "retro_boards",
+          filter: `id=eq.${board.id}`,
+        },
+        () => {
+          router.push("/")
+        },
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(cardsChannel)
+      supabase.removeChannel(participantsChannel)
+      supabase.removeChannel(boardChannel)
+    }
+  }, [board?.id, router])
+
   const handleJoin = useCallback(
     (username: string) => {
       if (!userId) return

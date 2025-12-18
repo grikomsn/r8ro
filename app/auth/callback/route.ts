@@ -26,15 +26,17 @@ export async function GET(request: Request) {
 
   if (afterUserId) {
     if (user && !user.is_anonymous) {
+      const currentDisplayName = user.user_metadata?.display_name?.trim()
       const githubIdentity = user.identities?.find((identity) => identity.provider === "github")
       const githubUsername =
         githubIdentity?.identity_data?.user_name ||
         githubIdentity?.identity_data?.preferred_username ||
+        githubIdentity?.identity_data?.name ||
         user.user_metadata?.user_name ||
         user.user_metadata?.preferred_username
 
-      // Only update if we have a GitHub username and display_name is not set or empty
-      if (githubUsername && !user.user_metadata?.display_name) {
+      // Update if we have a GitHub username and display_name is empty/not set
+      if (githubUsername && !currentDisplayName) {
         await supabase.auth.updateUser({
           data: { display_name: githubUsername },
         })
