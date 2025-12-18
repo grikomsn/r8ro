@@ -1,8 +1,8 @@
 "use client"
 
-import { createClient, clearSessionAndRecreateClient } from "@/lib/supabase/client"
+import { createClient } from "@/lib/supabase/client"
 import type { User } from "@supabase/supabase-js"
-import { useCallback, useEffect, useState, useRef } from "react"
+import { useCallback, useEffect, useState } from "react"
 
 interface AuthState {
   user: User | null
@@ -23,16 +23,14 @@ export function useAuth() {
     isAnonymous: true,
   })
 
-  const supabaseRef = useRef(createClient())
-  const isRecoveringRef = useRef(false)
-
   useEffect(() => {
+    const supabase = createClient()
     let mounted = true
 
-    async function signInAnonymously(client: ReturnType<typeof createClient>, isMounted: boolean) {
+    async function signInAnonymously() {
       const legacyName = typeof window !== "undefined" ? localStorage.getItem("retro_username") || "" : ""
 
-      const { data, error } = await client.auth.signInAnonymously({
+      const { data, error } = await supabase.auth.signInAnonymously({
         options: {
           data: {
             display_name: legacyName,
@@ -42,13 +40,13 @@ export function useAuth() {
 
       if (error) {
         console.error("Anonymous sign-in failed:", error)
-        if (isMounted) {
+        if (mounted) {
           setState((prev) => ({ ...prev, isLoading: false, isInitialized: true }))
         }
         return
       }
 
-      if (data.user && isMounted) {
+      if (data.user && mounted) {
         if (typeof window !== "undefined") {
           localStorage.removeItem("retro_username")
           localStorage.removeItem("retro_user_id")
@@ -65,59 +63,29 @@ export function useAuth() {
       }
     }
 
-    async function recoverFromCorruptedSession() {
-      if (isRecoveringRef.current) return
-      isRecoveringRef.current = true
-
-      // Clear tokens and get fresh client
-      const freshClient = clearSessionAndRecreateClient()
-      supabaseRef.current = freshClient
-
-      await signInAnonymously(freshClient, mounted)
-      isRecoveringRef.current = false
-    }
-
     async function initAuth() {
-      const supabase = supabaseRef.current
+      const {
+        data: { user },
+        error,
+      } = await supabase.auth.getUser()
 
-      try {
-        const { data: userData, error: userError } = await supabase.auth.getUser()
+      if (error || !user) {
+        await signInAnonymously()
+        return
+      }
 
-        if (userError) {
-          const errorMsg = userError.message || ""
-          if (errorMsg.includes("user_not_found") || errorMsg.includes("User from sub claim")) {
-            await recoverFromCorruptedSession()
-            return
-          }
-        }
+      const displayName = user.user_metadata?.display_name || ""
+      const isAnonymous = user.is_anonymous || false
 
-        if (!userData?.user) {
-          await signInAnonymously(supabase, mounted)
-          return
-        }
-
-        const displayName = userData.user.user_metadata?.display_name || ""
-        const isAnonymous = userData.user.is_anonymous || false
-
-        if (mounted) {
-          setState({
-            user: userData.user,
-            userId: userData.user.id,
-            displayName,
-            isLoading: false,
-            isInitialized: true,
-            isAnonymous,
-          })
-        }
-      } catch (error: any) {
-        const errorMessage = error?.message || String(error)
-        if (errorMessage.includes("user_not_found") || errorMessage.includes("User from sub claim")) {
-          await recoverFromCorruptedSession()
-          return
-        }
-
-        console.error("Auth initialization error:", error)
-        await recoverFromCorruptedSession()
+      if (mounted) {
+        setState({
+          user,
+          userId: user.id,
+          displayName,
+          isLoading: false,
+          isInitialized: true,
+          isAnonymous,
+        })
       }
     }
 
@@ -125,11 +93,11 @@ export function useAuth() {
 
     const {
       data: { subscription },
-    } = supabaseRef.current.auth.onAuthStateChange(async (event, session) => {
-      if (!mounted || isRecoveringRef.current) return
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return
 
       if (event === "SIGNED_OUT") {
-        await signInAnonymously(supabaseRef.current, mounted)
+        await signInAnonymously()
       } else if (session?.user) {
         const isAnonymous = session.user.is_anonymous || false
         setState({
@@ -150,9 +118,10 @@ export function useAuth() {
   }, [])
 
   const updateDisplayName = useCallback(async (newName: string) => {
+    const supabase = createClient()
     const trimmedName = newName.trim()
 
-    const { data, error } = await supabaseRef.current.auth.updateUser({
+    const { data, error } = await supabase.auth.updateUser({
       data: { display_name: trimmedName },
     })
 
@@ -174,38 +143,25 @@ export function useAuth() {
 
   const linkGitHubIdentity = useCallback(async () => {
     if (!state.isAnonymous) {
-      console.error("User is not anonymous")
       return { success: false, error: "User is not anonymous" }
     }
 
-    try {
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL
-      const origin = typeof window !== "undefined" ? window.location.origin : ""
+    const supabase = createClient()
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
 
-      // Use NEXT_PUBLIC_APP_URL if set (production), otherwise use current origin (development)
-      const baseUrl = appUrl || origin
-      const redirectUrl = `${baseUrl}/auth/callback`
+    const { data, error } = await supabase.auth.linkIdentity({
+      provider: "github",
+      options: {
+        redirectTo: `${appUrl}/auth/callback`,
+      },
+    })
 
-      console.log("[v0] GitHub OAuth redirect URL:", redirectUrl)
-
-      const { data, error } = await supabaseRef.current.auth.linkIdentity({
-        provider: "github",
-        options: {
-          redirectTo: redirectUrl,
-        },
-      })
-
-      if (error) {
-        console.error("Failed to link GitHub identity:", error)
-        return { success: false, error: error.message }
-      }
-
-      console.log("[v0] GitHub OAuth initiated successfully")
-      return { success: true, data }
-    } catch (error: any) {
+    if (error) {
       console.error("Failed to link GitHub identity:", error)
-      return { success: false, error: error.message || "Failed to link GitHub account" }
+      return { success: false, error: error.message }
     }
+
+    return { success: true, data }
   }, [state.isAnonymous])
 
   return {
