@@ -22,8 +22,25 @@ export async function GET(request: Request) {
 
   const { data: afterSession } = await supabase.auth.getSession()
   const afterUserId = afterSession.session?.user.id
+  const user = afterSession.session?.user
 
   if (afterUserId) {
+    if (user && !user.is_anonymous) {
+      const githubIdentity = user.identities?.find((identity) => identity.provider === "github")
+      const githubUsername =
+        githubIdentity?.identity_data?.user_name ||
+        githubIdentity?.identity_data?.preferred_username ||
+        user.user_metadata?.user_name ||
+        user.user_metadata?.preferred_username
+
+      // Only update if we have a GitHub username and display_name is not set or empty
+      if (githubUsername && !user.user_metadata?.display_name) {
+        await supabase.auth.updateUser({
+          data: { display_name: githubUsername },
+        })
+      }
+    }
+
     const migrationUserId = searchParams.get("migration_user_id")
 
     if (migrationUserId && migrationUserId !== afterUserId) {

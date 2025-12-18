@@ -46,7 +46,7 @@ export default function ClientPage() {
   const handleCreateSession = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!username.trim()) {
-      setError("Please enter your name")
+      setError("Please enter your display name")
       return
     }
     if (!userId) {
@@ -288,11 +288,11 @@ export default function ClientPage() {
                   <form onSubmit={handleCreateSession} className="space-y-6">
                     <div className="space-y-3">
                       <Label htmlFor="create-username" className="text-sm font-bold uppercase">
-                        Your Name *
+                        Display Name *
                       </Label>
                       <Input
                         id="create-username"
-                        placeholder="Enter your name"
+                        placeholder="Enter your display name"
                         value={username}
                         onChange={(e) => setUsername(e.target.value)}
                         className="h-12 rounded-xl border-2 border-border bg-background px-4 text-base shadow-sm"
@@ -325,11 +325,11 @@ export default function ClientPage() {
                   <form onSubmit={handleJoinSession} className="space-y-6">
                     <div className="space-y-3">
                       <Label htmlFor="join-username" className="text-sm font-bold uppercase">
-                        Your Name *
+                        Display Name *
                       </Label>
                       <Input
                         id="join-username"
-                        placeholder="Enter your name"
+                        placeholder="Enter your display name"
                         value={username}
                         onChange={(e) => setUsername(e.target.value)}
                         className="h-12 rounded-xl border-2 border-border bg-background px-4 text-base shadow-sm"
