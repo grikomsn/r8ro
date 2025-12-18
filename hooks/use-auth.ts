@@ -149,20 +149,28 @@ export function useAuth() {
     const supabase = createClient()
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
 
-    const { data, error } = await supabase.auth.linkIdentity({
+    if (typeof window !== "undefined" && state.userId) {
+      localStorage.setItem("pending_github_migration", state.userId)
+    }
+
+    const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "github",
       options: {
         redirectTo: `${appUrl}/auth/callback`,
+        skipBrowserRedirect: false,
       },
     })
 
     if (error) {
-      console.error("Failed to link GitHub identity:", error)
+      console.error("Failed to sign in with GitHub:", error)
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("pending_github_migration")
+      }
       return { success: false, error: error.message }
     }
 
     return { success: true, data }
-  }, [state.isAnonymous])
+  }, [state.isAnonymous, state.userId])
 
   return {
     user: state.user,
