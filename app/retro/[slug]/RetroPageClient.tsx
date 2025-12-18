@@ -101,6 +101,138 @@ export default function RetroPageClient() {
     }
   }, [slug, userId, userName])
 
+  useEffect(() => {
+    if (!board?.id) return
+
+    const supabase = createClient()
+
+    // Subscribe to board changes (lock status, title, visibility, timer)
+    const boardChannel = supabase
+      .channel(`board-changes-${board.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "retro_boards",
+          filter: `id=eq.${board.id}`,
+        },
+        (payload) => {
+          if (payload.eventType === "UPDATE") {
+            setBoard((prev) => {
+              if (!prev) return null
+              return { ...prev, ...(payload.new as Partial<RetroBoard>) }
+            })
+          } else if (payload.eventType === "DELETE") {
+            // Board was deleted, redirect to home
+            router.push("/")
+          }
+        },
+      )
+      .subscribe()
+
+    // Subscribe to card changes (INSERT, UPDATE, DELETE)
+    const cardsChannel = supabase
+      .channel(`cards-changes-${board.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "retro_cards",
+          filter: `board_id=eq.${board.id}`,
+        },
+        (payload) => {
+          const newCard = payload.new as RetroCard
+          setCards((prev) => {
+            // Avoid duplicates from optimistic updates
+            if (prev.find((c) => c.id === newCard.id)) return prev
+            return [...prev, newCard]
+          })
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "retro_cards",
+          filter: `board_id=eq.${board.id}`,
+        },
+        (payload) => {
+          const updatedCard = payload.new as RetroCard
+          setCards((prev) => prev.map((c) => (c.id === updatedCard.id ? updatedCard : c)))
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "retro_cards",
+          filter: `board_id=eq.${board.id}`,
+        },
+        (payload) => {
+          const deletedCard = payload.old as RetroCard
+          setCards((prev) => prev.filter((c) => c.id !== deletedCard.id))
+        },
+      )
+      .subscribe()
+
+    // Subscribe to participant changes (JOIN, LEAVE, ONLINE status)
+    const participantsChannel = supabase
+      .channel(`participants-changes-${board.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "retro_participants",
+          filter: `board_id=eq.${board.id}`,
+        },
+        (payload) => {
+          const newParticipant = payload.new as RetroParticipant
+          setParticipants((prev) => {
+            if (prev.find((p) => p.id === newParticipant.id)) return prev
+            return [...prev, newParticipant]
+          })
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "retro_participants",
+          filter: `board_id=eq.${board.id}`,
+        },
+        (payload) => {
+          const updatedParticipant = payload.new as RetroParticipant
+          setParticipants((prev) => prev.map((p) => (p.id === updatedParticipant.id ? updatedParticipant : p)))
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "DELETE",
+          schema: "public",
+          table: "retro_participants",
+          filter: `board_id=eq.${board.id}`,
+        },
+        (payload) => {
+          const deletedParticipant = payload.old as RetroParticipant
+          setParticipants((prev) => prev.filter((p) => p.id !== deletedParticipant.id))
+        },
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(boardChannel)
+      supabase.removeChannel(cardsChannel)
+      supabase.removeChannel(participantsChannel)
+    }
+  }, [board?.id, router])
+
   const handleJoin = useCallback(
     (username: string) => {
       if (!userId) return
@@ -114,14 +246,12 @@ export default function RetroPageClient() {
   const handleToggleVisibility = useCallback(async () => {
     const b = boardRef.current
     if (!b) return
-    setBoard((p) => (p ? { ...p, is_public: !p.is_public } : null))
     await createClient().from("retro_boards").update({ is_public: !b.is_public }).eq("id", b.id)
   }, [])
 
   const handleToggleLock = useCallback(async () => {
     const b = boardRef.current
     if (!b) return
-    setBoard((p) => (p ? { ...p, is_locked: !p.is_locked } : null))
     await createClient().from("retro_boards").update({ is_locked: !b.is_locked }).eq("id", b.id)
   }, [])
 
@@ -186,7 +316,6 @@ export default function RetroPageClient() {
   const handleEditBoardTitle = useCallback(async (title: string) => {
     const b = boardRef.current
     if (!b) return
-    setBoard((p) => (p ? { ...p, title } : null))
     await createClient().from("retro_boards").update({ title }).eq("id", b.id)
   }, [])
 
@@ -194,15 +323,13 @@ export default function RetroPageClient() {
     const b = boardRef.current
     if (!b) return
     await createClient().from("retro_boards").delete().eq("id", b.id)
-    router.push("/")
-  }, [router])
+  }, [])
 
   const handleTimerToggle = useCallback(async () => {
     const b = boardRef.current
     if (!b) return
     const running = !b.timer_running
     const startedAt = running ? new Date().toISOString() : null
-    setBoard((p) => (p ? { ...p, timer_running: running, timer_started_at: startedAt } : null))
     await createClient()
       .from("retro_boards")
       .update({ timer_running: running, timer_started_at: startedAt })
@@ -212,7 +339,6 @@ export default function RetroPageClient() {
   const handleTimerReset = useCallback(async () => {
     const b = boardRef.current
     if (!b) return
-    setBoard((p) => (p ? { ...p, timer_running: false, timer_seconds: 300, timer_started_at: null } : null))
     await createClient()
       .from("retro_boards")
       .update({ timer_running: false, timer_seconds: 300, timer_started_at: null })
@@ -222,7 +348,6 @@ export default function RetroPageClient() {
   const handleSetTimer = useCallback(async (seconds: number) => {
     const b = boardRef.current
     if (!b) return
-    setBoard((p) => (p ? { ...p, timer_seconds: seconds } : null))
     await createClient().from("retro_boards").update({ timer_seconds: seconds }).eq("id", b.id)
   }, [])
 
