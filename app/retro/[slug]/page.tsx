@@ -33,9 +33,9 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       siteName: "r8ro",
       images: [
         {
-          url: "/opengraph.png",
-          width: 1200,
-          height: 630,
+          url: "/opengraph.jpg",
+          width: 1600,
+          height: 900,
           alt: "r8ro - Real-time Collaborative Retrospectives",
         },
       ],
@@ -44,7 +44,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       card: "summary_large_image",
       title: `${title} - r8ro Retro Session`,
       description: `Join the "${title}" retrospective session on r8ro.`,
-      images: ["/opengraph.png"],
+      images: ["/opengraph.jpg"],
     },
   }
 }

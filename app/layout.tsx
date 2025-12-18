@@ -48,9 +48,9 @@ export const metadata: Metadata = {
     siteName: "r8ro",
     images: [
       {
-        url: "/opengraph.png",
-        width: 1200,
-        height: 630,
+        url: "/opengraph.jpg",
+        width: 1600,
+        height: 900,
         alt: "r8ro - Real-time Collaborative Retrospectives",
       },
     ],
@@ -60,7 +60,7 @@ export const metadata: Metadata = {
     title: "r8ro - Real-time Collaborative Retrospectives",
     description:
       "Create and run effective retrospective sessions with your team. Real-time collaboration, voting, and timer controls.",
-    images: ["/opengraph.png"],
+    images: ["/opengraph.jpg"],
     creator: "@r8ro",
   },
   robots: {
