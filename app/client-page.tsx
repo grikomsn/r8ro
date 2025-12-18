@@ -14,6 +14,7 @@ import { Zap, Users, Clock, Shield, History, X } from "lucide-react"
 import { useAuth } from "@/hooks/use-auth"
 import { getRecentBoards, addRecentBoard, removeRecentBoard, type RecentBoard } from "@/lib/utils/recent-boards"
 import { UserAccountPopover } from "@/components/auth/user-account-popover"
+import { ValidationError, getErrorMessage } from "@/lib/utils/errors"
 
 export default function ClientPage() {
   const router = useRouter()
@@ -45,6 +46,7 @@ export default function ClientPage() {
 
   const handleCreateSession = async (e: React.FormEvent) => {
     e.preventDefault()
+
     if (!username.trim()) {
       setError("Please enter your display name")
       return
@@ -75,37 +77,35 @@ export default function ClientPage() {
         timer_seconds: 0,
       }
 
-      const { error: insertError } = await supabase.from("retro_boards").insert(boardData)
-
-      if (insertError) {
-        throw new Error(insertError.message || "Failed to create board")
-      }
-
-      const { data: boardDataResult, error: boardError } = await supabase
+      const { data: createdBoard, error: insertError } = await supabase
         .from("retro_boards")
-        .select("id")
-        .eq("slug", slug)
+        .insert(boardData)
+        .select("id, slug, title")
         .single()
 
-      if (boardError || !boardDataResult) {
-        throw new Error(boardError?.message || "Failed to fetch created board")
+      if (insertError) {
+        throw new ValidationError("Failed to create board", { error: insertError })
+      }
+
+      if (!createdBoard) {
+        throw new ValidationError("Board creation returned no data")
       }
 
       const { error: participantError } = await supabase.from("retro_participants").insert({
-        board_id: boardDataResult.id,
+        board_id: createdBoard.id,
         user_id: userId,
         username: username.trim(),
         is_online: true,
       })
 
       if (participantError) {
-        throw new Error(participantError.message || "Failed to join as participant")
+        console.error("Failed to join as participant:", participantError)
       }
 
-      addRecentBoard(slug, createForm.title.trim() || "Untitled Retro")
+      addRecentBoard(slug, createdBoard.title)
       router.push(`/retro/${slug}`)
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to create session. Please try again."
+      const errorMessage = getErrorMessage(err)
       setError(errorMessage)
     } finally {
       setIsCreating(false)
@@ -114,6 +114,7 @@ export default function ClientPage() {
 
   const handleJoinSession = async (e: React.FormEvent) => {
     e.preventDefault()
+
     if (!joinForm.slug.trim() || !username.trim()) {
       setError("Please fill in all fields")
       return
@@ -130,24 +131,30 @@ export default function ClientPage() {
       const supabase = createClient()
       const { data: board, error: fetchError } = await supabase
         .from("retro_boards")
-        .select("id, is_public, title")
+        .select("id, is_public, title, slug")
         .eq("slug", joinForm.slug.trim().toLowerCase())
         .single()
 
-      if (fetchError || !board) {
-        setError("Session not found. Check the URL and try again.")
-        return
+      if (fetchError) {
+        if (fetchError.code === "PGRST116") {
+          throw new ValidationError("Session not found. Check the URL and try again.")
+        }
+        throw new ValidationError("Failed to find session", { error: fetchError })
+      }
+
+      if (!board) {
+        throw new ValidationError("Session not found. Check the URL and try again.")
       }
 
       if (username.trim() !== displayName) {
         await updateDisplayName(username.trim())
       }
 
-      addRecentBoard(joinForm.slug.trim().toLowerCase(), board.title)
+      addRecentBoard(board.slug, board.title)
       router.push(`/retro/${joinForm.slug.trim().toLowerCase()}`)
     } catch (err) {
-      console.error(err)
-      setError("Failed to join session. Please try again.")
+      const errorMessage = getErrorMessage(err)
+      setError(errorMessage)
     } finally {
       setIsJoining(false)
     }

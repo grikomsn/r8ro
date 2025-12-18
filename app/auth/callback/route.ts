@@ -13,11 +13,11 @@ export async function GET(request: Request) {
 
   const supabase = await createServerClient()
 
-  const { error } = await supabase.auth.exchangeCodeForSession(code)
+  const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
 
-  if (error) {
-    console.error("Failed to exchange code for session:", error)
-    return NextResponse.redirect(`${origin}/auth/auth-code-error`)
+  if (exchangeError) {
+    console.error("Failed to exchange code for session:", exchangeError)
+    return NextResponse.redirect(`${origin}/auth/auth-code-error?error=${encodeURIComponent(exchangeError.message)}`)
   }
 
   const { data: afterSession } = await supabase.auth.getSession()
@@ -35,7 +35,6 @@ export async function GET(request: Request) {
         user.user_metadata?.user_name ||
         user.user_metadata?.preferred_username
 
-      // Update if we have a GitHub username and display_name is empty/not set
       if (githubUsername && !currentDisplayName) {
         await supabase.auth.updateUser({
           data: { display_name: githubUsername },
@@ -48,15 +47,46 @@ export async function GET(request: Request) {
     if (migrationUserId && migrationUserId !== afterUserId) {
       const admin = createAdminClient()
 
-      await Promise.all([
-        admin.from("retro_boards").update({ author_id: afterUserId }).eq("author_id", migrationUserId),
-        admin.from("retro_cards").update({ author_id: afterUserId }).eq("author_id", migrationUserId),
-        admin.from("retro_participants").update({ user_id: afterUserId }).eq("user_id", migrationUserId),
-      ])
+      try {
+        // Batch all migration queries with Promise.all for better performance
+        const [boardsResult, cardsResult, participantsResult] = await Promise.all([
+          admin.from("retro_boards").update({ author_id: afterUserId }).eq("author_id", migrationUserId).select("id"),
+          admin.from("retro_cards").update({ author_id: afterUserId }).eq("author_id", migrationUserId).select("id"),
+          admin.from("retro_participants").update({ user_id: afterUserId }).eq("user_id", migrationUserId).select("id"),
+        ])
 
-      await admin.auth.admin.deleteUser(migrationUserId).catch(() => {
-        // Ignore deletion errors
-      })
+        // Check for errors in any of the migration operations
+        if (boardsResult.error || cardsResult.error || participantsResult.error) {
+          console.error("Migration error:", {
+            boards: boardsResult.error,
+            cards: cardsResult.error,
+            participants: participantsResult.error,
+          })
+
+          // Attempt rollback - restore original author_id
+          await Promise.all([
+            admin.from("retro_boards").update({ author_id: migrationUserId }).eq("author_id", afterUserId),
+            admin.from("retro_cards").update({ author_id: migrationUserId }).eq("author_id", afterUserId),
+            admin.from("retro_participants").update({ user_id: migrationUserId }).eq("user_id", afterUserId),
+          ])
+
+          return NextResponse.redirect(
+            `${origin}/auth/auth-code-error?error=${encodeURIComponent("Failed to migrate data")}`,
+          )
+        }
+
+        // Only delete the old user if migration succeeded
+        const { error: deleteError } = await admin.auth.admin.deleteUser(migrationUserId)
+        if (deleteError) {
+          console.warn("Failed to delete old anonymous user:", deleteError)
+          // Don't fail the whole operation if cleanup fails
+        }
+      } catch (error) {
+        console.error("Unexpected migration error:", error)
+        return NextResponse.redirect(
+          `${origin}/auth/auth-code-error?error=${encodeURIComponent("Unexpected error during migration")}`,
+        )
+      }
     }
   }
 
