@@ -24,7 +24,9 @@ export function PrivateBoardOverlay({ onGoHome }: PrivateBoardOverlayProps) {
           </p>
           <Button
             onClick={onGoHome}
-            className="w-full border-4 border-foreground bg-primary py-6 text-lg font-black uppercase shadow-md transition-all hover:shadow-lg hover:brightness-105"
+            variant="default"
+            size="xl"
+            className="w-full border-2 border-border font-black uppercase shadow-md transition-all hover:shadow-lg hover:brightness-105 rounded-xl"
           >
             Go Back Home
           </Button>

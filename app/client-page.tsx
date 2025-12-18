@@ -5,12 +5,12 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { createClient } from "@/lib/supabase/client"
 import { generateSlug } from "@/lib/utils/slug"
-import { Zap, Users, Clock, Shield, History, X } from "lucide-react"
+import { History, X, Plus, LogIn } from "lucide-react"
 import { useAuth } from "@/hooks/use-auth"
 import { getRecentBoards, addRecentBoard, removeRecentBoard, type RecentBoard } from "@/lib/utils/recent-boards"
 import { UserAccountPopover } from "@/components/auth/user-account-popover"
@@ -195,178 +195,166 @@ export default function ClientPage() {
           }),
         }}
       />
-      <main className="min-h-screen bg-secondary p-4 md:p-8 flex flex-col items-center justify-center">
-        <div className="w-full max-w-4xl">
-          {userId && (
-            <div className="mb-6 flex justify-end">
-              <UserAccountPopover />
-            </div>
-          )}
-
-          <div className="mb-12 text-center">
-            <h1 className="mb-4 text-5xl font-black uppercase tracking-tight md:text-6xl font-mono">
+      <main className="min-h-screen bg-secondary flex flex-col">
+        {/* Header with branding and account */}
+        <header className="border-b-2 border-border bg-background">
+          <div className="container mx-auto flex h-16 items-center justify-between px-4">
+            <h1 className="text-2xl font-black uppercase tracking-tight font-mono">
               r<span className="text-primary">8</span>ro
             </h1>
-            <p className="mx-auto max-w-2xl text-base font-medium text-foreground/80 md:text-lg">
-              Real-time collaborative retrospectives for agile teams. Brainstorm, vote, and improve together.
-            </p>
+            {userId && <UserAccountPopover />}
           </div>
+        </header>
 
-          <div className="mb-12 grid grid-cols-2 gap-4 md:grid-cols-4">
-            {[
-              { icon: Zap, label: "Real-time Sync" },
-              { icon: Users, label: "Collaborate" },
-              { icon: Clock, label: "Timer Control" },
-              { icon: Shield, label: "Privacy Toggle" },
-            ].map(({ icon: Icon, label }) => (
-              <div
-                key={label}
-                className="flex flex-col items-center gap-3 rounded-xl border-2 border-border bg-background p-6 shadow-sm"
-              >
-                <Icon className="h-8 w-8" />
-                <span className="text-center text-sm font-bold uppercase">{label}</span>
-              </div>
-            ))}
-          </div>
-
-          {recentBoards.length > 0 && (
-            <Card className="mb-8 rounded-2xl border-2 border-border shadow-md overflow-hidden p-0 gap-0">
-              <CardHeader className="border-b-2 border-border bg-muted px-6 py-4">
-                <CardTitle className="flex items-center gap-2 text-lg font-bold uppercase">
+        {/* Main content area */}
+        <div className="flex-1 flex flex-col items-center justify-center p-4 md:p-8">
+          <div className="w-full max-w-2xl space-y-6">
+            {/* Recent boards section */}
+            {recentBoards.length > 0 && (
+              <Card className="rounded-2xl border-2 border-border shadow-md overflow-hidden p-0 gap-0">
+                <div className="border-b-2 border-border bg-muted px-6 py-4 flex items-center gap-2">
                   <History className="h-5 w-5" />
-                  Recent Boards
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="p-6">
-                <div className="flex flex-wrap gap-3">
-                  {recentBoards.map((board) => (
-                    <a
-                      key={board.slug}
-                      href={`/retro/${board.slug}`}
-                      className="group flex items-center gap-2 rounded-lg border-2 border-border bg-background px-4 py-3 font-bold shadow-sm transition-all hover:shadow-md hover:border-primary"
-                    >
-                      <span className="truncate max-w-[150px]">{board.title}</span>
-                      <span className="text-xs text-muted-foreground">({board.slug})</span>
-                      <button
-                        onClick={(e) => handleRemoveRecent(board.slug, e)}
-                        className="ml-1 opacity-0 transition-opacity group-hover:opacity-100"
-                      >
-                        <X className="h-4 w-4 text-muted-foreground hover:text-primary" />
-                      </button>
-                    </a>
-                  ))}
+                  <h2 className="text-base font-bold uppercase">Recent</h2>
                 </div>
+                <CardContent className="p-4">
+                  <div className="grid gap-2">
+                    {recentBoards.map((board) => (
+                      <a
+                        key={board.slug}
+                        href={`/retro/${board.slug}`}
+                        className="group flex items-center justify-between rounded-xl border-2 border-border bg-background px-4 py-3 font-bold shadow-sm transition-all hover:shadow-md hover:border-primary"
+                      >
+                        <div className="flex flex-col gap-1 min-w-0">
+                          <span className="truncate">{board.title}</span>
+                          <span className="text-xs text-muted-foreground font-mono">{board.slug}</span>
+                        </div>
+                        <button
+                          onClick={(e) => handleRemoveRecent(board.slug, e)}
+                          className="ml-2 opacity-0 transition-opacity group-hover:opacity-100 shrink-0"
+                          aria-label="Remove from recent"
+                        >
+                          <X className="h-4 w-4 text-muted-foreground hover:text-primary" />
+                        </button>
+                      </a>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Main action card */}
+            <Card className="rounded-2xl shadow-lg overflow-hidden p-0 gap-0 border-0">
+              <CardContent className="p-0">
+                <Tabs defaultValue="create" className="w-full">
+                  <TabsList className="grid h-auto w-full grid-cols-2 p-0 rounded-tl-2xl rounded-tr-2xl bg-muted">
+                    <TabsTrigger
+                      value="create"
+                      className="rounded-tl-xl rounded-tr-none rounded-br-none rounded-bl-none border-2 border-border py-4 text-base font-bold uppercase data-[state=active]:border-primary data-[state=active]:bg-background data-[state=active]:text-foreground gap-2"
+                    >
+                      <Plus className="h-5 w-5" />
+                      Create
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="join"
+                      className="rounded-tl-none rounded-tr-xl rounded-br-none rounded-bl-none border-2 border-border py-4 text-base font-bold uppercase data-[state=active]:border-accent data-[state=active]:bg-background data-[state=active]:text-foreground gap-2"
+                    >
+                      <LogIn className="h-5 w-5" />
+                      Join
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="create" className="p-6 md:p-8 mt-0">
+                    <form onSubmit={handleCreateSession} className="space-y-5">
+                      <div className="space-y-2">
+                        <Label htmlFor="create-username" className="text-sm font-bold uppercase">
+                          Your Name
+                        </Label>
+                        <Input
+                          id="create-username"
+                          placeholder="Enter your name"
+                          value={username}
+                          onChange={(e) => setUsername(e.target.value)}
+                          className="h-12 rounded-xl border-2 border-border bg-background px-4 text-base shadow-sm"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="create-title" className="text-sm font-bold uppercase text-muted-foreground">
+                          Session Title <span className="text-xs">(Optional)</span>
+                        </Label>
+                        <Input
+                          id="create-title"
+                          placeholder="Sprint 42 Retro"
+                          value={createForm.title}
+                          onChange={(e) => setCreateForm({ ...createForm, title: e.target.value })}
+                          className="h-12 rounded-xl border-2 border-border bg-background px-4 text-base shadow-sm"
+                        />
+                      </div>
+                      {error && (
+                        <div className="rounded-xl border-2 border-primary/20 bg-primary/10 px-4 py-3">
+                          <p className="text-sm font-bold text-primary">{error}</p>
+                        </div>
+                      )}
+                      <Button
+                        type="submit"
+                        disabled={isCreating || authLoading || !userId}
+                        variant="default"
+                        size="xl"
+                        className="w-full border-2 border-border font-bold uppercase shadow-md transition-all hover:shadow-lg rounded-xl"
+                      >
+                        {isCreating ? "Creating..." : "Start New Retro"}
+                      </Button>
+                    </form>
+                  </TabsContent>
+
+                  <TabsContent value="join" className="p-6 md:p-8 mt-0">
+                    <form onSubmit={handleJoinSession} className="space-y-5">
+                      <div className="space-y-2">
+                        <Label htmlFor="join-username" className="text-sm font-bold uppercase">
+                          Your Name
+                        </Label>
+                        <Input
+                          id="join-username"
+                          placeholder="Enter your name"
+                          value={username}
+                          onChange={(e) => setUsername(e.target.value)}
+                          className="h-12 rounded-xl border-2 border-border bg-background px-4 text-base shadow-sm"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="join-slug" className="text-sm font-bold uppercase">
+                          Session Code
+                        </Label>
+                        <Input
+                          id="join-slug"
+                          placeholder="swift-falcon-123"
+                          value={joinForm.slug}
+                          onChange={(e) => setJoinForm({ ...joinForm, slug: e.target.value })}
+                          className="h-12 rounded-xl border-2 border-border bg-background px-4 text-base font-mono shadow-sm"
+                          required
+                        />
+                      </div>
+                      {error && (
+                        <div className="rounded-xl border-2 border-primary/20 bg-primary/10 px-4 py-3">
+                          <p className="text-sm font-bold text-primary">{error}</p>
+                        </div>
+                      )}
+                      <Button
+                        type="submit"
+                        disabled={isJoining || authLoading || !userId}
+                        variant="default"
+                        size="xl"
+                        className="w-full border-2 border-border font-bold uppercase shadow-md transition-all hover:shadow-lg rounded-xl"
+                      >
+                        {isJoining ? "Joining..." : "Join Session"}
+                      </Button>
+                    </form>
+                  </TabsContent>
+                </Tabs>
               </CardContent>
             </Card>
-          )}
-
-          <Card className="rounded-2xl border-2 border-border shadow-lg overflow-hidden p-0 gap-0">
-            <CardHeader className="border-b-2 border-border bg-primary px-6 py-5 text-primary-foreground">
-              <CardTitle className="text-2xl font-bold uppercase">Get Started</CardTitle>
-              <CardDescription className="text-base text-primary-foreground/80">
-                Create a new retro or join an existing session
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-              <Tabs defaultValue="create" className="w-full">
-                <TabsList className="grid h-auto w-full grid-cols-2 border-b-2 border-border p-0 rounded-none">
-                  <TabsTrigger
-                    value="create"
-                    className="rounded-none border-b-2 border-transparent py-5 text-base font-bold uppercase data-[state=active]:border-accent data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"
-                  >
-                    Create Session
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="join"
-                    className="rounded-none border-b-2 border-transparent py-5 text-base font-bold uppercase data-[state=active]:border-accent data-[state=active]:bg-accent data-[state=active]:text-accent-foreground"
-                  >
-                    Join Session
-                  </TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="create" className="p-8 md:p-10">
-                  <form onSubmit={handleCreateSession} className="space-y-6">
-                    <div className="space-y-3">
-                      <Label htmlFor="create-username" className="text-sm font-bold uppercase">
-                        Your Name *
-                      </Label>
-                      <Input
-                        id="create-username"
-                        placeholder="Enter your name"
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
-                        className="h-12 rounded-xl border-2 border-border bg-background px-4 text-base shadow-sm"
-                        required
-                      />
-                    </div>
-                    <div className="space-y-3">
-                      <Label htmlFor="create-title" className="text-sm font-bold uppercase">
-                        Session Title (optional)
-                      </Label>
-                      <Input
-                        id="create-title"
-                        placeholder="Sprint 42 Retro"
-                        value={createForm.title}
-                        onChange={(e) => setCreateForm({ ...createForm, title: e.target.value })}
-                        className="h-12 rounded-xl border-2 border-border bg-background px-4 text-base shadow-sm"
-                      />
-                    </div>
-                    <Button
-                      type="submit"
-                      disabled={isCreating || authLoading || !userId}
-                      className="w-full rounded-xl border-2 border-border bg-primary py-6 text-base font-bold uppercase shadow-md transition-all hover:shadow-lg hover:brightness-105"
-                    >
-                      {isCreating ? "Creating..." : "Create New Retro"}
-                    </Button>
-                  </form>
-                </TabsContent>
-
-                <TabsContent value="join" className="p-8 md:p-10">
-                  <form onSubmit={handleJoinSession} className="space-y-6">
-                    <div className="space-y-3">
-                      <Label htmlFor="join-username" className="text-sm font-bold uppercase">
-                        Your Name *
-                      </Label>
-                      <Input
-                        id="join-username"
-                        placeholder="Enter your name"
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
-                        className="h-12 rounded-xl border-2 border-border bg-background px-4 text-base shadow-sm"
-                        required
-                      />
-                    </div>
-                    <div className="space-y-3">
-                      <Label htmlFor="join-slug" className="text-sm font-bold uppercase">
-                        Session URL or Slug *
-                      </Label>
-                      <Input
-                        id="join-slug"
-                        placeholder="swift-falcon-123"
-                        value={joinForm.slug}
-                        onChange={(e) => setJoinForm({ ...joinForm, slug: e.target.value })}
-                        className="h-12 rounded-xl border-2 border-border bg-background px-4 text-base shadow-sm"
-                        required
-                      />
-                    </div>
-                    <Button
-                      type="submit"
-                      disabled={isJoining || authLoading || !userId}
-                      className="w-full rounded-xl border-2 border-border bg-accent py-6 text-base font-bold uppercase text-accent-foreground shadow-md transition-all hover:shadow-lg hover:brightness-105"
-                    >
-                      {isJoining ? "Joining..." : "Join Session"}
-                    </Button>
-                  </form>
-                </TabsContent>
-              </Tabs>
-
-              {error && (
-                <div className="border-t-2 border-border bg-primary/20 p-6">
-                  <p className="text-sm font-bold text-primary">{error}</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          </div>
         </div>
       </main>
     </>

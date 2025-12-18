@@ -280,10 +280,11 @@ export default function RetroPageClient() {
         onTimerToggle={handleTimerToggle}
         onTimerReset={handleTimerReset}
         onSetTimer={handleSetTimer}
-        onEditTitle={handleEditBoardTitle}
+        onTitleUpdate={handleEditBoardTitle}
         showSidebar={showSidebar}
         onToggleSidebar={() => setShowSidebar(!showSidebar)}
         participantCount={participants.length}
+        currentUserId={userId}
       />
       <div className="relative flex flex-1 overflow-x-hidden">
         {/* Main content area */}

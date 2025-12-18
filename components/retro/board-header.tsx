@@ -285,7 +285,7 @@ export function BoardHeader({
               r<span className="text-primary">8</span>ro
             </h1>
             {currentUserId && <UserAccountPopover variant="compact" />}
-            <div className="hidden border-l-2 border-border pl-4 lg:block">
+            <div className="hidden border-l-2 border-border pl-4 sm:block">
               {isEditingTitle ? (
                 <div className="flex items-center gap-2" role="form" aria-label="Edit board title">
                   <Input
@@ -300,7 +300,9 @@ export function BoardHeader({
                     <TooltipTrigger asChild>
                       <Button
                         onClick={saveTitle}
-                        className="h-8 w-8 p-0 border border-border bg-foreground text-background rounded-lg"
+                        variant="inverse"
+                        size="icon-sm"
+                        className="rounded-lg"
                         aria-label="Save title"
                       >
                         <Check className="h-4 w-4" aria-hidden="true" />
@@ -314,7 +316,8 @@ export function BoardHeader({
                       <Button
                         variant="outline"
                         onClick={cancelTitleEdit}
-                        className="h-8 w-8 p-0 border border-border bg-transparent rounded-lg"
+                        size="icon-sm"
+                        className="rounded-lg bg-transparent"
                         aria-label="Cancel editing"
                       >
                         <X className="h-4 w-4" aria-hidden="true" />
@@ -326,13 +329,19 @@ export function BoardHeader({
                 </div>
               ) : (
                 <div className="group flex items-center gap-2">
-                  <h1 className="text-lg font-bold">{board.title}</h1>
+                  <h1
+                    className={`text-lg font-bold ${isAuthor ? "cursor-pointer hover:text-primary transition-colors" : ""}`}
+                    onClick={() => isAuthor && setIsEditingTitle(true)}
+                  >
+                    {board.title}
+                  </h1>
                   {isAuthor && (
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
                           variant="ghost"
                           onClick={() => setIsEditingTitle(true)}
+                          size="icon-sm"
                           className="h-6 w-6 p-0 opacity-0 transition-opacity group-hover:opacity-100 rounded-lg"
                           aria-label="Edit board title"
                         >
@@ -340,7 +349,7 @@ export function BoardHeader({
                           <span className="sr-only">Edit board title</span>
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent>Edit title</TooltipContent>
+                      <TooltipContent>Edit title (click or press Enter)</TooltipContent>
                     </Tooltip>
                   )}
                 </div>
@@ -374,7 +383,8 @@ export function BoardHeader({
                     <Button
                       variant="outline"
                       onClick={onTimerToggle}
-                      className="h-10 w-10 p-0 border-2 border-border shadow-sm bg-transparent rounded-lg"
+                      size="icon-lg"
+                      className="rounded-lg bg-transparent"
                       aria-label={board.timer_running ? "Pause timer" : "Start timer"}
                       aria-pressed={board.timer_running}
                     >
@@ -393,7 +403,8 @@ export function BoardHeader({
                     <Button
                       variant="outline"
                       onClick={handleTimerReset}
-                      className="hidden h-10 w-10 p-0 border-2 border-border shadow-sm bg-transparent sm:flex rounded-lg"
+                      size="icon-lg"
+                      className="hidden sm:flex rounded-lg bg-transparent"
                       aria-label="Reset timer"
                     >
                       <RotateCcw className="h-4 w-4" aria-hidden="true" />
@@ -408,7 +419,8 @@ export function BoardHeader({
                       <DropdownMenuTrigger asChild>
                         <Button
                           variant="outline"
-                          className="hidden h-10 w-10 p-0 border-2 border-border shadow-sm bg-transparent sm:flex rounded-lg"
+                          size="icon-lg"
+                          className="hidden sm:flex rounded-lg bg-transparent"
                           aria-label="Timer settings"
                         >
                           <Settings className="h-4 w-4" aria-hidden="true" />
@@ -437,10 +449,7 @@ export function BoardHeader({
                           aria-labelledby="timer-input-label"
                           min="1"
                         />
-                        <Button
-                          onClick={handleSetTimer}
-                          className="h-10 border border-border bg-accent font-bold text-accent-foreground rounded-lg"
-                        >
+                        <Button onClick={handleSetTimer} variant="accent" size="lg" className="rounded-lg">
                           Set
                         </Button>
                       </div>
@@ -471,7 +480,8 @@ export function BoardHeader({
                   <Button
                     variant="outline"
                     onClick={onToggleSidebar}
-                    className="relative h-9 border-2 border-border font-bold shadow-sm bg-transparent xl:hidden md:h-10 rounded-lg"
+                    size="lg"
+                    className="relative xl:hidden rounded-lg bg-transparent"
                     aria-label={`Participants (${participantCount})`}
                     aria-expanded={showSidebar}
                   >
@@ -496,7 +506,8 @@ export function BoardHeader({
                 <Button
                   variant="outline"
                   onClick={() => {}}
-                  className="h-9 border-2 border-border font-bold shadow-sm bg-transparent md:h-10 rounded-lg"
+                  size="lg"
+                  className="rounded-lg"
                   aria-label="Share options"
                 >
                   {shareStatus ? (
@@ -530,7 +541,8 @@ export function BoardHeader({
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="outline"
-                    className="h-9 border-2 border-border font-bold shadow-sm bg-transparent md:h-10 rounded-lg"
+                    size="lg"
+                    className="rounded-lg bg-transparent"
                     aria-label="Board management options"
                     aria-haspopup="menu"
                   >
@@ -580,9 +592,8 @@ export function BoardHeader({
 
             <Button
               variant={board.is_public ? "outline" : "secondary"}
-              className={`h-9 border-2 font-bold shadow-sm md:h-10 rounded-lg ${
-                board.is_public ? "border-border bg-transparent" : "border-chart-4 bg-chart-4"
-              }`}
+              size="lg"
+              className={`rounded-lg ${board.is_public ? "border-border bg-transparent" : "border-chart-4 bg-chart-4"}`}
               aria-label={board.is_public ? "Board is public" : "Board is private"}
               aria-pressed={!board.is_public}
             >

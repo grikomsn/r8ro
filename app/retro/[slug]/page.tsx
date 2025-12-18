@@ -1,17 +1,23 @@
 import type { Metadata } from "next"
 import RetroPageClient from "./RetroPageClient"
+import { createClient } from "@/lib/supabase/server"
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params
 
-  const formattedTitle = slug
-    .split("-")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ")
+  const supabase = await createClient()
+  const { data: board } = await supabase.from("retro_boards").select("title").eq("slug", slug).single()
+
+  const title =
+    board?.title ||
+    slug
+      .split("-")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ")
 
   return {
-    title: `${formattedTitle} - Retro Session`,
-    description: `Join the "${formattedTitle}" retrospective session on r8ro. Collaborate in real-time with your team on sprint retrospectives and action items.`,
+    title: `${title} - Retro Session`,
+    description: `Join the "${title}" retrospective session on r8ro. Collaborate in real-time with your team on sprint retrospectives and action items.`,
     robots: {
       index: false,
       follow: false,
@@ -21,8 +27,8 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       },
     },
     openGraph: {
-      title: `${formattedTitle} - r8ro Retro Session`,
-      description: `Join the "${formattedTitle}" retrospective session. Collaborate in real-time with your team.`,
+      title: `${title} - r8ro Retro Session`,
+      description: `Join the "${title}" retrospective session. Collaborate in real-time with your team.`,
       type: "website",
       siteName: "r8ro",
       images: [
@@ -36,8 +42,8 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     },
     twitter: {
       card: "summary_large_image",
-      title: `${formattedTitle} - r8ro Retro Session`,
-      description: `Join the "${formattedTitle}" retrospective session on r8ro.`,
+      title: `${title} - r8ro Retro Session`,
+      description: `Join the "${title}" retrospective session on r8ro.`,
       images: ["/opengraph.png"],
     },
   }

@@ -63,7 +63,9 @@ export function JoinModal({ onJoin }: JoinModalProps) {
             <Button
               type="submit"
               disabled={isSubmitting || !isInitialized}
-              className="w-full rounded-xl border-2 border-border bg-primary py-6 text-base font-bold uppercase shadow-md transition-all hover:shadow-lg"
+              variant="default"
+              size="xl"
+              className="w-full border-2 border-border font-bold uppercase shadow-md transition-all hover:shadow-lg rounded-xl"
             >
               {isSubmitting ? "Joining..." : "Join Retro"}
             </Button>

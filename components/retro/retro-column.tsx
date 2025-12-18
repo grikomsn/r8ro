@@ -184,10 +184,7 @@ export function RetroColumn({
               aria-label="Card content"
             />
             <div className="flex gap-2">
-              <Button
-                onClick={handleSubmit}
-                className="flex-1 h-10 border border-border bg-foreground font-bold text-background rounded-lg"
-              >
+              <Button onClick={handleSubmit} variant="inverse" size="lg" className="flex-1 rounded-lg">
                 Add
               </Button>
               <TooltipProvider>
@@ -252,10 +249,7 @@ export function RetroColumn({
                         aria-label="Edit card content"
                       />
                       <div className="flex gap-2">
-                        <Button
-                          onClick={saveEdit}
-                          className="h-8 flex-1 border border-border bg-foreground text-xs font-bold text-background rounded-lg"
-                        >
+                        <Button onClick={saveEdit} variant="inverse" size="sm" className="flex-1 rounded-lg">
                           <Check className="mr-1 h-3 w-3" aria-hidden="true" />
                           Save
                         </Button>
@@ -265,7 +259,8 @@ export function RetroColumn({
                               <Button
                                 variant="outline"
                                 onClick={cancelEdit}
-                                className="h-8 border border-border bg-transparent rounded-lg"
+                                size="icon-sm"
+                                className="rounded-lg bg-transparent"
                                 aria-label="Cancel editing"
                               >
                                 <X className="h-3 w-3" aria-hidden="true" />
@@ -292,7 +287,8 @@ export function RetroColumn({
                           <Button
                             variant="ghost"
                             onClick={() => startEditing(card)}
-                            className="h-8 w-8 p-0 opacity-0 transition-opacity group-hover:opacity-100 rounded-lg"
+                            size="icon-sm"
+                            className="opacity-0 transition-opacity group-hover:opacity-100 rounded-lg"
                             aria-label="Edit card"
                           >
                             <Pencil className="h-4 w-4" aria-hidden="true" />
@@ -310,7 +306,8 @@ export function RetroColumn({
                           <Button
                             variant="ghost"
                             onClick={() => onDeleteCard(card.id)}
-                            className="h-8 w-8 p-0 opacity-0 transition-opacity group-hover:opacity-100 rounded-lg"
+                            size="icon-sm"
+                            className="opacity-0 transition-opacity group-hover:opacity-100 rounded-lg"
                             aria-label="Delete card"
                           >
                             <Trash2 className="h-4 w-4 text-primary" aria-hidden="true" />
@@ -327,7 +324,8 @@ export function RetroColumn({
                         <Button
                           variant="outline"
                           onClick={() => onVoteCard(card.id, card.votes)}
-                          className="h-8 px-2 border border-border font-bold shadow-sm transition-all hover:bg-secondary rounded-lg"
+                          size="sm"
+                          className="rounded-lg"
                           aria-label={`Vote for this card. Current votes: ${card.votes}`}
                         >
                           <ThumbsUp className="mr-1 h-3 w-3" aria-hidden="true" />
