@@ -410,8 +410,6 @@ export default function RetroPageClient() {
         onToggleSidebar={() => setShowSidebar(!showSidebar)}
         participantCount={participants.length}
         currentUserId={userId}
-        cards={cards}
-        participants={participants}
       />
       <div className="relative flex flex-1 overflow-x-hidden">
         {/* Main content area */}

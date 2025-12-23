@@ -152,13 +152,6 @@ export function useAuth() {
   const updateDisplayName = useCallback(async (newName: string) => {
     const trimmedName = newName.trim()
 
-    const { data: sessionData } = await supabaseRef.current.auth.getSession()
-
-    if (!sessionData.session) {
-      console.error("Failed to update display name: Auth session missing!")
-      return false
-    }
-
     const { data, error } = await supabaseRef.current.auth.updateUser({
       data: { display_name: trimmedName },
     })
