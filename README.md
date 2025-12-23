@@ -1,30 +1,272 @@
 # r8ro
 
-*Automatically synced with your [v0.app](https://v0.app) deployments*
+Realtime collaborative retrospective boards. Anonymous-first with GitHub auth binding.
 
-[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/nibras-enterprises/v0-r8ro)
-[![Built with v0](https://img.shields.io/badge/Built%20with-v0.app-black?style=for-the-badge)](https://v0.app/chat/vz2kiOcpA0u)
+![Homepage](docs/images/homepage.png)
+![Board](docs/images/board-with-content.png)
 
-## Overview
+## Features
 
-This repository will stay in sync with your deployed chats on [v0.app](https://v0.app).
-Any changes you make to your deployed app will be automatically pushed to this repository from [v0.app](https://v0.app).
+### Core
+
+- **Anonymous-first auth** — Auto sign-in as guest, optional GitHub binding to preserve identity
+- **Realtime collaboration** — Live updates for cards, votes, participants via Supabase Realtime
+- **3-column retro format** — Went Well / To Improve / Action Items
+- **Vote tracking** — Toggle votes on cards, prevents duplicates, tracks per user
+- **Timer** — Built-in session timer with play/pause/reset
+- **Recent boards** — Local history of visited boards
+
+### Access Control
+
+- **Public boards** — Anyone can join, add cards, vote
+- **Private boards** — Only previous participants can access
+- **Locked boards** — Author-only write, everyone else read-only
+- **Author privileges** — Only authors can delete their boards
+
+### Permissions Matrix
+
+| Action           | Public        | Private           | Locked            | Author |
+| ---------------- | ------------- | ----------------- | ----------------- | ------ |
+| View board       | Anyone authed | Participants only | Participants only | ✓      |
+| Join board       | ✓             | ✗                 | ✗                 | ✓      |
+| Add cards        | ✓             | Participants      | Author only       | ✓      |
+| Edit own cards   | ✓             | Participants      | Author only       | ✓      |
+| Delete own cards | ✓             | Participants      | Author only       | ✓      |
+| Vote             | ✓             | Participants      | Read-only         | ✓      |
+| Delete board     | ✗             | ✗                 | ✗                 | ✓      |
+
+## Tech Stack
+
+- **Framework** — Next.js 16 (App Router) + React 19
+- **Language** — TypeScript
+- **Styling** — Tailwind CSS 4 + shadcn/ui
+- **Database** — Supabase (PostgreSQL + Realtime + Auth)
+- **Deployment** — Vercel
+
+## Architecture
+
+### Authentication Flow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant App
+    participant Supabase
+
+    User->>App: Visit site
+    App->>Supabase: signInAnonymously()
+    Supabase-->>App: Anonymous UUID
+    App->>User: Signed in as Guest
+
+    opt Link to GitHub
+        User->>App: Click "Sign in with GitHub"
+        App->>Supabase: linkIdentity(GitHub)
+        Supabase-->>App: Same UUID, now linked
+        App->>User: GitHub identity preserved
+    end
+```
+
+### Data Model
+
+```mermaid
+erDiagram
+    retro_boards ||--o{ retro_cards : contains
+    retro_boards ||--o{ retro_participants : has
+    retro_cards ||--o{ retro_card_votes : receives
+    auth_users ||--o{ retro_boards : authors
+    auth_users ||--o{ retro_cards : authors
+    auth_users ||--o{ retro_participants : joins
+    auth_users ||--o{ retro_card_votes : casts
+
+    retro_boards {
+        uuid id PK
+        text slug UK
+        text title
+        uuid author_id FK
+        text author_name
+        bool is_public
+        bool is_locked
+        bool timer_running
+        int timer_seconds
+        timestamptz timer_started_at
+    }
+
+    retro_cards {
+        uuid id PK
+        uuid board_id FK
+        text column_type
+        text content
+        uuid author_id FK
+        text author_name
+    }
+
+    retro_participants {
+        uuid id PK
+        uuid board_id FK
+        uuid user_id FK
+        text username
+        bool is_online
+    }
+
+    retro_card_votes {
+        uuid id PK
+        uuid card_id FK
+        uuid user_id FK
+    }
+```
+
+### User Flow
+
+```mermaid
+flowchart TD
+    Start([User visits site]) --> AutoAuth[Auto sign-in anonymous]
+    AutoAuth --> HomePage[Homepage with CREATE/JOIN]
+
+    HomePage --> Create[Click CREATE]
+    HomePage --> Join[Click JOIN with slug]
+
+    Create --> EnterName[Enter name + optional title]
+    EnterName --> NewBoard[Navigate to /retro/slug]
+
+    Join --> EnterSlug[Enter board slug]
+    EnterSlug --> CheckAccess{RLS check access}
+    CheckAccess -->|Public or participant| ExistingBoard[Navigate to /retro/slug]
+    CheckAccess -->|Denied| Error[Error: Access denied]
+
+    NewBoard --> BoardView[Board view]
+    ExistingBoard --> BoardView
+
+    BoardView --> Actions{User actions}
+    Actions --> AddCard[Add card to column]
+    Actions --> VoteCard[Toggle vote on card]
+    Actions --> EditCard[Edit/delete own card]
+    Actions --> ManageBoard[Manage settings]
+    Actions --> ShareBoard[Share link]
+
+    AddCard --> Realtime[Supabase Realtime broadcast]
+    VoteCard --> Realtime
+    EditCard --> Realtime
+    ManageBoard --> Realtime
+
+    Realtime --> AllClients[All connected clients update]
+```
+
+### RLS Policy Architecture
+
+```mermaid
+flowchart TD
+    Request[Client request] --> RLS{RLS Policy Check}
+
+    RLS --> CheckAuth{auth.uid exists?}
+    CheckAuth -->|No| Deny[DENY]
+    CheckAuth -->|Yes| CheckTable{Which table?}
+
+    CheckTable -->|retro_boards| BoardPolicy[Board access policy]
+    CheckTable -->|retro_cards| CardPolicy[Card access policy]
+    CheckTable -->|retro_participants| ParticipantPolicy[Participant policy]
+    CheckTable -->|retro_card_votes| VotePolicy[Vote policy]
+
+    BoardPolicy --> CheckBoardAccess{Public OR Author OR Participant?}
+    CheckBoardAccess -->|Yes| Allow[ALLOW]
+    CheckBoardAccess -->|No| Deny
+
+    CardPolicy --> CheckCardAccess{Board accessible AND Locked check}
+    CheckCardAccess -->|Pass| Allow
+    CheckCardAccess -->|Fail| Deny
+
+    ParticipantPolicy --> HelperFunc[can_access_board function]
+    HelperFunc -->|True| Allow
+    HelperFunc -->|False| Deny
+
+    VotePolicy --> CheckVoteAccess{Board accessible AND Not locked}
+    CheckVoteAccess -->|Yes| Allow
+    CheckVoteAccess -->|No| Deny
+```
+
+## Project Structure
+
+```
+r8ro/
+├── app/
+│   ├── new/route.ts              # Board creation API
+│   ├── retro/[slug]/
+│   │   ├── page.tsx              # Board page (server)
+│   │   └── RetroPageClient.tsx   # Board UI (client + realtime)
+│   └── client-page.tsx           # Homepage
+├── components/
+│   ├── ui/                       # shadcn/ui primitives
+│   └── retro/                    # Retro board components
+│       ├── retro-column.tsx      # Column with cards
+│       ├── retro-card.tsx        # Individual card
+│       └── ...
+├── hooks/
+│   └── use-auth.ts               # Auth state hook
+├── lib/
+│   ├── supabase/
+│   │   ├── client.ts             # Browser client
+│   │   ├── server.ts             # Server client
+│   │   └── proxy.ts              # Proxy for env vars
+│   ├── types.ts                  # TypeScript types
+│   └── utils/
+│       └── slug.ts               # Slug generation
+└── supabase/
+    ├── schema.sql                # Complete schema dump
+    ├── RLS_POLICIES.md           # RLS documentation
+    └── README.md                 # Schema overview
+```
+
+## Development
+
+### Setup
+
+```bash
+# Install dependencies
+pnpm install
+
+# Set up environment variables
+cp .env.example .env.local
+# Add your Supabase URL and anon key
+
+# Run dev server
+pnpm dev
+```
+
+### Environment Variables
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+### Database Setup
+
+Apply schema from `supabase/schema.sql`:
+
+```bash
+# Using Supabase CLI
+supabase db reset
+
+# Or apply manually via Supabase Dashboard
+# Copy contents of supabase/schema.sql to SQL Editor
+```
+
+### Commands
+
+- `pnpm dev` — Start dev server
+- `pnpm build` — Production build
+- `pnpm lint` — Run ESLint
 
 ## Deployment
 
-Your project is live at:
+Deployed on Vercel: [vercel.com/nibras-enterprises/v0-r8ro](https://vercel.com/nibras-enterprises/v0-r8ro)
 
-**[https://vercel.com/nibras-enterprises/v0-r8ro](https://vercel.com/nibras-enterprises/v0-r8ro)**
+Configure environment variables in Vercel dashboard before deploying.
 
-## Build your app
+## Security
 
-Continue building your app on:
+- All tables protected by Row Level Security (RLS)
+- Helper function `can_access_board()` prevents recursion in participant checks
+- Policies optimized with `(SELECT auth.uid())` pattern for performance
+- Anonymous users get full Supabase Auth UUIDs (can be upgraded to GitHub)
 
-**[https://v0.app/chat/vz2kiOcpA0u](https://v0.app/chat/vz2kiOcpA0u)**
-
-## How It Works
-
-1. Create and modify your project using [v0.app](https://v0.app)
-2. Deploy your chats from the v0 interface
-3. Changes are automatically pushed to this repository
-4. Vercel deploys the latest version from this repository
+See [`supabase/RLS_POLICIES.md`](supabase/RLS_POLICIES.md) for detailed policy documentation.
