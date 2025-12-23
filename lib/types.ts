@@ -34,3 +34,36 @@ export interface RetroParticipant {
 }
 
 export type ColumnType = "went_well" | "to_improve" | "action_items";
+
+export interface PokerSession {
+  id: string;
+  slug: string;
+  title: string;
+  author_id: string;
+  author_name: string;
+  voting_scale: string[];
+  current_story: string | null;
+  votes_revealed: boolean;
+  is_voting_active: boolean;
+  is_public: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PokerParticipant {
+  id: string;
+  session_id: string;
+  user_id: string;
+  username: string;
+  is_online: boolean;
+  is_observer: boolean;
+  joined_at: string;
+}
+
+export interface PokerVote {
+  id: string;
+  session_id: string;
+  user_id: string;
+  vote_value: string;
+  created_at: string;
+}
