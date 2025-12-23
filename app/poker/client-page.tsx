@@ -100,7 +100,7 @@ export default function PokerClientPage() {
         voting_scale: votingScale,
         is_public: true,
         votes_revealed: false,
-        is_voting_active: false,
+        is_voting_active: true,
       };
 
       const { error: insertError } = await supabase
