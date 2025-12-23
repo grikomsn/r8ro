@@ -1,17 +1,17 @@
-"use client"
+"use client";
 
-import type React from "react"
-import { UserAccountPopover } from "@/components/auth/user-account-popover"
-import { useState, useEffect, useRef } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import type React from "react";
+import { UserAccountPopover } from "@/components/auth/user-account-popover";
+import { useState, useEffect, useRef } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,9 +21,14 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import type { RetroBoard } from "@/lib/types"
+} from "@/components/ui/alert-dialog";
+import {
+  TooltipProvider,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import type { RetroBoard } from "@/lib/types";
 import {
   Play,
   Pause,
@@ -43,23 +48,23 @@ import {
   ImageIcon,
   Share,
   Users,
-} from "lucide-react"
-import html2canvas from "html2canvas"
+} from "lucide-react";
+import html2canvas from "html2canvas";
 
 interface BoardHeaderProps {
-  board: RetroBoard
-  isAuthor: boolean
-  onToggleVisibility: () => void
-  onDeleteBoard: () => void
-  onTimerToggle: () => void
-  onTimerReset: () => void
-  onSetTimer: (seconds: number) => void
-  onTitleUpdate: (newTitle: string) => void
-  onToggleLock: () => void
-  showSidebar?: boolean
-  onToggleSidebar?: () => void
-  participantCount?: number
-  currentUserId?: string
+  board: RetroBoard;
+  isAuthor: boolean;
+  onToggleVisibility: () => void;
+  onDeleteBoard: () => void;
+  onTimerToggle: () => void;
+  onTimerReset: () => void;
+  onSetTimer: (seconds: number) => void;
+  onTitleUpdate: (newTitle: string) => void;
+  onToggleLock: () => void;
+  showSidebar?: boolean;
+  onToggleSidebar?: () => void;
+  participantCount?: number;
+  currentUserId?: string;
 }
 
 export function BoardHeader({
@@ -77,91 +82,98 @@ export function BoardHeader({
   participantCount = 0,
   currentUserId,
 }: BoardHeaderProps) {
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
-  const [remainingTime, setRemainingTime] = useState(board.timer_seconds || 300)
-  const [copied, setCopied] = useState(false)
-  const [shareStatus, setShareStatus] = useState<string | null>(null)
-  const [timerInput, setTimerInput] = useState("")
-  const [isEditingTitle, setIsEditingTitle] = useState(false)
-  const [titleInput, setTitleInput] = useState(board.title)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
-  const hasPlayedAlarm = useRef(false)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [remainingTime, setRemainingTime] = useState(
+    board.timer_seconds || 300,
+  );
+  const [copied, setCopied] = useState(false);
+  const [shareStatus, setShareStatus] = useState<string | null>(null);
+  const [timerInput, setTimerInput] = useState("");
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [titleInput, setTitleInput] = useState(board.title);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const hasPlayedAlarm = useRef(false);
 
   useEffect(() => {
-    setTitleInput(board.title)
-  }, [board.title])
+    setTitleInput(board.title);
+  }, [board.title]);
 
   useEffect(() => {
     if (!board.timer_running) {
-      setRemainingTime(board.timer_seconds || 300)
-      hasPlayedAlarm.current = false
+      setRemainingTime(board.timer_seconds || 300);
+      hasPlayedAlarm.current = false;
     }
-  }, [board.timer_seconds, board.timer_running])
+  }, [board.timer_seconds, board.timer_running]);
 
   useEffect(() => {
     if (!board.timer_running || !board.timer_started_at) {
-      return
+      return;
     }
 
-    const startTime = new Date(board.timer_started_at).getTime()
-    const targetSeconds = board.timer_seconds || 300
+    const startTime = new Date(board.timer_started_at).getTime();
+    const targetSeconds = board.timer_seconds || 300;
 
     const interval = setInterval(() => {
-      const now = Date.now()
-      const elapsed = Math.floor((now - startTime) / 1000)
-      const remaining = Math.max(0, targetSeconds - elapsed)
-      setRemainingTime(remaining)
+      const now = Date.now();
+      const elapsed = Math.floor((now - startTime) / 1000);
+      const remaining = Math.max(0, targetSeconds - elapsed);
+      setRemainingTime(remaining);
 
       if (remaining === 0 && !hasPlayedAlarm.current) {
-        hasPlayedAlarm.current = true
-        playAlarm()
+        hasPlayedAlarm.current = true;
+        playAlarm();
       }
-    }, 1000)
+    }, 1000);
 
-    return () => clearInterval(interval)
-  }, [board.timer_running, board.timer_started_at, board.timer_seconds])
+    return () => clearInterval(interval);
+  }, [board.timer_running, board.timer_started_at, board.timer_seconds]);
 
   const playAlarm = () => {
     try {
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+      const audioContext = new (
+        window.AudioContext || (window as any).webkitAudioContext
+      )();
 
       const playBeep = (time: number) => {
-        const oscillator = audioContext.createOscillator()
-        const gainNode = audioContext.createGain()
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
 
-        oscillator.connect(gainNode)
-        gainNode.connect(audioContext.destination)
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
 
-        oscillator.frequency.value = 800
-        oscillator.type = "square"
+        oscillator.frequency.value = 800;
+        oscillator.type = "square";
 
-        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime + time)
-        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + time + 0.3)
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime + time);
+        gainNode.gain.exponentialRampToValueAtTime(
+          0.01,
+          audioContext.currentTime + time + 0.3,
+        );
 
-        oscillator.start(audioContext.currentTime + time)
-        oscillator.stop(audioContext.currentTime + time + 0.3)
-      }
+        oscillator.start(audioContext.currentTime + time);
+        oscillator.stop(audioContext.currentTime + time + 0.3);
+      };
 
-      playBeep(0)
-      playBeep(0.4)
-      playBeep(0.8)
+      playBeep(0);
+      playBeep(0.4);
+      playBeep(0.8);
     } catch (e) {
-      console.log("[v0] Audio playback failed:", e)
+      console.log("[v0] Audio playback failed:", e);
     }
-  }
+  };
 
   const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60)
-    const secs = seconds % 60
-    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
-  }
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  };
 
   const copyToClipboard = async () => {
-    const url = window.location.href
-    await navigator.clipboard.writeText(url)
-    setShareStatus("copied")
-    setTimeout(() => setShareStatus(null), 2000)
-  }
+    const url = window.location.href;
+    await navigator.clipboard.writeText(url);
+    setShareStatus("copied");
+    setTimeout(() => setShareStatus(null), 2000);
+  };
 
   const shareNative = async () => {
     if (navigator.share) {
@@ -170,26 +182,28 @@ export function BoardHeader({
           title: `r8ro - ${board.title}`,
           text: `Join my retro session: ${board.title}`,
           url: window.location.href,
-        })
-        setShareStatus("shared")
-        setTimeout(() => setShareStatus(null), 2000)
+        });
+        setShareStatus("shared");
+        setTimeout(() => setShareStatus(null), 2000);
       } catch (err) {
         if ((err as Error).name !== "AbortError") {
-          console.log("[v0] Share failed:", err)
+          console.log("[v0] Share failed:", err);
         }
       }
     } else {
-      copyToClipboard()
+      copyToClipboard();
     }
-  }
+  };
 
   const captureAsImage = async () => {
     try {
-      setShareStatus("capturing")
-      const boardElement = document.querySelector("[data-board-capture]") as HTMLElement
+      setShareStatus("capturing");
+      const boardElement = document.querySelector(
+        "[data-board-capture]",
+      ) as HTMLElement;
       if (!boardElement) {
-        console.log("[v0] Board element not found")
-        return
+        console.log("[v0] Board element not found");
+        return;
       }
 
       const canvas = await html2canvas(boardElement, {
@@ -197,80 +211,82 @@ export function BoardHeader({
         scale: 2,
         logging: false,
         useCORS: true,
-      })
+      });
 
       try {
         canvas.toBlob(async (blob) => {
           if (blob) {
-            await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })])
-            setShareStatus("image-copied")
-            setTimeout(() => setShareStatus(null), 2000)
+            await navigator.clipboard.write([
+              new ClipboardItem({ "image/png": blob }),
+            ]);
+            setShareStatus("image-copied");
+            setTimeout(() => setShareStatus(null), 2000);
           }
-        }, "image/png")
+        }, "image/png");
       } catch {
-        const link = document.createElement("a")
-        link.download = `${board.slug}-retro.png`
-        link.href = canvas.toDataURL("image/png")
-        link.click()
-        setShareStatus("image-downloaded")
-        setTimeout(() => setShareStatus(null), 2000)
+        const link = document.createElement("a");
+        link.download = `${board.slug}-retro.png`;
+        link.href = canvas.toDataURL("image/png");
+        link.click();
+        setShareStatus("image-downloaded");
+        setTimeout(() => setShareStatus(null), 2000);
       }
     } catch (err) {
-      console.log("[v0] Capture failed:", err)
-      setShareStatus(null)
+      console.log("[v0] Capture failed:", err);
+      setShareStatus(null);
     }
-  }
+  };
 
   const getShareLabel = () => {
     switch (shareStatus) {
       case "copied":
-        return "Link Copied!"
+        return "Link Copied!";
       case "shared":
-        return "Shared!"
+        return "Shared!";
       case "capturing":
-        return "Capturing..."
+        return "Capturing...";
       case "image-copied":
-        return "Image Copied!"
+        return "Image Copied!";
       case "image-downloaded":
-        return "Downloaded!"
+        return "Downloaded!";
       default:
-        return "Share"
+        return "Share";
     }
-  }
+  };
 
   const handleSetTimer = () => {
-    const minutes = Number.parseInt(timerInput)
+    const minutes = Number.parseInt(timerInput);
     if (!isNaN(minutes) && minutes > 0) {
-      onSetTimer(minutes * 60)
-      setTimerInput("")
+      onSetTimer(minutes * 60);
+      setTimerInput("");
     }
-  }
+  };
 
   const saveTitle = () => {
     if (titleInput.trim()) {
-      onTitleUpdate(titleInput.trim())
-      setIsEditingTitle(false)
+      onTitleUpdate(titleInput.trim());
+      setIsEditingTitle(false);
     }
-  }
+  };
 
   const cancelTitleEdit = () => {
-    setTitleInput(board.title)
-    setIsEditingTitle(false)
-  }
+    setTitleInput(board.title);
+    setIsEditingTitle(false);
+  };
 
   const handleTitleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
-      saveTitle()
+      saveTitle();
     }
     if (e.key === "Escape") {
-      cancelTitleEdit()
+      cancelTitleEdit();
     }
-  }
+  };
 
   const handleTimerReset = () => {
-    hasPlayedAlarm.current = false
-    onTimerReset()
-  }
+    hasPlayedAlarm.current = false;
+    onTimerReset();
+  };
 
   return (
     <>
@@ -287,7 +303,11 @@ export function BoardHeader({
             {currentUserId && <UserAccountPopover variant="compact" />}
             <div className="hidden border-l-2 border-border pl-4 sm:block">
               {isEditingTitle ? (
-                <div className="flex items-center gap-2" role="form" aria-label="Edit board title">
+                <div
+                  className="flex items-center gap-2"
+                  role="form"
+                  aria-label="Edit board title"
+                >
                   <Input
                     value={titleInput}
                     onChange={(e) => setTitleInput(e.target.value)}
@@ -345,7 +365,9 @@ export function BoardHeader({
                           <span className="sr-only">Edit board title</span>
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent>Edit title (click or press Enter)</TooltipContent>
+                      <TooltipContent>
+                        Edit title (click or press Enter)
+                      </TooltipContent>
                     </Tooltip>
                   )}
                 </div>
@@ -373,14 +395,20 @@ export function BoardHeader({
             </div>
 
             {isAuthor && (
-              <div className="flex gap-1" role="group" aria-label="Timer controls">
+              <div
+                className="flex gap-1"
+                role="group"
+                aria-label="Timer controls"
+              >
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
                       variant="outline"
                       onClick={onTimerToggle}
                       className="h-10 w-10 p-0 border-2 border-border shadow-sm bg-transparent rounded-lg"
-                      aria-label={board.timer_running ? "Pause timer" : "Start timer"}
+                      aria-label={
+                        board.timer_running ? "Pause timer" : "Start timer"
+                      }
                       aria-pressed={board.timer_running}
                     >
                       {board.timer_running ? (
@@ -388,10 +416,14 @@ export function BoardHeader({
                       ) : (
                         <Play className="h-4 w-4" aria-hidden="true" />
                       )}
-                      <span className="sr-only">{board.timer_running ? "Pause timer" : "Start timer"}</span>
+                      <span className="sr-only">
+                        {board.timer_running ? "Pause timer" : "Start timer"}
+                      </span>
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent>{board.timer_running ? "Pause timer" : "Start timer"}</TooltipContent>
+                  <TooltipContent>
+                    {board.timer_running ? "Pause timer" : "Start timer"}
+                  </TooltipContent>
                 </Tooltip>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -429,7 +461,10 @@ export function BoardHeader({
                     sideOffset={12}
                   >
                     <div className="p-4 space-y-3">
-                      <p className="mb-2 text-xs font-bold uppercase" id="timer-input-label">
+                      <p
+                        className="mb-2 text-xs font-bold uppercase"
+                        id="timer-input-label"
+                      >
                         Set Timer (minutes)
                       </p>
                       <div className="flex gap-2">
@@ -451,7 +486,10 @@ export function BoardHeader({
                       </div>
                     </div>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => onSetTimer(5 * 60)} className="font-bold">
+                    <DropdownMenuItem
+                      onClick={() => onSetTimer(5 * 60)}
+                      className="font-bold"
+                    >
                       <Clock className="mr-2 h-4 w-4" />5 minutes (default)
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => onSetTimer(10 * 60)}>
@@ -469,7 +507,11 @@ export function BoardHeader({
           </div>
 
           {/* RIGHT SECTION: Actions */}
-          <div className="flex items-center justify-end gap-2" role="group" aria-label="Board actions">
+          <div
+            className="flex items-center justify-end gap-2"
+            role="group"
+            aria-label="Board actions"
+          >
             {onToggleSidebar && (
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -492,7 +534,9 @@ export function BoardHeader({
                     )}
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent className="xl:hidden">Participants ({participantCount})</TooltipContent>
+                <TooltipContent className="xl:hidden">
+                  Participants ({participantCount})
+                </TooltipContent>
               </Tooltip>
             )}
 
@@ -513,7 +557,10 @@ export function BoardHeader({
                   <span className="sr-only md:hidden">{getShareLabel()}</span>
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="border-2 border-border rounded-xl" align="end">
+              <DropdownMenuContent
+                className="border-2 border-border rounded-xl"
+                align="end"
+              >
                 <DropdownMenuItem onClick={copyToClipboard}>
                   <Copy className="mr-2 h-4 w-4" aria-hidden="true" />
                   Copy Link
@@ -544,7 +591,10 @@ export function BoardHeader({
                     <span className="sr-only md:hidden">Manage board</span>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="border-2 border-border rounded-xl" align="end">
+                <DropdownMenuContent
+                  className="border-2 border-border rounded-xl"
+                  align="end"
+                >
                   <DropdownMenuItem onClick={onToggleVisibility}>
                     {board.is_public ? (
                       <>
@@ -586,9 +636,13 @@ export function BoardHeader({
             <Button
               variant={board.is_public ? "outline" : "secondary"}
               className={`h-9 border-2 font-bold shadow-sm md:h-10 rounded-lg ${
-                board.is_public ? "border-border bg-transparent" : "border-chart-4 bg-chart-4"
+                board.is_public
+                  ? "border-border bg-transparent"
+                  : "border-chart-4 bg-chart-4"
               }`}
-              aria-label={board.is_public ? "Board is public" : "Board is private"}
+              aria-label={
+                board.is_public ? "Board is public" : "Board is private"
+              }
               aria-pressed={!board.is_public}
             >
               {board.is_public ? (
@@ -618,15 +672,21 @@ export function BoardHeader({
           aria-describedby="delete-dialog-description"
         >
           <AlertDialogHeader>
-            <AlertDialogTitle id="delete-dialog-title" className="text-xl font-black uppercase">
+            <AlertDialogTitle
+              id="delete-dialog-title"
+              className="text-xl font-black uppercase"
+            >
               Delete Board?
             </AlertDialogTitle>
             <AlertDialogDescription id="delete-dialog-description">
-              This action cannot be undone. All cards and data will be permanently deleted.
+              This action cannot be undone. All cards and data will be
+              permanently deleted.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="h-10 border-2 border-border font-bold rounded-lg">Cancel</AlertDialogCancel>
+            <AlertDialogCancel className="h-10 border-2 border-border font-bold rounded-lg">
+              Cancel
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={onDeleteBoard}
               className="h-10 border-2 border-red-600 bg-red-600 font-bold text-white hover:bg-red-700 rounded-lg"
@@ -637,5 +697,5 @@ export function BoardHeader({
         </AlertDialogContent>
       </AlertDialog>
     </>
-  )
+  );
 }

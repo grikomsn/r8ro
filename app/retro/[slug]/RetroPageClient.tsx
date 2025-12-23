@@ -1,135 +1,290 @@
-"use client"
+"use client";
 
-import { useEffect, useState, useCallback, useRef } from "react"
-import { useParams, useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
-import type { RetroBoard, RetroCard, RetroParticipant, ColumnType } from "@/lib/types"
-import { JoinModal } from "@/components/retro/join-modal"
-import { BoardHeader } from "@/components/retro/board-header"
-import { RetroColumn } from "@/components/retro/retro-column"
-import { ParticipantsList } from "@/components/retro/participants-list"
-import { PrivateBoardOverlay } from "@/components/retro/private-board-overlay"
-import { addRecentBoard } from "@/lib/utils/recent-boards"
-import { ChevronLeft, ChevronRight } from "lucide-react"
-import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip"
-import { useAuth } from "@/hooks/use-auth"
+import { useEffect, useState, useCallback, useRef } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import type {
+  RetroBoard,
+  RetroCard,
+  RetroParticipant,
+  ColumnType,
+} from "@/lib/types";
+import { JoinModal } from "@/components/retro/join-modal";
+import { BoardHeader } from "@/components/retro/board-header";
+import { RetroColumn } from "@/components/retro/retro-column";
+import { ParticipantsList } from "@/components/retro/participants-list";
+import { PrivateBoardOverlay } from "@/components/retro/private-board-overlay";
+import { addRecentBoard } from "@/lib/utils/recent-boards";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+  TooltipProvider,
+} from "@/components/ui/tooltip";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function RetroPageClient() {
-  const params = useParams()
-  const router = useRouter()
-  const slug = params.slug as string
+  const params = useParams();
+  const router = useRouter();
+  const slug = params.slug as string;
 
-  const { userId, displayName, isInitialized: authInitialized } = useAuth()
+  const { userId, displayName, isInitialized: authInitialized } = useAuth();
 
-  const [board, setBoard] = useState<RetroBoard | null>(null)
-  const [cards, setCards] = useState<RetroCard[]>([])
-  const [participants, setParticipants] = useState<RetroParticipant[]>([])
-  const [userName, setUserName] = useState<string | null>(null)
-  const [showJoinModal, setShowJoinModal] = useState(false)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState("")
-  const [draggedCard, setDraggedCard] = useState<RetroCard | null>(null)
-  const [showSidebar, setShowSidebar] = useState(true)
+  const [board, setBoard] = useState<RetroBoard | null>(null);
+  const [cards, setCards] = useState<RetroCard[]>([]);
+  const [participants, setParticipants] = useState<RetroParticipant[]>([]);
+  const [userName, setUserName] = useState<string | null>(null);
+  const [showJoinModal, setShowJoinModal] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [draggedCard, setDraggedCard] = useState<RetroCard | null>(null);
+  const [showSidebar, setShowSidebar] = useState(true);
 
-  const boardRef = useRef(board)
-  const cardsRef = useRef(cards)
-  boardRef.current = board
-  cardsRef.current = cards
+  const boardRef = useRef(board);
+  const cardsRef = useRef(cards);
+  boardRef.current = board;
+  cardsRef.current = cards;
 
-  const isAuthor = board && userId === board.author_id
+  const isAuthor = board && userId === board.author_id;
 
   useEffect(() => {
-    if (!authInitialized) return
+    if (!authInitialized) return;
 
-    // Check URL params for shared links
-    const urlParams = new URLSearchParams(window.location.search)
-    const unameParam = urlParams.get("uname")
-
-    if (unameParam) {
-      setUserName(unameParam)
-      window.history.replaceState({}, "", window.location.pathname)
-    } else if (displayName) {
-      setUserName(displayName)
+    // Use display name from auth, or show join modal if missing
+    if (displayName) {
+      setUserName(displayName);
     } else if (userId) {
       // User has auth but no display name - show join modal to get name
-      setShowJoinModal(true)
-      setLoading(false)
+      setShowJoinModal(true);
+      setLoading(false);
     }
-  }, [authInitialized, displayName, userId])
+  }, [authInitialized, displayName, userId]);
 
   useEffect(() => {
-    if (!userId || !userName) return
+    if (!userId || !userName) return;
 
-    let cancelled = false
-    const supabase = createClient()
+    let cancelled = false;
+    const supabase = createClient();
 
     async function load() {
-      const { data: boardData } = await supabase.from("retro_boards").select("*").eq("slug", slug).single()
+      const { data: boardData } = await supabase
+        .from("retro_boards")
+        .select("*")
+        .eq("slug", slug)
+        .single();
 
-      if (cancelled) return
+      if (cancelled) return;
       if (!boardData) {
-        setError("Board not found")
-        setLoading(false)
-        return
+        setError("Board not found");
+        setLoading(false);
+        return;
       }
 
-      setBoard(boardData)
-      addRecentBoard(boardData.slug, boardData.title)
+      setBoard(boardData);
+      addRecentBoard(boardData.slug, boardData.title);
 
-      const [cardsRes, participantsRes] = await Promise.all([
-        supabase.from("retro_cards").select("*").eq("board_id", boardData.id).order("created_at", { ascending: true }),
-        supabase.from("retro_participants").select("*").eq("board_id", boardData.id),
-      ])
+      // Load cards first, then votes for those cards
+      const cardsRes = await supabase
+        .from("retro_cards")
+        .select("*")
+        .eq("board_id", boardData.id)
+        .order("created_at", { ascending: true });
 
-      if (cancelled) return
-      setCards(cardsRes.data || [])
-      setParticipants(participantsRes.data || [])
+      const cardIds = (cardsRes.data || []).map((c) => c.id);
+      const [votesRes, participantsRes] = await Promise.all([
+        cardIds.length > 0
+          ? supabase
+              .from("retro_card_votes")
+              .select("card_id")
+              .in("card_id", cardIds)
+          : Promise.resolve({ data: [] }),
+        supabase
+          .from("retro_participants")
+          .select("*")
+          .eq("board_id", boardData.id),
+      ]);
 
-      const existing = participantsRes.data?.find((p) => p.user_id === userId)
+      if (cancelled) return;
+
+      // Count votes per card
+      const voteCounts = new Map<string, number>();
+      (votesRes.data || []).forEach((vote: any) => {
+        voteCounts.set(vote.card_id, (voteCounts.get(vote.card_id) || 0) + 1);
+      });
+
+      // Transform cards to include vote count
+      const cardsWithVotes = (cardsRes.data || []).map((card: any) => ({
+        ...card,
+        votes: voteCounts.get(card.id) || 0,
+      }));
+
+      setCards(cardsWithVotes);
+      setParticipants(participantsRes.data || []);
+
+      const existing = participantsRes.data?.find((p) => p.user_id === userId);
       if (!existing) {
         await supabase
           .from("retro_participants")
-          .upsert({ board_id: boardData.id, user_id: userId, username: userName, is_online: true })
+          .upsert({
+            board_id: boardData.id,
+            user_id: userId,
+            username: userName,
+            is_online: true,
+          });
       }
 
-      if (!cancelled) setLoading(false)
+      if (!cancelled) setLoading(false);
     }
 
-    load()
+    load();
     return () => {
-      cancelled = true
-    }
-  }, [slug, userId, userName])
+      cancelled = true;
+    };
+  }, [slug, userId, userName]);
+
+  // Set up realtime subscriptions after board is loaded
+  useEffect(() => {
+    if (!board || !userId) return;
+
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`retro-${slug}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "retro_boards",
+          filter: `id=eq.${board.id}`,
+        },
+        (payload) => {
+          if (payload.eventType === "UPDATE" && payload.new) {
+            setBoard(payload.new as RetroBoard);
+          } else if (payload.eventType === "DELETE") {
+            router.push("/");
+          }
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "retro_cards",
+          filter: `board_id=eq.${board.id}`,
+        },
+        async (payload) => {
+          if (payload.eventType === "INSERT" && payload.new) {
+            // New card - add with 0 votes initially
+            setCards((p) => [
+              ...p,
+              { ...(payload.new as RetroCard), votes: 0 },
+            ]);
+          } else if (payload.eventType === "UPDATE" && payload.new) {
+            setCards((p) =>
+              p.map((c) =>
+                c.id === payload.new.id
+                  ? { ...(payload.new as RetroCard), votes: c.votes }
+                  : c,
+              ),
+            );
+          } else if (payload.eventType === "DELETE") {
+            setCards((p) => p.filter((c) => c.id !== payload.old.id));
+          }
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "retro_card_votes",
+        },
+        async (payload) => {
+          // When votes change, reload vote counts for affected cards
+          const cardId = payload.new?.card_id || payload.old?.card_id;
+          if (cardId) {
+            const { data: votes } = await supabase
+              .from("retro_card_votes")
+              .select("id")
+              .eq("card_id", cardId);
+
+            const voteCount = votes?.length || 0;
+            setCards((p) =>
+              p.map((c) => (c.id === cardId ? { ...c, votes: voteCount } : c)),
+            );
+          }
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "retro_participants",
+          filter: `board_id=eq.${board.id}`,
+        },
+        (payload) => {
+          if (payload.eventType === "INSERT" && payload.new) {
+            setParticipants((p) => [...p, payload.new as RetroParticipant]);
+          } else if (payload.eventType === "UPDATE" && payload.new) {
+            setParticipants((p) =>
+              p.map((part) =>
+                part.id === payload.new.id
+                  ? (payload.new as RetroParticipant)
+                  : part,
+              ),
+            );
+          } else if (payload.eventType === "DELETE") {
+            setParticipants((p) =>
+              p.filter((part) => part.id !== payload.old.id),
+            );
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [board, slug, userId, router]);
 
   const handleJoin = useCallback(
     (username: string) => {
-      if (!userId) return
-      setUserName(username)
-      setShowJoinModal(false)
-      setLoading(true)
+      if (!userId) return;
+      setUserName(username);
+      setShowJoinModal(false);
+      setLoading(true);
     },
     [userId],
-  )
+  );
 
   const handleToggleVisibility = useCallback(async () => {
-    const b = boardRef.current
-    if (!b) return
-    setBoard((p) => (p ? { ...p, is_public: !p.is_public } : null))
-    await createClient().from("retro_boards").update({ is_public: !b.is_public }).eq("id", b.id)
-  }, [])
+    const b = boardRef.current;
+    if (!b) return;
+    setBoard((p) => (p ? { ...p, is_public: !p.is_public } : null));
+    await createClient()
+      .from("retro_boards")
+      .update({ is_public: !b.is_public })
+      .eq("id", b.id);
+  }, []);
 
   const handleToggleLock = useCallback(async () => {
-    const b = boardRef.current
-    if (!b) return
-    setBoard((p) => (p ? { ...p, is_locked: !p.is_locked } : null))
-    await createClient().from("retro_boards").update({ is_locked: !b.is_locked }).eq("id", b.id)
-  }, [])
+    const b = boardRef.current;
+    if (!b) return;
+    setBoard((p) => (p ? { ...p, is_locked: !p.is_locked } : null));
+    await createClient()
+      .from("retro_boards")
+      .update({ is_locked: !b.is_locked })
+      .eq("id", b.id);
+  }, []);
 
   const handleAddCard = useCallback(
     async (columnType: ColumnType, content: string) => {
-      const b = boardRef.current
-      if (!b || !userId || !userName) return
-      const tempId = `temp-${Date.now()}`
+      const b = boardRef.current;
+      if (!b || !userId || !userName) return;
+      const tempId = `temp-${Date.now()}`;
       setCards((p) => [
         ...p,
         {
@@ -142,7 +297,7 @@ export default function RetroPageClient() {
           votes: 0,
           created_at: new Date().toISOString(),
         },
-      ])
+      ]);
       const { data } = await createClient()
         .from("retro_cards")
         .insert({
@@ -151,80 +306,154 @@ export default function RetroPageClient() {
           content,
           author_name: userName,
           author_id: userId,
-          votes: 0,
         })
         .select()
-        .single()
-      if (data) setCards((p) => p.map((c) => (c.id === tempId ? data : c)))
+        .single();
+      if (data) {
+        // Add vote count of 0 for new card
+        setCards((p) =>
+          p.map((c) => (c.id === tempId ? { ...data, votes: 0 } : c)),
+        );
+      }
     },
     [userId, userName],
-  )
+  );
 
-  const handleVoteCard = useCallback(async (cardId: string, votes: number) => {
-    setCards((p) => p.map((c) => (c.id === cardId ? { ...c, votes: votes + 1 } : c)))
-    await createClient()
-      .from("retro_cards")
-      .update({ votes: votes + 1 })
-      .eq("id", cardId)
-  }, [])
+  const handleVoteCard = useCallback(
+    async (cardId: string) => {
+      if (!userId) return;
+
+      const supabase = createClient();
+
+      // Check if user already voted
+      const { data: existingVote } = await supabase
+        .from("retro_card_votes")
+        .select("id")
+        .eq("card_id", cardId)
+        .eq("user_id", userId)
+        .single();
+
+      if (existingVote) {
+        // Un-vote
+        await supabase
+          .from("retro_card_votes")
+          .delete()
+          .eq("id", existingVote.id);
+        setCards((p) =>
+          p.map((c) => {
+            if (c.id === cardId) {
+              return { ...c, votes: Math.max(0, c.votes - 1) };
+            }
+            return c;
+          }),
+        );
+      } else {
+        // Vote
+        await supabase
+          .from("retro_card_votes")
+          .insert({ card_id: cardId, user_id: userId });
+        setCards((p) =>
+          p.map((c) => {
+            if (c.id === cardId) {
+              return { ...c, votes: c.votes + 1 };
+            }
+            return c;
+          }),
+        );
+      }
+    },
+    [userId],
+  );
 
   const handleDeleteCard = useCallback(async (cardId: string) => {
-    setCards((p) => p.filter((c) => c.id !== cardId))
-    await createClient().from("retro_cards").delete().eq("id", cardId)
-  }, [])
+    setCards((p) => p.filter((c) => c.id !== cardId));
+    await createClient().from("retro_cards").delete().eq("id", cardId);
+  }, []);
 
-  const handleEditCard = useCallback(async (cardId: string, content: string) => {
-    setCards((p) => p.map((c) => (c.id === cardId ? { ...c, content } : c)))
-    await createClient().from("retro_cards").update({ content }).eq("id", cardId)
-  }, [])
+  const handleEditCard = useCallback(
+    async (cardId: string, content: string) => {
+      setCards((p) => p.map((c) => (c.id === cardId ? { ...c, content } : c)));
+      await createClient()
+        .from("retro_cards")
+        .update({ content })
+        .eq("id", cardId);
+    },
+    [],
+  );
 
-  const handleMoveCard = useCallback(async (cardId: string, columnType: ColumnType) => {
-    setCards((p) => p.map((c) => (c.id === cardId ? { ...c, column_type: columnType } : c)))
-    await createClient().from("retro_cards").update({ column_type: columnType }).eq("id", cardId)
-  }, [])
+  const handleMoveCard = useCallback(
+    async (cardId: string, columnType: ColumnType) => {
+      setCards((p) =>
+        p.map((c) => (c.id === cardId ? { ...c, column_type: columnType } : c)),
+      );
+      await createClient()
+        .from("retro_cards")
+        .update({ column_type: columnType })
+        .eq("id", cardId);
+    },
+    [],
+  );
 
   const handleEditBoardTitle = useCallback(async (title: string) => {
-    const b = boardRef.current
-    if (!b) return
-    setBoard((p) => (p ? { ...p, title } : null))
-    await createClient().from("retro_boards").update({ title }).eq("id", b.id)
-  }, [])
+    const b = boardRef.current;
+    if (!b) return;
+    setBoard((p) => (p ? { ...p, title } : null));
+    await createClient().from("retro_boards").update({ title }).eq("id", b.id);
+  }, []);
 
   const handleDeleteBoard = useCallback(async () => {
-    const b = boardRef.current
-    if (!b) return
-    await createClient().from("retro_boards").delete().eq("id", b.id)
-    router.push("/")
-  }, [router])
+    const b = boardRef.current;
+    if (!b) return;
+    await createClient().from("retro_boards").delete().eq("id", b.id);
+    router.push("/");
+  }, [router]);
 
   const handleTimerToggle = useCallback(async () => {
-    const b = boardRef.current
-    if (!b) return
-    const running = !b.timer_running
-    const startedAt = running ? new Date().toISOString() : null
-    setBoard((p) => (p ? { ...p, timer_running: running, timer_started_at: startedAt } : null))
+    const b = boardRef.current;
+    if (!b) return;
+    const running = !b.timer_running;
+    const startedAt = running ? new Date().toISOString() : null;
+    setBoard((p) =>
+      p ? { ...p, timer_running: running, timer_started_at: startedAt } : null,
+    );
     await createClient()
       .from("retro_boards")
       .update({ timer_running: running, timer_started_at: startedAt })
-      .eq("id", b.id)
-  }, [])
+      .eq("id", b.id);
+  }, []);
 
   const handleTimerReset = useCallback(async () => {
-    const b = boardRef.current
-    if (!b) return
-    setBoard((p) => (p ? { ...p, timer_running: false, timer_seconds: 300, timer_started_at: null } : null))
+    const b = boardRef.current;
+    if (!b) return;
+    setBoard((p) =>
+      p
+        ? {
+            ...p,
+            timer_running: false,
+            timer_seconds: 300,
+            timer_started_at: null,
+          }
+        : null,
+    );
     await createClient()
       .from("retro_boards")
-      .update({ timer_running: false, timer_seconds: 300, timer_started_at: null })
-      .eq("id", b.id)
-  }, [])
+      .update({
+        timer_running: false,
+        timer_seconds: 300,
+        timer_started_at: null,
+      })
+      .eq("id", b.id);
+  }, []);
 
   const handleSetTimer = useCallback(async (seconds: number) => {
-    const b = boardRef.current
-    if (!b) return
-    setBoard((p) => (p ? { ...p, timer_seconds: seconds } : null))
-    await createClient().from("retro_boards").update({ timer_seconds: seconds }).eq("id", b.id)
-  }, [])
+    const b = boardRef.current;
+    if (!b) return;
+    setBoard((p) => (p ? { ...p, timer_seconds: seconds } : null));
+    await createClient()
+      .from("retro_boards")
+      .update({ timer_seconds: seconds })
+      .eq("id", b.id);
+  }, []);
 
   if (!authInitialized) {
     return (
@@ -236,10 +465,10 @@ export default function RetroPageClient() {
           </div>
         </div>
       </div>
-    )
+    );
   }
 
-  if (showJoinModal) return <JoinModal onJoin={handleJoin} />
+  if (showJoinModal) return <JoinModal onJoin={handleJoin} />;
 
   if (loading) {
     return (
@@ -251,23 +480,26 @@ export default function RetroPageClient() {
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   if (error || !board) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-secondary">
         <div className="border-2 border-border bg-background p-8 shadow-md rounded-2xl">
-          <p className="text-xl font-bold text-primary">{error || "Board not found"}</p>
+          <p className="text-xl font-bold text-primary">
+            {error || "Board not found"}
+          </p>
           <button onClick={() => router.push("/")} className="mt-4 underline">
             Go back home
           </button>
         </div>
       </div>
-    )
+    );
   }
 
-  if (!board.is_public && !isAuthor) return <PrivateBoardOverlay onGoHome={() => router.push("/")} />
+  if (!board.is_public && !isAuthor)
+    return <PrivateBoardOverlay onGoHome={() => router.push("/")} />;
 
   return (
     <div className="flex h-screen flex-col bg-secondary overflow-hidden">
@@ -303,7 +535,7 @@ export default function RetroPageClient() {
               isLocked={board.is_locked || false}
               bgColor="bg-green-600"
               onAddCard={handleAddCard}
-              onVoteCard={handleVoteCard}
+              onVoteCard={(cardId) => handleVoteCard(cardId)}
               onDeleteCard={handleDeleteCard}
               onEditCard={handleEditCard}
               onMoveCard={handleMoveCard}
@@ -320,7 +552,7 @@ export default function RetroPageClient() {
               isLocked={board.is_locked || false}
               bgColor="bg-red-700"
               onAddCard={handleAddCard}
-              onVoteCard={handleVoteCard}
+              onVoteCard={(cardId) => handleVoteCard(cardId)}
               onDeleteCard={handleDeleteCard}
               onEditCard={handleEditCard}
               onMoveCard={handleMoveCard}
@@ -337,7 +569,7 @@ export default function RetroPageClient() {
               isLocked={board.is_locked || false}
               bgColor="bg-blue-700"
               onAddCard={handleAddCard}
-              onVoteCard={handleVoteCard}
+              onVoteCard={(cardId) => handleVoteCard(cardId)}
               onDeleteCard={handleDeleteCard}
               onEditCard={handleEditCard}
               onMoveCard={handleMoveCard}
@@ -362,7 +594,11 @@ export default function RetroPageClient() {
               <button
                 onClick={() => setShowSidebar(!showSidebar)}
                 className={`fixed top-1/2 -translate-y-1/2 z-50 flex items-center justify-center w-6 h-16 transition-all duration-300 ease-in-out rounded-l-lg border-2 border-r-0 border-border bg-background hover:bg-muted shadow-md xl:hidden ${showSidebar ? "right-80" : "right-0"}`}
-                aria-label={showSidebar ? "Hide participants sidebar" : "Show participants sidebar"}
+                aria-label={
+                  showSidebar
+                    ? "Hide participants sidebar"
+                    : "Show participants sidebar"
+                }
                 aria-expanded={showSidebar}
                 aria-controls="participants-sidebar-mobile"
               >
@@ -371,10 +607,14 @@ export default function RetroPageClient() {
                 ) : (
                   <ChevronLeft className="h-4 w-4" aria-hidden="true" />
                 )}
-                <span className="sr-only">{showSidebar ? "Hide sidebar" : "Show sidebar"}</span>
+                <span className="sr-only">
+                  {showSidebar ? "Hide sidebar" : "Show sidebar"}
+                </span>
               </button>
             </TooltipTrigger>
-            <TooltipContent side="left">{showSidebar ? "Hide sidebar" : "Show sidebar"}</TooltipContent>
+            <TooltipContent side="left">
+              {showSidebar ? "Hide sidebar" : "Show sidebar"}
+            </TooltipContent>
           </Tooltip>
 
           <div
@@ -390,7 +630,11 @@ export default function RetroPageClient() {
                   <button
                     onClick={() => setShowSidebar(!showSidebar)}
                     className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-full z-20 flex items-center justify-center w-5 h-14 rounded-l-md border-2 border-r-0 border-border bg-background hover:bg-muted transition-colors duration-200 shadow-sm"
-                    aria-label={showSidebar ? "Hide participants sidebar" : "Show participants sidebar"}
+                    aria-label={
+                      showSidebar
+                        ? "Hide participants sidebar"
+                        : "Show participants sidebar"
+                    }
                     aria-expanded={showSidebar}
                     aria-controls="participants-sidebar"
                   >
@@ -399,10 +643,14 @@ export default function RetroPageClient() {
                     ) : (
                       <ChevronLeft className="h-3 w-3" aria-hidden="true" />
                     )}
-                    <span className="sr-only">{showSidebar ? "Hide sidebar" : "Show sidebar"}</span>
+                    <span className="sr-only">
+                      {showSidebar ? "Hide sidebar" : "Show sidebar"}
+                    </span>
                   </button>
                 </TooltipTrigger>
-                <TooltipContent side="left">{showSidebar ? "Hide sidebar" : "Show sidebar"}</TooltipContent>
+                <TooltipContent side="left">
+                  {showSidebar ? "Hide sidebar" : "Show sidebar"}
+                </TooltipContent>
               </Tooltip>
 
               {/* Sidebar content */}
@@ -437,5 +685,5 @@ export default function RetroPageClient() {
         </TooltipProvider>
       </div>
     </div>
-  )
+  );
 }

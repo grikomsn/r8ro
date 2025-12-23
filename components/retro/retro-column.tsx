@@ -1,35 +1,49 @@
-"use client"
+"use client";
 
-import type React from "react"
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Textarea } from "@/components/ui/textarea"
-import { Input } from "@/components/ui/input"
-import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip"
-import type { RetroCard, ColumnType } from "@/lib/types"
-import { Plus, ThumbsUp, Trash2, X, GripVertical, Pencil, Check, Lock } from "lucide-react"
+import type React from "react";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+  TooltipProvider,
+} from "@/components/ui/tooltip";
+import type { RetroCard, ColumnType } from "@/lib/types";
+import {
+  Plus,
+  ThumbsUp,
+  Trash2,
+  X,
+  GripVertical,
+  Pencil,
+  Check,
+  Lock,
+} from "lucide-react";
 
 interface RetroColumnProps {
-  title: string
-  columnType: ColumnType
-  cards: RetroCard[]
-  onAddCard: (columnType: ColumnType, content: string) => void
-  onVoteCard: (cardId: string, currentVotes: number) => void
-  onDeleteCard: (cardId: string) => void
-  onEditCard: (cardId: string, newContent: string) => void
-  onMoveCard: (cardId: string, newColumnType: ColumnType) => void
-  currentUserId: string
-  bgColor: string
-  draggedCard: RetroCard | null
-  setDraggedCard: (card: RetroCard | null) => void
-  isLocked: boolean
+  title: string;
+  columnType: ColumnType;
+  cards: RetroCard[];
+  onAddCard: (columnType: ColumnType, content: string) => void;
+  onVoteCard: (cardId: string) => void;
+  onDeleteCard: (cardId: string) => void;
+  onEditCard: (cardId: string, newContent: string) => void;
+  onMoveCard: (cardId: string, newColumnType: ColumnType) => void;
+  currentUserId: string;
+  bgColor: string;
+  draggedCard: RetroCard | null;
+  setDraggedCard: (card: RetroCard | null) => void;
+  isLocked: boolean;
 }
 
 const columnColorConfig: Record<ColumnType, { bg: string; text: string }> = {
   went_well: { bg: "bg-green-600", text: "text-white" },
   to_improve: { bg: "bg-red-600", text: "text-white" },
   action_items: { bg: "bg-blue-600", text: "text-white" },
-}
+};
 
 export function RetroColumn({
   title,
@@ -46,99 +60,113 @@ export function RetroColumn({
   setDraggedCard,
   isLocked,
 }: RetroColumnProps) {
-  const [isAdding, setIsAdding] = useState(false)
-  const [newCardContent, setNewCardContent] = useState("")
-  const [editingCardId, setEditingCardId] = useState<string | null>(null)
-  const [editContent, setEditContent] = useState("")
-  const [isDragOver, setIsDragOver] = useState(false)
+  const [isAdding, setIsAdding] = useState(false);
+  const [newCardContent, setNewCardContent] = useState("");
+  const [editingCardId, setEditingCardId] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState("");
+  const [isDragOver, setIsDragOver] = useState(false);
 
   // Handler functions
   const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragOver(true)
-  }
+    e.preventDefault();
+    setIsDragOver(true);
+  };
 
   const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragOver(false)
-  }
+    e.preventDefault();
+    setIsDragOver(false);
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter") {
-      handleSubmit()
+      handleSubmit();
     }
-  }
+  };
 
   const handleSubmit = () => {
     if (newCardContent.trim()) {
-      onAddCard(columnType, newCardContent)
-      setIsAdding(false)
-      setNewCardContent("")
+      onAddCard(columnType, newCardContent);
+      setIsAdding(false);
+      setNewCardContent("");
     }
-  }
+  };
 
   const handleDragEnd = () => {
-    setDraggedCard(null)
-  }
+    setDraggedCard(null);
+  };
 
   const handleEditKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
-      saveEdit()
+      saveEdit();
     }
-  }
+  };
 
   const saveEdit = () => {
     if (editingCardId && editContent.trim()) {
-      onEditCard(editingCardId, editContent)
-      setEditingCardId(null)
-      setEditContent("")
+      onEditCard(editingCardId, editContent);
+      setEditingCardId(null);
+      setEditContent("");
     }
-  }
+  };
 
   const cancelEdit = () => {
-    setEditingCardId(null)
-    setEditContent("")
-  }
+    setEditingCardId(null);
+    setEditContent("");
+  };
 
   const startEditing = (card: RetroCard) => {
-    setEditingCardId(card.id)
-    setEditContent(card.content)
-  }
+    setEditingCardId(card.id);
+    setEditContent(card.content);
+  };
 
   const handleDragStart = (e: React.DragEvent, card: RetroCard) => {
     if (isLocked) {
-      e.preventDefault()
-      return
+      e.preventDefault();
+      return;
     }
-    setDraggedCard(card)
-    e.dataTransfer.effectAllowed = "move"
-  }
+    setDraggedCard(card);
+    e.dataTransfer.effectAllowed = "move";
+  };
 
   const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragOver(false)
-    if (isLocked) return
+    e.preventDefault();
+    setIsDragOver(false);
+    if (isLocked) return;
     if (draggedCard && draggedCard.column_type !== columnType) {
-      onMoveCard(draggedCard.id, columnType)
+      onMoveCard(draggedCard.id, columnType);
     }
-    setDraggedCard(null)
-  }
+    setDraggedCard(null);
+  };
 
   // Sort cards by votes (highest first)
-  const sortedCards = [...cards].sort((a, b) => b.votes - a.votes)
+  const sortedCards = [...cards].sort((a, b) => b.votes - a.votes);
 
-  const colors = columnColorConfig[columnType]
+  const colors = columnColorConfig[columnType];
 
   return (
-    <div className="flex flex-1 min-w-0 flex-col h-full" role="region" aria-label={`${title} column`}>
+    <div
+      className="flex flex-1 min-w-0 flex-col h-full"
+      role="region"
+      aria-label={`${title} column`}
+    >
       {/* Column Header - Using design system colors */}
-      <div className={`border-2 border-b-0 border-border ${colors.bg} p-4 shadow-sm rounded-t-xl`}>
+      <div
+        className={`border-2 border-b-0 border-border ${colors.bg} p-4 shadow-sm rounded-t-xl`}
+      >
         <div className="flex items-center justify-between">
-          <h2 className={`text-lg font-black uppercase ${colors.text}`} id={`column-${columnType}-heading`}>
+          <h2
+            className={`text-lg font-black uppercase ${colors.text}`}
+            id={`column-${columnType}-heading`}
+          >
             {title}
           </h2>
           <div className="flex items-center gap-2">
-            {isLocked && <Lock className={`h-4 w-4 ${colors.text} opacity-70`} aria-hidden="true" />}
+            {isLocked && (
+              <Lock
+                className={`h-4 w-4 ${colors.text} opacity-70`}
+                aria-hidden="true"
+              />
+            )}
             <span
               className="border border-border bg-background px-2 py-1 text-sm font-bold text-foreground rounded-md"
               aria-label={`${cards.length} cards`}
@@ -196,8 +224,8 @@ export function RetroColumn({
                     <Button
                       variant="outline"
                       onClick={() => {
-                        setIsAdding(false)
-                        setNewCardContent("")
+                        setIsAdding(false);
+                        setNewCardContent("");
                       }}
                       className="h-10 w-10 p-0 border border-border rounded-lg"
                       aria-label="Cancel"
@@ -232,17 +260,26 @@ export function RetroColumn({
               onDragStart={(e) => handleDragStart(e, card)}
               onDragEnd={handleDragEnd}
               className={`group border-2 border-border bg-background p-3 shadow-sm transition-all hover:shadow-md rounded-xl ${
-                isLocked ? "cursor-default" : "cursor-grab active:cursor-grabbing"
+                isLocked
+                  ? "cursor-default"
+                  : "cursor-grab active:cursor-grabbing"
               } ${draggedCard?.id === card.id ? "opacity-50" : ""}`}
               aria-label={`Card by ${card.author_name}: ${card.content}`}
             >
               <div className="flex items-start gap-2 mb-2">
                 {!isLocked && (
-                  <GripVertical className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" aria-hidden="true" />
+                  <GripVertical
+                    className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5"
+                    aria-hidden="true"
+                  />
                 )}
                 <div className="flex-1">
                   {editingCardId === card.id && !isLocked ? (
-                    <div className="space-y-2" role="form" aria-label="Edit card">
+                    <div
+                      className="space-y-2"
+                      role="form"
+                      aria-label="Edit card"
+                    >
                       <Input
                         value={editContent}
                         onChange={(e) => setEditContent(e.target.value)}
@@ -278,31 +315,45 @@ export function RetroColumn({
                       </div>
                     </div>
                   ) : (
-                    <p className={`whitespace-pre-wrap text-sm ${isLocked ? "pl-0" : ""}`}>{card.content}</p>
+                    <p
+                      className={`whitespace-pre-wrap text-sm ${isLocked ? "pl-0" : ""}`}
+                    >
+                      {card.content}
+                    </p>
                   )}
                 </div>
               </div>
-              <div className={`flex items-center justify-between ${isLocked ? "pl-0" : "pl-7"}`}>
-                <span className="text-xs text-muted-foreground">by {card.author_name}</span>
-                <div className="flex items-center gap-1" role="group" aria-label="Card actions">
-                  {!isLocked && card.author_id === currentUserId && editingCardId !== card.id && (
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            onClick={() => startEditing(card)}
-                            className="h-8 w-8 p-0 opacity-0 transition-opacity group-hover:opacity-100 rounded-lg"
-                            aria-label="Edit card"
-                          >
-                            <Pencil className="h-4 w-4" aria-hidden="true" />
-                            <span className="sr-only">Edit card</span>
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Edit</TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  )}
+              <div
+                className={`flex items-center justify-between ${isLocked ? "pl-0" : "pl-7"}`}
+              >
+                <span className="text-xs text-muted-foreground">
+                  by {card.author_name}
+                </span>
+                <div
+                  className="flex items-center gap-1"
+                  role="group"
+                  aria-label="Card actions"
+                >
+                  {!isLocked &&
+                    card.author_id === currentUserId &&
+                    editingCardId !== card.id && (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              onClick={() => startEditing(card)}
+                              className="h-8 w-8 p-0 opacity-0 transition-opacity group-hover:opacity-100 rounded-lg"
+                              aria-label="Edit card"
+                            >
+                              <Pencil className="h-4 w-4" aria-hidden="true" />
+                              <span className="sr-only">Edit card</span>
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Edit</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
                   {!isLocked && card.author_id === currentUserId && (
                     <TooltipProvider>
                       <Tooltip>
@@ -313,7 +364,10 @@ export function RetroColumn({
                             className="h-8 w-8 p-0 opacity-0 transition-opacity group-hover:opacity-100 rounded-lg"
                             aria-label="Delete card"
                           >
-                            <Trash2 className="h-4 w-4 text-primary" aria-hidden="true" />
+                            <Trash2
+                              className="h-4 w-4 text-primary"
+                              aria-hidden="true"
+                            />
                             <span className="sr-only">Delete card</span>
                           </Button>
                         </TooltipTrigger>
@@ -326,11 +380,14 @@ export function RetroColumn({
                       <TooltipTrigger asChild>
                         <Button
                           variant="outline"
-                          onClick={() => onVoteCard(card.id, card.votes)}
+                          onClick={() => onVoteCard(card.id)}
                           className="h-8 px-2 border border-border font-bold shadow-sm transition-all hover:bg-secondary rounded-lg"
                           aria-label={`Vote for this card. Current votes: ${card.votes}`}
                         >
-                          <ThumbsUp className="mr-1 h-3 w-3" aria-hidden="true" />
+                          <ThumbsUp
+                            className="mr-1 h-3 w-3"
+                            aria-hidden="true"
+                          />
                           {card.votes}
                         </Button>
                       </TooltipTrigger>
@@ -344,5 +401,5 @@ export function RetroColumn({
         </div>
       </div>
     </div>
-  )
+  );
 }

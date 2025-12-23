@@ -1,70 +1,83 @@
-"use client"
+"use client";
 
-import type React from "react"
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent } from "@/components/ui/card"
-import { Label } from "@/components/ui/label"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { createClient } from "@/lib/supabase/client"
-import { generateSlug } from "@/lib/utils/slug"
-import { History, X, Plus, LogIn } from "lucide-react"
-import { useAuth } from "@/hooks/use-auth"
-import { getRecentBoards, addRecentBoard, removeRecentBoard, type RecentBoard } from "@/lib/utils/recent-boards"
-import { UserAccountPopover } from "@/components/auth/user-account-popover"
+import type React from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { createClient } from "@/lib/supabase/client";
+import { generateSlug } from "@/lib/utils/slug";
+import { History, X, Plus, LogIn } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
+import {
+  getRecentBoards,
+  addRecentBoard,
+  removeRecentBoard,
+  type RecentBoard,
+} from "@/lib/utils/recent-boards";
+import { UserAccountPopover } from "@/components/auth/user-account-popover";
 
 export default function ClientPage() {
-  const router = useRouter()
-  const { userId, displayName, updateDisplayName, isLoading: authLoading, isInitialized } = useAuth()
-  const [isCreating, setIsCreating] = useState(false)
-  const [isJoining, setIsJoining] = useState(false)
-  const [username, setUsername] = useState("")
-  const [createForm, setCreateForm] = useState({ title: "" })
-  const [joinForm, setJoinForm] = useState({ slug: "" })
-  const [error, setError] = useState("")
-  const [recentBoards, setRecentBoards] = useState<RecentBoard[]>([])
+  const router = useRouter();
+  const {
+    userId,
+    displayName,
+    updateDisplayName,
+    isLoading: authLoading,
+    isInitialized,
+  } = useAuth();
+  const [isCreating, setIsCreating] = useState(false);
+  const [isJoining, setIsJoining] = useState(false);
+  const [username, setUsername] = useState("");
+  const [createForm, setCreateForm] = useState({ title: "" });
+  const [joinForm, setJoinForm] = useState({ slug: "" });
+  const [error, setError] = useState("");
+  const [recentBoards, setRecentBoards] = useState<RecentBoard[]>([]);
 
   useEffect(() => {
     if (isInitialized && displayName) {
-      setUsername(displayName)
+      setUsername(displayName);
     }
-  }, [isInitialized, displayName])
+  }, [isInitialized, displayName]);
 
   useEffect(() => {
-    setRecentBoards(getRecentBoards())
-  }, [])
+    setRecentBoards(getRecentBoards());
+  }, []);
 
   const handleRemoveRecent = (slug: string, e: React.MouseEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    removeRecentBoard(slug)
-    setRecentBoards(getRecentBoards())
-  }
+    e.preventDefault();
+    e.stopPropagation();
+    removeRecentBoard(slug);
+    setRecentBoards(getRecentBoards());
+  };
 
   const handleCreateSession = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
     if (!username.trim()) {
-      setError("Please enter your name")
-      return
+      setError("Please enter your name");
+      return;
     }
     if (!userId) {
-      setError("Authentication not ready. Please wait...")
-      return
+      setError("Authentication not ready. Please wait...");
+      return;
     }
 
-    setIsCreating(true)
-    setError("")
+    setIsCreating(true);
+    setError("");
 
     try {
-      const supabase = createClient()
-      const slug = generateSlug()
+      const supabase = createClient();
+      const slug = generateSlug();
 
       if (username.trim() !== displayName) {
-        const success = await updateDisplayName(username.trim())
+        const success = await updateDisplayName(username.trim());
         if (!success) {
-          console.warn("Failed to update display name, continuing with current name")
+          console.warn(
+            "Failed to update display name, continuing with current name",
+          );
         }
       }
 
@@ -76,88 +89,99 @@ export default function ClientPage() {
         is_public: true,
         timer_running: false,
         timer_seconds: 0,
-      }
+      };
 
-      const { error: insertError } = await supabase.from("retro_boards").insert(boardData)
+      const { error: insertError } = await supabase
+        .from("retro_boards")
+        .insert(boardData);
 
       if (insertError) {
-        throw new Error(insertError.message || "Failed to create board")
+        throw new Error(insertError.message || "Failed to create board");
       }
 
       const { data: boardDataResult, error: boardError } = await supabase
         .from("retro_boards")
         .select("id")
         .eq("slug", slug)
-        .single()
+        .single();
 
       if (boardError || !boardDataResult) {
-        throw new Error(boardError?.message || "Failed to fetch created board")
+        throw new Error(boardError?.message || "Failed to fetch created board");
       }
 
-      const { error: participantError } = await supabase.from("retro_participants").insert({
-        board_id: boardDataResult.id,
-        user_id: userId,
-        username: username.trim(),
-        is_online: true,
-      })
+      const { error: participantError } = await supabase
+        .from("retro_participants")
+        .insert({
+          board_id: boardDataResult.id,
+          user_id: userId,
+          username: username.trim(),
+          is_online: true,
+        });
 
       if (participantError) {
-        throw new Error(participantError.message || "Failed to join as participant")
+        throw new Error(
+          participantError.message || "Failed to join as participant",
+        );
       }
 
-      addRecentBoard(slug, createForm.title.trim() || "Untitled Retro")
-      router.push(`/retro/${slug}`)
+      addRecentBoard(slug, createForm.title.trim() || "Untitled Retro");
+      router.push(`/retro/${slug}`);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to create session. Please try again."
-      setError(errorMessage)
+      const errorMessage =
+        err instanceof Error
+          ? err.message
+          : "Failed to create session. Please try again.";
+      setError(errorMessage);
     } finally {
-      setIsCreating(false)
+      setIsCreating(false);
     }
-  }
+  };
 
   const handleJoinSession = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
     if (!joinForm.slug.trim() || !username.trim()) {
-      setError("Please fill in all fields")
-      return
+      setError("Please fill in all fields");
+      return;
     }
     if (!userId) {
-      setError("Authentication not ready. Please wait...")
-      return
+      setError("Authentication not ready. Please wait...");
+      return;
     }
 
-    setIsJoining(true)
-    setError("")
+    setIsJoining(true);
+    setError("");
 
     try {
-      const supabase = createClient()
+      const supabase = createClient();
       const { data: board, error: fetchError } = await supabase
         .from("retro_boards")
         .select("id, is_public, title")
         .eq("slug", joinForm.slug.trim().toLowerCase())
-        .single()
+        .single();
 
       if (fetchError || !board) {
-        setError("Session not found. Check the URL and try again.")
-        return
+        setError("Session not found. Check the URL and try again.");
+        return;
       }
 
       if (username.trim() !== displayName) {
-        const success = await updateDisplayName(username.trim())
+        const success = await updateDisplayName(username.trim());
         if (!success) {
-          console.warn("Failed to update display name, continuing with current name")
+          console.warn(
+            "Failed to update display name, continuing with current name",
+          );
         }
       }
 
-      addRecentBoard(joinForm.slug.trim().toLowerCase(), board.title)
-      router.push(`/retro/${joinForm.slug.trim().toLowerCase()}`)
+      addRecentBoard(joinForm.slug.trim().toLowerCase(), board.title);
+      router.push(`/retro/${joinForm.slug.trim().toLowerCase()}`);
     } catch (err) {
-      console.error(err)
-      setError("Failed to join session. Please try again.")
+      console.error(err);
+      setError("Failed to join session. Please try again.");
     } finally {
-      setIsJoining(false)
+      setIsJoining(false);
     }
-  }
+  };
 
   if (!isInitialized) {
     return (
@@ -167,7 +191,7 @@ export default function ClientPage() {
           <p className="text-sm font-medium text-foreground/60">Loading...</p>
         </div>
       </main>
-    )
+    );
   }
 
   return (
@@ -232,7 +256,9 @@ export default function ClientPage() {
                       >
                         <div className="flex flex-col gap-1 min-w-0">
                           <span className="truncate">{board.title}</span>
-                          <span className="text-xs text-muted-foreground font-mono">{board.slug}</span>
+                          <span className="text-xs text-muted-foreground font-mono">
+                            {board.slug}
+                          </span>
                         </div>
                         <button
                           onClick={(e) => handleRemoveRecent(board.slug, e)}
@@ -272,7 +298,10 @@ export default function ClientPage() {
                   <TabsContent value="create" className="p-6 md:p-8 mt-0">
                     <form onSubmit={handleCreateSession} className="space-y-5">
                       <div className="space-y-2">
-                        <Label htmlFor="create-username" className="text-sm font-bold uppercase">
+                        <Label
+                          htmlFor="create-username"
+                          className="text-sm font-bold uppercase"
+                        >
                           Your Name
                         </Label>
                         <Input
@@ -285,20 +314,31 @@ export default function ClientPage() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="create-title" className="text-sm font-bold uppercase text-muted-foreground">
-                          Session Title <span className="text-xs">(Optional)</span>
+                        <Label
+                          htmlFor="create-title"
+                          className="text-sm font-bold uppercase text-muted-foreground"
+                        >
+                          Session Title{" "}
+                          <span className="text-xs">(Optional)</span>
                         </Label>
                         <Input
                           id="create-title"
                           placeholder="Sprint 42 Retro"
                           value={createForm.title}
-                          onChange={(e) => setCreateForm({ ...createForm, title: e.target.value })}
+                          onChange={(e) =>
+                            setCreateForm({
+                              ...createForm,
+                              title: e.target.value,
+                            })
+                          }
                           className="h-12 rounded-xl border-2 border-border bg-background px-4 text-base shadow-sm"
                         />
                       </div>
                       {error && (
                         <div className="rounded-xl border-2 border-primary/20 bg-primary/10 px-4 py-3">
-                          <p className="text-sm font-bold text-primary">{error}</p>
+                          <p className="text-sm font-bold text-primary">
+                            {error}
+                          </p>
                         </div>
                       )}
                       <Button
@@ -314,7 +354,10 @@ export default function ClientPage() {
                   <TabsContent value="join" className="p-6 md:p-8 mt-0">
                     <form onSubmit={handleJoinSession} className="space-y-5">
                       <div className="space-y-2">
-                        <Label htmlFor="join-username" className="text-sm font-bold uppercase">
+                        <Label
+                          htmlFor="join-username"
+                          className="text-sm font-bold uppercase"
+                        >
                           Your Name
                         </Label>
                         <Input
@@ -327,21 +370,28 @@ export default function ClientPage() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="join-slug" className="text-sm font-bold uppercase">
+                        <Label
+                          htmlFor="join-slug"
+                          className="text-sm font-bold uppercase"
+                        >
                           Session Code
                         </Label>
                         <Input
                           id="join-slug"
                           placeholder="swift-falcon-123"
                           value={joinForm.slug}
-                          onChange={(e) => setJoinForm({ ...joinForm, slug: e.target.value })}
+                          onChange={(e) =>
+                            setJoinForm({ ...joinForm, slug: e.target.value })
+                          }
                           className="h-12 rounded-xl border-2 border-border bg-background px-4 text-base font-mono shadow-sm"
                           required
                         />
                       </div>
                       {error && (
                         <div className="rounded-xl border-2 border-primary/20 bg-primary/10 px-4 py-3">
-                          <p className="text-sm font-bold text-primary">{error}</p>
+                          <p className="text-sm font-bold text-primary">
+                            {error}
+                          </p>
                         </div>
                       )}
                       <Button
@@ -360,5 +410,5 @@ export default function ClientPage() {
         </div>
       </main>
     </>
-  )
+  );
 }

@@ -1,27 +1,34 @@
-"use client"
+"use client";
 
-import { Button } from "@/components/ui/button"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { useAuth } from "@/hooks/use-auth"
-import { Github, User, ShieldCheck, UserCircle } from "lucide-react"
+import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { useAuth } from "@/hooks/use-auth";
+import { Github, User, ShieldCheck, UserCircle } from "lucide-react";
 
 interface UserAccountPopoverProps {
-  variant?: "default" | "compact"
+  variant?: "default" | "compact";
 }
 
-export function UserAccountPopover({ variant = "default" }: UserAccountPopoverProps) {
-  const { userId, displayName, isAnonymous, linkGitHubIdentity, isLoading } = useAuth()
+export function UserAccountPopover({
+  variant = "default",
+}: UserAccountPopoverProps) {
+  const { userId, displayName, isAnonymous, linkGitHubIdentity, isLoading } =
+    useAuth();
 
   const handleLinkGitHub = async () => {
-    const result = await linkGitHubIdentity()
+    const result = await linkGitHubIdentity();
     if (!result.success) {
-      alert(`Failed to link GitHub: ${result.error}`)
+      alert(`Failed to link GitHub: ${result.error}`);
     }
-  }
+  };
 
-  if (!userId) return null
+  if (!userId) return null;
 
-  const isCompact = variant === "compact"
+  const isCompact = variant === "compact";
 
   return (
     <Popover>
@@ -42,9 +49,13 @@ export function UserAccountPopover({ variant = "default" }: UserAccountPopoverPr
               } ${isCompact ? "h-6 w-6" : "h-7 w-7"}`}
             >
               {isAnonymous ? (
-                <UserCircle className={`text-amber-700 ${isCompact ? "h-4 w-4" : "h-5 w-5"}`} />
+                <UserCircle
+                  className={`text-amber-700 ${isCompact ? "h-4 w-4" : "h-5 w-5"}`}
+                />
               ) : (
-                <Github className={`text-green-700 ${isCompact ? "h-3.5 w-3.5" : "h-4 w-4"}`} />
+                <Github
+                  className={`text-green-700 ${isCompact ? "h-3.5 w-3.5" : "h-4 w-4"}`}
+                />
               )}
             </div>
             {/* Status dot */}
@@ -68,7 +79,10 @@ export function UserAccountPopover({ variant = "default" }: UserAccountPopoverPr
       <PopoverContent className="w-80 p-0 rounded-xl" align="end">
         <div className="border-b-2 border-border bg-muted px-4 py-3 rounded-t-xl">
           <div className="flex items-center gap-2">
-            <User className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+            <User
+              className="h-5 w-5 text-muted-foreground"
+              aria-hidden="true"
+            />
             <h3 className="text-base font-bold uppercase">Account</h3>
           </div>
         </div>
@@ -77,25 +91,42 @@ export function UserAccountPopover({ variant = "default" }: UserAccountPopoverPr
           {/* User Info */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase text-muted-foreground">Display Name</span>
-              <span className="text-sm font-semibold">{displayName || "Not set"}</span>
+              <span className="text-xs font-bold uppercase text-muted-foreground">
+                Display Name
+              </span>
+              <span className="text-sm font-semibold">
+                {displayName || "Not set"}
+              </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase text-muted-foreground">User ID</span>
-              <code className="text-xs font-mono font-semibold">{userId.slice(0, 8)}...</code>
+              <span className="text-xs font-bold uppercase text-muted-foreground">
+                User ID
+              </span>
+              <code className="text-xs font-mono font-semibold">
+                {userId.slice(0, 8)}...
+              </code>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase text-muted-foreground">Status</span>
+              <span className="text-xs font-bold uppercase text-muted-foreground">
+                Status
+              </span>
               <div className="flex items-center gap-1.5">
                 {isAnonymous ? (
                   <>
                     <div className="h-2 w-2 rounded-full bg-amber-500" />
-                    <span className="text-xs font-semibold text-amber-600">Anonymous</span>
+                    <span className="text-xs font-semibold text-amber-600">
+                      Anonymous
+                    </span>
                   </>
                 ) : (
                   <>
-                    <ShieldCheck className="h-3.5 w-3.5 text-green-600" aria-hidden="true" />
-                    <span className="text-xs font-semibold text-green-600">Linked</span>
+                    <ShieldCheck
+                      className="h-3.5 w-3.5 text-green-600"
+                      aria-hidden="true"
+                    />
+                    <span className="text-xs font-semibold text-green-600">
+                      Linked
+                    </span>
                   </>
                 )}
               </div>
@@ -109,16 +140,24 @@ export function UserAccountPopover({ variant = "default" }: UserAccountPopoverPr
               <div className="space-y-3">
                 <div className="rounded-xl bg-muted p-3">
                   <p className="text-xs font-medium text-muted-foreground">
-                    <strong className="text-foreground">Upgrade your account</strong> to keep your data permanently and
-                    access it from any device.
+                    <strong className="text-foreground">
+                      Upgrade your account
+                    </strong>{" "}
+                    to keep your data permanently and access it from any device.
                   </p>
                 </div>
-                <Button onClick={handleLinkGitHub} disabled={isLoading} size="lg" className="w-full rounded-xl">
+                <Button
+                  onClick={handleLinkGitHub}
+                  disabled={isLoading}
+                  size="lg"
+                  className="w-full rounded-xl"
+                >
                   <Github className="mr-2 h-4 w-4" aria-hidden="true" />
                   Link GitHub Account
                 </Button>
                 <p className="text-[10px] text-muted-foreground text-center">
-                  Your current user ID and all data will be preserved after linking.
+                  Your current user ID and all data will be preserved after
+                  linking.
                 </p>
               </div>
             </>
@@ -126,5 +165,5 @@ export function UserAccountPopover({ variant = "default" }: UserAccountPopoverPr
         </div>
       </PopoverContent>
     </Popover>
-  )
+  );
 }
