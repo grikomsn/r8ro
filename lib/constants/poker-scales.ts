@@ -5,4 +5,3 @@ export const VOTING_SCALES = {
 } as const;
 
 export type VotingScaleType = keyof typeof VOTING_SCALES;
-

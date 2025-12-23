@@ -1,11 +1,11 @@
 "use client";
 
-import {
-  createClient,
-  clearSessionAndRecreateClient,
-} from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
-import { useCallback, useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  clearSessionAndRecreateClient,
+  createClient,
+} from "@/lib/supabase/client";
 
 interface AuthState {
   user: User | null;
@@ -34,7 +34,7 @@ export function useAuth() {
 
     async function signInAnonymously(
       client: ReturnType<typeof createClient>,
-      isMounted: boolean,
+      isMounted: boolean
     ) {
       const legacyName =
         typeof window !== "undefined"
@@ -79,7 +79,9 @@ export function useAuth() {
     }
 
     async function recoverFromCorruptedSession() {
-      if (isRecoveringRef.current) return;
+      if (isRecoveringRef.current) {
+        return;
+      }
       isRecoveringRef.current = true;
 
       // Clear tokens and get fresh client
@@ -114,7 +116,7 @@ export function useAuth() {
         }
 
         const displayName = userData.user.user_metadata?.display_name || "";
-        const isAnonymous = userData.user.is_anonymous || false;
+        const isAnonymous = !!userData.user.is_anonymous;
 
         if (mounted) {
           setState({
@@ -126,8 +128,9 @@ export function useAuth() {
             isAnonymous,
           });
         }
-      } catch (error: any) {
-        const errorMessage = error?.message || String(error);
+      } catch (error: unknown) {
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
         if (
           errorMessage.includes("user_not_found") ||
           errorMessage.includes("User from sub claim")
@@ -146,12 +149,14 @@ export function useAuth() {
     const {
       data: { subscription },
     } = supabaseRef.current.auth.onAuthStateChange(async (event, session) => {
-      if (!mounted || isRecoveringRef.current) return;
+      if (!mounted || isRecoveringRef.current) {
+        return;
+      }
 
       if (event === "SIGNED_OUT") {
         await signInAnonymously(supabaseRef.current, mounted);
       } else if (session?.user) {
-        const isAnonymous = session.user.is_anonymous || false;
+        const isAnonymous = !!session.user.is_anonymous;
         setState({
           user: session.user,
           userId: session.user.id,
@@ -223,11 +228,14 @@ export function useAuth() {
       }
 
       return { success: true, data };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Failed to link GitHub identity:", error);
       return {
         success: false,
-        error: error.message || "Failed to link GitHub account",
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to link GitHub account",
       };
     }
   }, [state.isAnonymous]);
