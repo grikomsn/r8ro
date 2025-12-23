@@ -1,0 +1,10 @@
+.next
+.turbo
+.vercel
+*.env*
+next-env.d.ts
+node_modules/
+package-lock.json
+yarn.lock
+
+!.env.example
