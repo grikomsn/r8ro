@@ -6,7 +6,7 @@ export default function AuthCodeErrorPage() {
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <div className="w-full max-w-md space-y-6 rounded-xl border-2 border-border bg-card p-8 text-center shadow-lg">
         <div className="space-y-2">
-          <h1 className="text-3xl font-bold text-foreground">
+          <h1 className="font-bold text-3xl text-foreground">
             Authentication Error
           </h1>
           <p className="text-muted-foreground">
@@ -15,7 +15,7 @@ export default function AuthCodeErrorPage() {
           </p>
         </div>
 
-        <ul className="space-y-2 text-left text-sm text-muted-foreground">
+        <ul className="space-y-2 text-left text-muted-foreground text-sm">
           <li className="flex items-start gap-2">
             <span className="mt-0.5">•</span>
             <span>The authentication code was invalid or expired</span>
@@ -34,7 +34,7 @@ export default function AuthCodeErrorPage() {
           <Button asChild className="w-full" size="lg">
             <Link href="/">Return to Home</Link>
           </Button>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-muted-foreground text-xs">
             You can try linking your account again from your profile.
           </p>
         </div>

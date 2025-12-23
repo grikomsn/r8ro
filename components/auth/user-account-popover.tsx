@@ -1,5 +1,6 @@
 "use client";
 
+import { Github, ShieldCheck, User, UserCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -7,7 +8,6 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { useAuth } from "@/hooks/use-auth";
-import { Github, User, ShieldCheck, UserCircle } from "lucide-react";
 
 interface UserAccountPopoverProps {
   variant?: "default" | "compact";
@@ -22,11 +22,13 @@ export function UserAccountPopover({
   const handleLinkGitHub = async () => {
     const result = await linkGitHubIdentity();
     if (!result.success) {
-      alert(`Failed to link GitHub: ${result.error}`);
+      console.error(`Failed to link GitHub: ${result.error}`);
     }
   };
 
-  if (!userId) return null;
+  if (!userId) {
+    return null;
+  }
 
   const isCompact = variant === "compact";
 
@@ -34,12 +36,13 @@ export function UserAccountPopover({
     <Popover>
       <PopoverTrigger asChild>
         <button
+          aria-label="User account menu"
           className={`group flex items-center gap-2 rounded-full border-2 transition-all hover:shadow-md ${
             isAnonymous
-              ? "border-amber-400 bg-amber-50 hover:bg-amber-100 hover:border-amber-500"
-              : "border-green-400 bg-green-50 hover:bg-green-100 hover:border-green-500"
-          } ${isCompact ? "py-1 pl-1 pr-2.5" : "py-1.5 pl-1.5 pr-3"}`}
-          aria-label="User account menu"
+              ? "border-amber-400 bg-amber-50 hover:border-amber-500 hover:bg-amber-100"
+              : "border-green-400 bg-green-50 hover:border-green-500 hover:bg-green-100"
+          } ${isCompact ? "py-1 pr-2.5 pl-1" : "py-1.5 pr-3 pl-1.5"}`}
+          type="button"
         >
           {/* Avatar circle with status indicator */}
           <div className="relative">
@@ -60,7 +63,7 @@ export function UserAccountPopover({
             </div>
             {/* Status dot */}
             <div
-              className={`absolute -bottom-0.5 -right-0.5 rounded-full border-2 border-white ${
+              className={`absolute -right-0.5 -bottom-0.5 rounded-full border-2 border-white ${
                 isAnonymous ? "bg-amber-500" : "bg-green-500"
               } ${isCompact ? "h-2.5 w-2.5" : "h-3 w-3"}`}
             />
@@ -68,7 +71,7 @@ export function UserAccountPopover({
 
           {/* Display name or anonymous label */}
           <span
-            className={`font-semibold truncate max-w-[100px] ${
+            className={`max-w-[100px] truncate font-semibold ${
               isAnonymous ? "text-amber-800" : "text-green-800"
             } ${isCompact ? "text-xs" : "text-sm"}`}
           >
@@ -76,14 +79,14 @@ export function UserAccountPopover({
           </span>
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-80 p-0 rounded-xl" align="end">
-        <div className="border-b-2 border-border bg-muted px-4 py-3 rounded-t-xl">
+      <PopoverContent align="end" className="w-80 rounded-xl p-0">
+        <div className="rounded-t-xl border-border border-b-2 bg-muted px-4 py-3">
           <div className="flex items-center gap-2">
             <User
-              className="h-5 w-5 text-muted-foreground"
               aria-hidden="true"
+              className="h-5 w-5 text-muted-foreground"
             />
-            <h3 className="text-base font-bold uppercase">Account</h3>
+            <h3 className="font-bold text-base uppercase">Account</h3>
           </div>
         </div>
 
@@ -91,40 +94,40 @@ export function UserAccountPopover({
           {/* User Info */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase text-muted-foreground">
+              <span className="font-bold text-muted-foreground text-xs uppercase">
                 Display Name
               </span>
-              <span className="text-sm font-semibold">
+              <span className="font-semibold text-sm">
                 {displayName || "Not set"}
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase text-muted-foreground">
+              <span className="font-bold text-muted-foreground text-xs uppercase">
                 User ID
               </span>
-              <code className="text-xs font-mono font-semibold">
+              <code className="font-mono font-semibold text-xs">
                 {userId.slice(0, 8)}...
               </code>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase text-muted-foreground">
+              <span className="font-bold text-muted-foreground text-xs uppercase">
                 Status
               </span>
               <div className="flex items-center gap-1.5">
                 {isAnonymous ? (
                   <>
                     <div className="h-2 w-2 rounded-full bg-amber-500" />
-                    <span className="text-xs font-semibold text-amber-600">
+                    <span className="font-semibold text-amber-600 text-xs">
                       Anonymous
                     </span>
                   </>
                 ) : (
                   <>
                     <ShieldCheck
-                      className="h-3.5 w-3.5 text-green-600"
                       aria-hidden="true"
+                      className="h-3.5 w-3.5 text-green-600"
                     />
-                    <span className="text-xs font-semibold text-green-600">
+                    <span className="font-semibold text-green-600 text-xs">
                       Linked
                     </span>
                   </>
@@ -139,7 +142,7 @@ export function UserAccountPopover({
               <div className="h-px bg-border" />
               <div className="space-y-3">
                 <div className="rounded-xl bg-muted p-3">
-                  <p className="text-xs font-medium text-muted-foreground">
+                  <p className="font-medium text-muted-foreground text-xs">
                     <strong className="text-foreground">
                       Upgrade your account
                     </strong>{" "}
@@ -147,15 +150,15 @@ export function UserAccountPopover({
                   </p>
                 </div>
                 <Button
-                  onClick={handleLinkGitHub}
-                  disabled={isLoading}
-                  size="lg"
                   className="w-full rounded-xl"
+                  disabled={isLoading}
+                  onClick={handleLinkGitHub}
+                  size="lg"
                 >
-                  <Github className="mr-2 h-4 w-4" aria-hidden="true" />
+                  <Github aria-hidden="true" className="mr-2 h-4 w-4" />
                   Link GitHub Account
                 </Button>
-                <p className="text-[10px] text-muted-foreground text-center">
+                <p className="text-center text-[10px] text-muted-foreground">
                   Your current user ID and all data will be preserved after
                   linking.
                 </p>

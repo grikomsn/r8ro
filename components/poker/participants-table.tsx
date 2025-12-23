@@ -1,7 +1,7 @@
 "use client";
 
-import type { PokerParticipant, PokerVote } from "@/lib/types";
 import { Crown, Eye } from "lucide-react";
+import type { PokerParticipant, PokerVote } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface ParticipantsTableProps {
@@ -21,20 +21,24 @@ export function ParticipantsTable({
   isAuthor,
   currentUserId,
   authorId,
-  scale,
+  scale: _scale,
 }: ParticipantsTableProps) {
   // Calculate statistics if votes are revealed
   const calculateStats = () => {
-    if (!votesRevealed || votes.length === 0) return null;
+    if (!votesRevealed || votes.length === 0) {
+      return null;
+    }
 
     const numericVotes = votes
       .map((v) => {
         const num = Number.parseFloat(v.vote_value);
-        return isNaN(num) ? null : num;
+        return Number.isNaN(num) ? null : num;
       })
       .filter((v): v is number => v !== null);
 
-    if (numericVotes.length === 0) return null;
+    if (numericVotes.length === 0) {
+      return null;
+    }
 
     const min = Math.min(...numericVotes);
     const max = Math.max(...numericVotes);
@@ -43,9 +47,9 @@ export function ParticipantsTable({
 
     // Find mode
     const frequency: Record<number, number> = {};
-    numericVotes.forEach((v) => {
+    for (const v of numericVotes) {
       frequency[v] = (frequency[v] || 0) + 1;
-    });
+    }
     const mode = Object.entries(frequency).reduce((a, b) =>
       a[1] > b[1] ? a : b
     )[0];
@@ -53,7 +57,9 @@ export function ParticipantsTable({
     // Find outliers (votes > 1.5x away from average)
     const outliers = votes.filter((v) => {
       const num = Number.parseFloat(v.vote_value);
-      if (isNaN(num)) return false;
+      if (Number.isNaN(num)) {
+        return false;
+      }
       return Math.abs(num - avg) > avg * 1.5;
     });
 
@@ -69,7 +75,9 @@ export function ParticipantsTable({
 
   // Check if vote is outlier
   const isOutlier = (vote: PokerVote | undefined) => {
-    if (!stats || !vote) return false;
+    if (!(stats && vote)) {
+      return false;
+    }
     return stats.outliers.some((o) => o.id === vote.id);
   };
 
@@ -78,27 +86,33 @@ export function ParticipantsTable({
     participant: PokerParticipant,
     vote: PokerVote | undefined
   ) => {
-    if (!vote) return false;
-    if (votesRevealed) return true;
+    if (!vote) {
+      return false;
+    }
+    if (votesRevealed) {
+      return true;
+    }
     // Before reveal: admin sees only their own vote
-    if (isAuthor && participant.user_id === currentUserId) return true;
+    if (isAuthor && participant.user_id === currentUserId) {
+      return true;
+    }
     return false;
   };
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-black uppercase">Participants & Votes</h2>
-      <div className="rounded-xl border-2 border-border bg-background overflow-hidden">
+      <h2 className="font-black text-xl uppercase">Participants & Votes</h2>
+      <div className="overflow-hidden rounded-xl border-2 border-border bg-background">
         <table className="w-full">
-          <thead className="border-b-2 border-border bg-muted">
+          <thead className="border-border border-b-2 bg-muted">
             <tr>
-              <th className="px-4 py-3 text-left text-sm font-bold uppercase">
+              <th className="px-4 py-3 text-left font-bold text-sm uppercase">
                 Name
               </th>
-              <th className="px-4 py-3 text-center text-sm font-bold uppercase">
+              <th className="px-4 py-3 text-center font-bold text-sm uppercase">
                 Vote
               </th>
-              <th className="px-4 py-3 text-center text-sm font-bold uppercase">
+              <th className="px-4 py-3 text-center font-bold text-sm uppercase">
                 Status
               </th>
             </tr>
@@ -112,13 +126,13 @@ export function ParticipantsTable({
 
               return (
                 <tr
-                  key={participant.id}
                   className={cn(
-                    "border-b border-border last:border-b-0",
+                    "border-border border-b last:border-b-0",
                     participant.is_online
                       ? "bg-background"
                       : "bg-muted/30 opacity-60"
                   )}
+                  key={participant.id}
                 >
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
@@ -135,12 +149,12 @@ export function ParticipantsTable({
                       </span>
                       {participant.is_observer && (
                         <Eye
-                          className="h-4 w-4 text-muted-foreground"
                           aria-label="Observer"
+                          className="h-4 w-4 text-muted-foreground"
                         />
                       )}
                       {participant.user_id === authorId && (
-                        <Crown className="h-4 w-4 text-amber-600 fill-amber-500" />
+                        <Crown className="h-4 w-4 fill-amber-500 text-amber-600" />
                       )}
                     </div>
                   </td>
@@ -148,27 +162,27 @@ export function ParticipantsTable({
                     {showVoteValue && vote ? (
                       <span
                         className={cn(
-                          "inline-block px-3 py-1 rounded-lg font-mono font-bold text-lg",
+                          "inline-block rounded-lg px-3 py-1 font-bold font-mono text-lg",
                           outlier
-                            ? "bg-amber-100 text-amber-900 border-2 border-amber-500"
-                            : "bg-primary/20 text-primary border-2 border-primary"
+                            ? "border-2 border-amber-500 bg-amber-100 text-amber-900"
+                            : "border-2 border-primary bg-primary/20 text-primary"
                         )}
                       >
                         {vote.vote_value}
                       </span>
                     ) : hasVoted ? (
-                      <span className="text-primary font-bold">✓</span>
+                      <span className="font-bold text-primary">✓</span>
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )}
                   </td>
                   <td className="px-4 py-3 text-center">
                     {participant.is_online ? (
-                      <span className="text-xs font-bold text-chart-4">
+                      <span className="font-bold text-chart-4 text-xs">
                         Online
                       </span>
                     ) : (
-                      <span className="text-xs font-bold text-muted-foreground">
+                      <span className="font-bold text-muted-foreground text-xs">
                         Offline
                       </span>
                     )}
@@ -181,37 +195,37 @@ export function ParticipantsTable({
       </div>
 
       {votesRevealed && stats && (
-        <div className="rounded-xl border-2 border-border bg-muted p-4 space-y-2">
-          <h3 className="text-lg font-black uppercase">Statistics</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="space-y-2 rounded-xl border-2 border-border bg-muted p-4">
+          <h3 className="font-black text-lg uppercase">Statistics</h3>
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
             <div>
-              <p className="text-xs font-bold uppercase text-muted-foreground">
+              <p className="font-bold text-muted-foreground text-xs uppercase">
                 Min
               </p>
-              <p className="text-2xl font-black">{stats.min}</p>
+              <p className="font-black text-2xl">{stats.min}</p>
             </div>
             <div>
-              <p className="text-xs font-bold uppercase text-muted-foreground">
+              <p className="font-bold text-muted-foreground text-xs uppercase">
                 Max
               </p>
-              <p className="text-2xl font-black">{stats.max}</p>
+              <p className="font-black text-2xl">{stats.max}</p>
             </div>
             <div>
-              <p className="text-xs font-bold uppercase text-muted-foreground">
+              <p className="font-bold text-muted-foreground text-xs uppercase">
                 Average
               </p>
-              <p className="text-2xl font-black">{stats.avg.toFixed(1)}</p>
+              <p className="font-black text-2xl">{stats.avg.toFixed(1)}</p>
             </div>
             <div>
-              <p className="text-xs font-bold uppercase text-muted-foreground">
+              <p className="font-bold text-muted-foreground text-xs uppercase">
                 Mode
               </p>
-              <p className="text-2xl font-black">{stats.mode}</p>
+              <p className="font-black text-2xl">{stats.mode}</p>
             </div>
           </div>
           {stats.outliers.length > 0 && (
-            <div className="mt-4 pt-4 border-t border-border">
-              <p className="text-sm font-bold text-amber-600">
+            <div className="mt-4 border-border border-t pt-4">
+              <p className="font-bold text-amber-600 text-sm">
                 {stats.outliers.length} outlier
                 {stats.outliers.length > 1 ? "s" : ""} detected
               </p>

@@ -1,17 +1,26 @@
 "use client";
 
-import type React from "react";
-import { UserAccountPopover } from "@/components/auth/user-account-popover";
-import { useState, useEffect, useRef } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import html2canvas from "html2canvas";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  Check,
+  Clock,
+  Copy,
+  Eye,
+  EyeOff,
+  ImageIcon,
+  Lock,
+  Pencil,
+  Settings,
+  Share,
+  Share2,
+  Trash2,
+  Unlock,
+  Users,
+  X,
+} from "lucide-react";
+import type React from "react";
+import { useEffect, useRef, useState } from "react";
+import { UserAccountPopover } from "@/components/auth/user-account-popover";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,34 +31,22 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
 import {
-  TooltipProvider,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import {
   Tooltip,
   TooltipContent,
+  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { RetroBoard } from "@/lib/types";
-import {
-  Play,
-  Pause,
-  RotateCcw,
-  Eye,
-  EyeOff,
-  Trash2,
-  Share2,
-  Settings,
-  Clock,
-  Check,
-  Pencil,
-  X,
-  Lock,
-  Unlock,
-  Copy,
-  ImageIcon,
-  Share,
-  Users,
-} from "lucide-react";
-import html2canvas from "html2canvas";
 
 interface BoardHeaderProps {
   board: RetroBoard;
@@ -72,9 +69,9 @@ export function BoardHeader({
   isAuthor,
   onToggleVisibility,
   onDeleteBoard,
-  onTimerToggle,
-  onTimerReset,
-  onSetTimer,
+  onTimerToggle: _onTimerToggle,
+  onTimerReset: _onTimerReset,
+  onSetTimer: _onSetTimer,
   onTitleUpdate,
   onToggleLock,
   showSidebar,
@@ -84,14 +81,11 @@ export function BoardHeader({
 }: BoardHeaderProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [remainingTime, setRemainingTime] = useState(
-    board.timer_seconds || 300,
+    board.timer_seconds || 300
   );
-  const [copied, setCopied] = useState(false);
   const [shareStatus, setShareStatus] = useState<string | null>(null);
-  const [timerInput, setTimerInput] = useState("");
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleInput, setTitleInput] = useState(board.title);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const hasPlayedAlarm = useRef(false);
 
   useEffect(() => {
@@ -106,7 +100,41 @@ export function BoardHeader({
   }, [board.timer_seconds, board.timer_running]);
 
   useEffect(() => {
-    if (!board.timer_running || !board.timer_started_at) {
+    const playAlarm = () => {
+      try {
+        const audioContext =
+          new // biome-ignore lint/suspicious/noExplicitAny: we need to use any to get the webkitAudioContext
+          (window.AudioContext || (window as any).webkitAudioContext)();
+
+        const playBeep = (time: number) => {
+          const oscillator = audioContext.createOscillator();
+          const gainNode = audioContext.createGain();
+
+          oscillator.connect(gainNode);
+          gainNode.connect(audioContext.destination);
+
+          oscillator.frequency.value = 800;
+          oscillator.type = "square";
+
+          gainNode.gain.setValueAtTime(0.3, audioContext.currentTime + time);
+          gainNode.gain.exponentialRampToValueAtTime(
+            0.01,
+            audioContext.currentTime + time + 0.3
+          );
+
+          oscillator.start(audioContext.currentTime + time);
+          oscillator.stop(audioContext.currentTime + time + 0.3);
+        };
+
+        playBeep(0);
+        playBeep(0.4);
+        playBeep(0.8);
+      } catch (e) {
+        console.log("[v0] Audio playback failed:", e);
+      }
+    };
+
+    if (!(board.timer_running && board.timer_started_at)) {
       return;
     }
 
@@ -127,40 +155,6 @@ export function BoardHeader({
 
     return () => clearInterval(interval);
   }, [board.timer_running, board.timer_started_at, board.timer_seconds]);
-
-  const playAlarm = () => {
-    try {
-      const audioContext = new (
-        window.AudioContext || (window as any).webkitAudioContext
-      )();
-
-      const playBeep = (time: number) => {
-        const oscillator = audioContext.createOscillator();
-        const gainNode = audioContext.createGain();
-
-        oscillator.connect(gainNode);
-        gainNode.connect(audioContext.destination);
-
-        oscillator.frequency.value = 800;
-        oscillator.type = "square";
-
-        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime + time);
-        gainNode.gain.exponentialRampToValueAtTime(
-          0.01,
-          audioContext.currentTime + time + 0.3,
-        );
-
-        oscillator.start(audioContext.currentTime + time);
-        oscillator.stop(audioContext.currentTime + time + 0.3);
-      };
-
-      playBeep(0);
-      playBeep(0.4);
-      playBeep(0.8);
-    } catch (e) {
-      console.log("[v0] Audio playback failed:", e);
-    }
-  };
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -199,7 +193,7 @@ export function BoardHeader({
     try {
       setShareStatus("capturing");
       const boardElement = document.querySelector(
-        "[data-board-capture]",
+        "[data-board-capture]"
       ) as HTMLElement;
       if (!boardElement) {
         console.log("[v0] Board element not found");
@@ -254,14 +248,6 @@ export function BoardHeader({
     }
   };
 
-  const handleSetTimer = () => {
-    const minutes = Number.parseInt(timerInput);
-    if (!isNaN(minutes) && minutes > 0) {
-      onSetTimer(minutes * 60);
-      setTimerInput("");
-    }
-  };
-
   const saveTitle = () => {
     if (titleInput.trim()) {
       onTitleUpdate(titleInput.trim());
@@ -283,47 +269,39 @@ export function BoardHeader({
     }
   };
 
-  const handleTimerReset = () => {
-    hasPlayedAlarm.current = false;
-    onTimerReset();
-  };
-
   return (
     <>
       <TooltipProvider>
-        <header
-          className="grid grid-cols-1 gap-4 rounded-t-xl border-b-2 border-border bg-background px-4 py-4 shadow-sm md:grid-cols-[1fr_auto_1fr] md:px-6"
-          role="banner"
-        >
+        <header className="grid grid-cols-1 gap-4 rounded-b-xl border-border border-b-2 bg-background px-3 py-3 shadow-sm md:px-4 lg:grid-cols-[1fr_auto]">
           {/* LEFT SECTION: Branding and Info */}
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-black uppercase md:text-3xl font-mono">
+          <div className="flex min-w-0 items-center gap-3">
+            <h1 className="shrink-0 font-black font-mono text-2xl uppercase md:text-3xl">
               r<span className="text-primary">8</span>ro
             </h1>
             {currentUserId && <UserAccountPopover variant="compact" />}
-            <div className="hidden border-l-2 border-border pl-4 sm:block">
+            <div className="hidden min-w-0 border-border border-l-2 pl-4 sm:block">
               {isEditingTitle ? (
                 <div
+                  aria-label="Edit board title"
                   className="flex items-center gap-2"
                   role="form"
-                  aria-label="Edit board title"
                 >
                   <Input
-                    value={titleInput}
+                    aria-label="Board title"
+                    autoFocus
+                    className="h-8 w-48 rounded-lg border border-border font-bold"
                     onChange={(e) => setTitleInput(e.target.value)}
                     onKeyDown={handleTitleKeyDown}
-                    className="h-8 w-48 border border-border font-bold rounded-lg"
-                    autoFocus
-                    aria-label="Board title"
+                    value={titleInput}
                   />
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
-                        onClick={saveTitle}
-                        className="h-8 w-8 p-0 border border-border bg-foreground text-background rounded-lg"
                         aria-label="Save title"
+                        className="h-8 w-8 rounded-lg border border-border bg-foreground p-0 text-background"
+                        onClick={saveTitle}
                       >
-                        <Check className="h-4 w-4" aria-hidden="true" />
+                        <Check aria-hidden="true" className="h-4 w-4" />
                         <span className="sr-only">Save title</span>
                       </Button>
                     </TooltipTrigger>
@@ -332,12 +310,12 @@ export function BoardHeader({
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
-                        variant="outline"
-                        onClick={cancelTitleEdit}
-                        className="h-8 w-8 p-0 border border-border bg-transparent rounded-lg"
                         aria-label="Cancel editing"
+                        className="h-8 w-8 rounded-lg border border-border bg-transparent p-0"
+                        onClick={cancelTitleEdit}
+                        variant="outline"
                       >
-                        <X className="h-4 w-4" aria-hidden="true" />
+                        <X aria-hidden="true" className="h-4 w-4" />
                         <span className="sr-only">Cancel editing</span>
                       </Button>
                     </TooltipTrigger>
@@ -347,7 +325,7 @@ export function BoardHeader({
               ) : (
                 <div className="group flex items-center gap-2">
                   <h1
-                    className={`text-lg font-bold ${isAuthor ? "cursor-pointer hover:text-primary transition-colors" : ""}`}
+                    className={`font-bold text-lg ${isAuthor ? "cursor-pointer transition-colors hover:text-primary" : ""}`}
                     onClick={() => isAuthor && setIsEditingTitle(true)}
                   >
                     {board.title}
@@ -356,12 +334,12 @@ export function BoardHeader({
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
-                          variant="ghost"
-                          onClick={() => setIsEditingTitle(true)}
-                          className="h-6 w-6 p-0 opacity-0 transition-opacity group-hover:opacity-100 rounded-lg"
                           aria-label="Edit board title"
+                          className="h-6 w-6 rounded-lg p-0 opacity-0 transition-opacity group-hover:opacity-100"
+                          onClick={() => setIsEditingTitle(true)}
+                          variant="ghost"
                         >
-                          <Pencil className="h-3 w-3" aria-hidden="true" />
+                          <Pencil aria-hidden="true" className="h-3 w-3" />
                           <span className="sr-only">Edit board title</span>
                         </Button>
                       </TooltipTrigger>
@@ -372,14 +350,21 @@ export function BoardHeader({
                   )}
                 </div>
               )}
-              <p className="text-sm text-muted-foreground">{board.slug}</p>
+              <p className="text-muted-foreground text-sm">{board.slug}</p>
             </div>
           </div>
 
-          {/* CENTER SECTION: Timer and Controls */}
-          <div className="flex items-center justify-center gap-2">
+          {/* RIGHT SECTION: Timer and Actions */}
+          <div
+            aria-label="Board actions"
+            className="flex min-w-0 flex-wrap items-center justify-end gap-2 md:gap-4"
+            role="group"
+          >
+            {/* Timer Display (Read-only) */}
             <div
-              className={`flex items-center gap-2 border-2 border-border px-4 py-2 text-2xl font-black shadow-sm rounded-xl ${
+              aria-label={`Timer: ${formatTime(remainingTime)}`}
+              aria-live="polite"
+              className={`flex items-center gap-2 rounded-xl border-2 border-border px-3 py-1.5 font-black text-lg shadow-sm md:px-4 md:py-2 md:text-2xl ${
                 board.timer_running && remainingTime <= 10
                   ? "animate-pulse bg-primary text-primary-foreground"
                   : board.timer_running
@@ -387,154 +372,33 @@ export function BoardHeader({
                     : "bg-background"
               }`}
               role="timer"
-              aria-label={`Timer: ${formatTime(remainingTime)}`}
-              aria-live="polite"
             >
-              <Clock className="h-5 w-5" aria-hidden="true" />
+              <Clock aria-hidden="true" className="h-4 w-4 md:h-5 md:w-5" />
               <span>{formatTime(remainingTime)}</span>
             </div>
-
-            {isAuthor && (
-              <div
-                className="flex gap-1"
-                role="group"
-                aria-label="Timer controls"
-              >
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="outline"
-                      onClick={onTimerToggle}
-                      className="h-10 w-10 p-0 border-2 border-border shadow-sm bg-transparent rounded-lg"
-                      aria-label={
-                        board.timer_running ? "Pause timer" : "Start timer"
-                      }
-                      aria-pressed={board.timer_running}
-                    >
-                      {board.timer_running ? (
-                        <Pause className="h-4 w-4" aria-hidden="true" />
-                      ) : (
-                        <Play className="h-4 w-4" aria-hidden="true" />
-                      )}
-                      <span className="sr-only">
-                        {board.timer_running ? "Pause timer" : "Start timer"}
-                      </span>
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    {board.timer_running ? "Pause timer" : "Start timer"}
-                  </TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="outline"
-                      onClick={handleTimerReset}
-                      className="hidden h-10 w-10 p-0 border-2 border-border shadow-sm bg-transparent sm:flex rounded-lg"
-                      aria-label="Reset timer"
-                    >
-                      <RotateCcw className="h-4 w-4" aria-hidden="true" />
-                      <span className="sr-only">Reset timer</span>
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Reset timer</TooltipContent>
-                </Tooltip>
-                <DropdownMenu>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="outline"
-                          className="hidden h-10 w-10 p-0 border-2 border-border shadow-sm bg-transparent sm:flex rounded-lg"
-                          aria-label="Timer settings"
-                        >
-                          <Settings className="h-4 w-4" aria-hidden="true" />
-                          <span className="sr-only">Timer settings</span>
-                        </Button>
-                      </DropdownMenuTrigger>
-                    </TooltipTrigger>
-                    <TooltipContent>Timer settings</TooltipContent>
-                  </Tooltip>
-                  <DropdownMenuContent
-                    className="border-2 border-border rounded-xl w-64"
-                    align="center"
-                    sideOffset={12}
-                  >
-                    <div className="p-4 space-y-3">
-                      <p
-                        className="mb-2 text-xs font-bold uppercase"
-                        id="timer-input-label"
-                      >
-                        Set Timer (minutes)
-                      </p>
-                      <div className="flex gap-2">
-                        <Input
-                          type="number"
-                          placeholder="5"
-                          value={timerInput}
-                          onChange={(e) => setTimerInput(e.target.value)}
-                          className="w-20 border border-border rounded-lg"
-                          aria-labelledby="timer-input-label"
-                          min="1"
-                        />
-                        <Button
-                          onClick={handleSetTimer}
-                          className="h-10 border border-border bg-accent font-bold text-accent-foreground rounded-lg"
-                        >
-                          Set
-                        </Button>
-                      </div>
-                    </div>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onClick={() => onSetTimer(5 * 60)}
-                      className="font-bold"
-                    >
-                      <Clock className="mr-2 h-4 w-4" />5 minutes (default)
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => onSetTimer(10 * 60)}>
-                      <Clock className="mr-2 h-4 w-4" />
-                      10 minutes
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => onSetTimer(15 * 60)}>
-                      <Clock className="mr-2 h-4 w-4" />
-                      15 minutes
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            )}
-          </div>
-
-          {/* RIGHT SECTION: Actions */}
-          <div
-            className="flex items-center justify-end gap-2"
-            role="group"
-            aria-label="Board actions"
-          >
             {onToggleSidebar && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
-                    variant="outline"
-                    onClick={onToggleSidebar}
-                    className="relative h-9 border-2 border-border font-bold shadow-sm bg-transparent xl:hidden md:h-10 rounded-lg"
-                    aria-label={`Participants (${participantCount})`}
                     aria-expanded={showSidebar}
+                    aria-label={`Participants (${participantCount})`}
+                    className="relative h-9 rounded-lg border-2 border-border bg-transparent font-bold shadow-sm md:h-10 xl:hidden"
+                    onClick={onToggleSidebar}
+                    variant="outline"
                   >
-                    <Users className="h-4 w-4 md:mr-2" aria-hidden="true" />
+                    <Users aria-hidden="true" className="h-4 w-4 md:mr-2" />
                     <span className="hidden md:inline">Participants</span>
                     {participantCount > 0 && (
                       <span
-                        className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center border border-border bg-primary text-xs font-bold text-primary-foreground rounded-full"
                         aria-hidden="true"
+                        className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full border border-border bg-primary font-bold text-primary-foreground text-xs"
                       >
                         {participantCount}
                       </span>
                     )}
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent className="xl:hidden">
+                <TooltipContent className="md:hidden xl:hidden">
                   Participants ({participantCount})
                 </TooltipContent>
               </Tooltip>
@@ -543,35 +407,34 @@ export function BoardHeader({
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
-                  variant="outline"
-                  onClick={() => {}}
-                  className="h-9 border-2 border-border font-bold shadow-sm bg-transparent md:h-10 rounded-lg"
                   aria-label="Share options"
+                  className="h-9 rounded-lg border-2 border-border bg-transparent font-bold shadow-sm md:h-10"
+                  variant="outline"
                 >
                   {shareStatus ? (
-                    <Check className="h-4 w-4 md:mr-2" aria-hidden="true" />
+                    <Check aria-hidden="true" className="h-4 w-4 md:mr-2" />
                   ) : (
-                    <Share2 className="h-4 w-4 md:mr-2" aria-hidden="true" />
+                    <Share2 aria-hidden="true" className="h-4 w-4 md:mr-2" />
                   )}
                   <span className="hidden md:inline">{getShareLabel()}</span>
                   <span className="sr-only md:hidden">{getShareLabel()}</span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent
-                className="border-2 border-border rounded-xl"
                 align="end"
+                className="rounded-xl border-2 border-border"
               >
                 <DropdownMenuItem onClick={copyToClipboard}>
-                  <Copy className="mr-2 h-4 w-4" aria-hidden="true" />
+                  <Copy aria-hidden="true" className="mr-2 h-4 w-4" />
                   Copy Link
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={shareNative}>
-                  <Share className="mr-2 h-4 w-4" aria-hidden="true" />
+                  <Share aria-hidden="true" className="mr-2 h-4 w-4" />
                   Share via...
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={captureAsImage}>
-                  <ImageIcon className="mr-2 h-4 w-4" aria-hidden="true" />
+                  <ImageIcon aria-hidden="true" className="mr-2 h-4 w-4" />
                   Copy as Image
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -581,29 +444,29 @@ export function BoardHeader({
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
-                    variant="outline"
-                    className="h-9 border-2 border-border font-bold shadow-sm bg-transparent md:h-10 rounded-lg"
-                    aria-label="Board management options"
                     aria-haspopup="menu"
+                    aria-label="Board management options"
+                    className="h-9 rounded-lg border-2 border-border bg-transparent font-bold shadow-sm md:h-10"
+                    variant="outline"
                   >
-                    <Settings className="h-4 w-4 md:mr-2" aria-hidden="true" />
+                    <Settings aria-hidden="true" className="h-4 w-4 md:mr-2" />
                     <span className="hidden md:inline">Manage</span>
                     <span className="sr-only md:hidden">Manage board</span>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
-                  className="border-2 border-border rounded-xl"
                   align="end"
+                  className="rounded-xl border-2 border-border"
                 >
                   <DropdownMenuItem onClick={onToggleVisibility}>
                     {board.is_public ? (
                       <>
-                        <EyeOff className="mr-2 h-4 w-4" aria-hidden="true" />
+                        <EyeOff aria-hidden="true" className="mr-2 h-4 w-4" />
                         Make Private
                       </>
                     ) : (
                       <>
-                        <Eye className="mr-2 h-4 w-4" aria-hidden="true" />
+                        <Eye aria-hidden="true" className="mr-2 h-4 w-4" />
                         Make Public
                       </>
                     )}
@@ -611,22 +474,22 @@ export function BoardHeader({
                   <DropdownMenuItem onClick={onToggleLock}>
                     {board.is_locked ? (
                       <>
-                        <Unlock className="mr-2 h-4 w-4" aria-hidden="true" />
+                        <Unlock aria-hidden="true" className="mr-2 h-4 w-4" />
                         Unlock Board
                       </>
                     ) : (
                       <>
-                        <Lock className="mr-2 h-4 w-4" aria-hidden="true" />
+                        <Lock aria-hidden="true" className="mr-2 h-4 w-4" />
                         Lock Board
                       </>
                     )}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
+                    className="text-red-600 focus:bg-red-50 focus:text-red-600"
                     onClick={() => setShowDeleteDialog(true)}
-                    className="text-red-600 focus:text-red-600 focus:bg-red-50"
                   >
-                    <Trash2 className="mr-2 h-4 w-4" aria-hidden="true" />
+                    <Trash2 aria-hidden="true" className="mr-2 h-4 w-4" />
                     Delete Board
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -634,26 +497,26 @@ export function BoardHeader({
             )}
 
             <Button
-              variant={board.is_public ? "outline" : "secondary"}
-              className={`h-9 border-2 font-bold shadow-sm md:h-10 rounded-lg ${
-                board.is_public
-                  ? "border-border bg-transparent"
-                  : "border-chart-4 bg-chart-4"
-              }`}
               aria-label={
                 board.is_public ? "Board is public" : "Board is private"
               }
               aria-pressed={!board.is_public}
+              className={`h-9 rounded-lg border-2 font-bold shadow-sm md:h-10 ${
+                board.is_public
+                  ? "border-border bg-transparent"
+                  : "border-chart-4 bg-chart-4"
+              }`}
+              variant={board.is_public ? "outline" : "secondary"}
             >
               {board.is_public ? (
                 <>
-                  <Eye className="h-4 w-4 md:mr-2" aria-hidden="true" />
+                  <Eye aria-hidden="true" className="h-4 w-4 md:mr-2" />
                   <span className="hidden md:inline">Public</span>
                   <span className="sr-only md:hidden">Public board</span>
                 </>
               ) : (
                 <>
-                  <EyeOff className="h-4 w-4 md:mr-2" aria-hidden="true" />
+                  <EyeOff aria-hidden="true" className="h-4 w-4 md:mr-2" />
                   <span className="hidden md:inline">Private</span>
                   <span className="sr-only md:hidden">Private board</span>
                 </>
@@ -664,17 +527,17 @@ export function BoardHeader({
       </TooltipProvider>
 
       {/* Delete confirmation dialog */}
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+      <AlertDialog onOpenChange={setShowDeleteDialog} open={showDeleteDialog}>
         <AlertDialogContent
-          className="border-2 border-border rounded-2xl"
-          role="alertdialog"
-          aria-labelledby="delete-dialog-title"
           aria-describedby="delete-dialog-description"
+          aria-labelledby="delete-dialog-title"
+          className="rounded-2xl border-2 border-border"
+          role="alertdialog"
         >
           <AlertDialogHeader>
             <AlertDialogTitle
+              className="font-black text-xl uppercase"
               id="delete-dialog-title"
-              className="text-xl font-black uppercase"
             >
               Delete Board?
             </AlertDialogTitle>
@@ -684,12 +547,12 @@ export function BoardHeader({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="h-10 border-2 border-border font-bold rounded-lg">
+            <AlertDialogCancel className="h-10 rounded-lg border-2 border-border font-bold">
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
+              className="h-10 rounded-lg border-2 border-red-600 bg-red-600 font-bold text-white hover:bg-red-700"
               onClick={onDeleteBoard}
-              className="h-10 border-2 border-red-600 bg-red-600 font-bold text-white hover:bg-red-700 rounded-lg"
             >
               Delete
             </AlertDialogAction>

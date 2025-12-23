@@ -1,24 +1,24 @@
 "use client";
 
-import type React from "react";
-import { useState, useEffect } from "react";
+import { History, LogIn, Plus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
+import type React from "react";
+import { useEffect, useState } from "react";
+import { UserAccountPopover } from "@/components/auth/user-account-popover";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { createClient } from "@/lib/supabase/client";
-import { generateSlug } from "@/lib/utils/slug";
-import { History, X, Plus, LogIn } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
+import { createClient } from "@/lib/supabase/client";
 import {
-  getRecentBoards,
   addRecentBoard,
-  removeRecentBoard,
+  getRecentBoards,
   type RecentBoard,
+  removeRecentBoard,
 } from "@/lib/utils/recent-boards";
-import { UserAccountPopover } from "@/components/auth/user-account-popover";
+import { generateSlug } from "@/lib/utils/slug";
 
 export default function ClientPage() {
   const router = useRouter();
@@ -76,7 +76,7 @@ export default function ClientPage() {
         const success = await updateDisplayName(username.trim());
         if (!success) {
           console.warn(
-            "Failed to update display name, continuing with current name",
+            "Failed to update display name, continuing with current name"
           );
         }
       }
@@ -120,7 +120,7 @@ export default function ClientPage() {
 
       if (participantError) {
         throw new Error(
-          participantError.message || "Failed to join as participant",
+          participantError.message || "Failed to join as participant"
         );
       }
 
@@ -139,7 +139,7 @@ export default function ClientPage() {
 
   const handleJoinSession = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!joinForm.slug.trim() || !username.trim()) {
+    if (!(joinForm.slug.trim() && username.trim())) {
       setError("Please fill in all fields");
       return;
     }
@@ -168,7 +168,7 @@ export default function ClientPage() {
         const success = await updateDisplayName(username.trim());
         if (!success) {
           console.warn(
-            "Failed to update display name, continuing with current name",
+            "Failed to update display name, continuing with current name"
           );
         }
       }
@@ -185,10 +185,10 @@ export default function ClientPage() {
 
   if (!isInitialized) {
     return (
-      <main className="min-h-screen bg-secondary p-4 md:p-8 flex flex-col items-center justify-center">
+      <main className="flex min-h-screen flex-col items-center justify-center bg-secondary p-4 md:p-8">
         <div className="flex flex-col items-center gap-4">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-          <p className="text-sm font-medium text-foreground/60">Loading...</p>
+          <p className="font-medium text-foreground/60 text-sm">Loading...</p>
         </div>
       </main>
     );
@@ -197,7 +197,6 @@ export default function ClientPage() {
   return (
     <>
       <script
-        type="application/ld+json"
         dangerouslySetInnerHTML={{
           __html: JSON.stringify({
             "@context": "https://schema.org",
@@ -224,12 +223,13 @@ export default function ClientPage() {
             browserRequirements: "Requires JavaScript. Requires HTML5.",
           }),
         }}
+        type="application/ld+json"
       />
-      <main className="min-h-screen bg-secondary flex flex-col">
+      <main className="flex min-h-screen flex-col bg-secondary">
         {/* Header with branding and account */}
-        <header className="border-b-2 border-border bg-background">
+        <header className="border-border border-b-2 bg-background">
           <div className="container mx-auto flex h-16 items-center justify-between px-4">
-            <h1 className="text-2xl font-black uppercase tracking-tight font-mono">
+            <h1 className="font-black font-mono text-2xl uppercase tracking-tight">
               r<span className="text-primary">8</span>ro
             </h1>
             {userId && <UserAccountPopover />}
@@ -237,33 +237,34 @@ export default function ClientPage() {
         </header>
 
         {/* Main content area */}
-        <div className="flex-1 flex flex-col items-center justify-center p-4 md:p-8">
+        <div className="flex flex-1 flex-col items-center justify-center p-4 md:p-8">
           <div className="w-full max-w-2xl space-y-6">
             {/* Recent boards section */}
             {recentBoards.length > 0 && (
-              <Card className="rounded-2xl border-2 border-border shadow-md overflow-hidden p-0 gap-0">
-                <div className="border-b-2 border-border bg-muted px-6 py-4 flex items-center gap-2">
+              <Card className="gap-0 overflow-hidden rounded-2xl border-2 border-border p-0 shadow-md">
+                <div className="flex items-center gap-2 border-border border-b-2 bg-muted px-6 py-4">
                   <History className="h-5 w-5" />
-                  <h2 className="text-base font-bold uppercase">Recent</h2>
+                  <h2 className="font-bold text-base uppercase">Recent</h2>
                 </div>
                 <CardContent className="p-4">
                   <div className="grid gap-2">
                     {recentBoards.map((board) => (
                       <a
-                        key={board.slug}
+                        className="group flex items-center justify-between rounded-xl border-2 border-border bg-background px-4 py-3 font-bold shadow-sm transition-all hover:border-primary hover:shadow-md"
                         href={`/retro/${board.slug}`}
-                        className="group flex items-center justify-between rounded-xl border-2 border-border bg-background px-4 py-3 font-bold shadow-sm transition-all hover:shadow-md hover:border-primary"
+                        key={board.slug}
                       >
-                        <div className="flex flex-col gap-1 min-w-0">
+                        <div className="flex min-w-0 flex-col gap-1">
                           <span className="truncate">{board.title}</span>
-                          <span className="text-xs text-muted-foreground font-mono">
+                          <span className="font-mono text-muted-foreground text-xs">
                             {board.slug}
                           </span>
                         </div>
                         <button
-                          onClick={(e) => handleRemoveRecent(board.slug, e)}
-                          className="ml-2 opacity-0 transition-opacity group-hover:opacity-100 shrink-0"
                           aria-label="Remove from recent"
+                          className="ml-2 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+                          onClick={(e) => handleRemoveRecent(board.slug, e)}
+                          type="button"
                         >
                           <X className="h-4 w-4 text-muted-foreground hover:text-primary" />
                         </button>
@@ -275,129 +276,129 @@ export default function ClientPage() {
             )}
 
             {/* Main action card */}
-            <Card className="rounded-2xl border-2 border-border shadow-lg overflow-hidden p-0 gap-0">
+            <Card className="gap-0 overflow-hidden rounded-2xl border-2 border-border p-0 shadow-lg">
               <CardContent className="p-0">
-                <Tabs defaultValue="create" className="w-full">
-                  <TabsList className="grid h-auto w-full grid-cols-2 border-b-2 border-border p-0 rounded-none bg-muted">
+                <Tabs className="w-full" defaultValue="create">
+                  <TabsList className="grid h-auto w-full grid-cols-2 rounded-none border-border border-b-2 bg-muted p-0">
                     <TabsTrigger
+                      className="gap-2 rounded-none border-transparent border-b-4 py-4 font-bold text-base uppercase data-[state=active]:border-primary data-[state=active]:bg-background data-[state=active]:text-foreground"
                       value="create"
-                      className="rounded-none border-b-4 border-transparent py-4 text-base font-bold uppercase data-[state=active]:border-primary data-[state=active]:bg-background data-[state=active]:text-foreground gap-2"
                     >
                       <Plus className="h-5 w-5" />
                       Create
                     </TabsTrigger>
                     <TabsTrigger
+                      className="gap-2 rounded-none border-transparent border-b-4 py-4 font-bold text-base uppercase data-[state=active]:border-accent data-[state=active]:bg-background data-[state=active]:text-foreground"
                       value="join"
-                      className="rounded-none border-b-4 border-transparent py-4 text-base font-bold uppercase data-[state=active]:border-accent data-[state=active]:bg-background data-[state=active]:text-foreground gap-2"
                     >
                       <LogIn className="h-5 w-5" />
                       Join
                     </TabsTrigger>
                   </TabsList>
 
-                  <TabsContent value="create" className="p-6 md:p-8 mt-0">
-                    <form onSubmit={handleCreateSession} className="space-y-5">
+                  <TabsContent className="mt-0 p-6 md:p-8" value="create">
+                    <form className="space-y-5" onSubmit={handleCreateSession}>
                       <div className="space-y-2">
                         <Label
+                          className="font-bold text-sm uppercase"
                           htmlFor="create-username"
-                          className="text-sm font-bold uppercase"
                         >
                           Your Name
                         </Label>
                         <Input
-                          id="create-username"
-                          placeholder="Enter your name"
-                          value={username}
-                          onChange={(e) => setUsername(e.target.value)}
                           className="h-12 rounded-xl border-2 border-border bg-background px-4 text-base shadow-sm"
+                          id="create-username"
+                          onChange={(e) => setUsername(e.target.value)}
+                          placeholder="Enter your name"
                           required
+                          value={username}
                         />
                       </div>
                       <div className="space-y-2">
                         <Label
+                          className="font-bold text-muted-foreground text-sm uppercase"
                           htmlFor="create-title"
-                          className="text-sm font-bold uppercase text-muted-foreground"
                         >
                           Session Title{" "}
                           <span className="text-xs">(Optional)</span>
                         </Label>
                         <Input
+                          className="h-12 rounded-xl border-2 border-border bg-background px-4 text-base shadow-sm"
                           id="create-title"
-                          placeholder="Sprint 42 Retro"
-                          value={createForm.title}
                           onChange={(e) =>
                             setCreateForm({
                               ...createForm,
                               title: e.target.value,
                             })
                           }
-                          className="h-12 rounded-xl border-2 border-border bg-background px-4 text-base shadow-sm"
+                          placeholder="Sprint 42 Retro"
+                          value={createForm.title}
                         />
                       </div>
                       {error && (
                         <div className="rounded-xl border-2 border-primary/20 bg-primary/10 px-4 py-3">
-                          <p className="text-sm font-bold text-primary">
+                          <p className="font-bold text-primary text-sm">
                             {error}
                           </p>
                         </div>
                       )}
                       <Button
-                        type="submit"
+                        className="w-full rounded-xl border-2 border-border bg-primary py-6 font-bold text-base uppercase shadow-md transition-all hover:shadow-lg hover:brightness-105"
                         disabled={isCreating || authLoading || !userId}
-                        className="w-full rounded-xl border-2 border-border bg-primary py-6 text-base font-bold uppercase shadow-md transition-all hover:shadow-lg hover:brightness-105"
+                        type="submit"
                       >
                         {isCreating ? "Creating..." : "Start New Retro"}
                       </Button>
                     </form>
                   </TabsContent>
 
-                  <TabsContent value="join" className="p-6 md:p-8 mt-0">
-                    <form onSubmit={handleJoinSession} className="space-y-5">
+                  <TabsContent className="mt-0 p-6 md:p-8" value="join">
+                    <form className="space-y-5" onSubmit={handleJoinSession}>
                       <div className="space-y-2">
                         <Label
+                          className="font-bold text-sm uppercase"
                           htmlFor="join-username"
-                          className="text-sm font-bold uppercase"
                         >
                           Your Name
                         </Label>
                         <Input
-                          id="join-username"
-                          placeholder="Enter your name"
-                          value={username}
-                          onChange={(e) => setUsername(e.target.value)}
                           className="h-12 rounded-xl border-2 border-border bg-background px-4 text-base shadow-sm"
+                          id="join-username"
+                          onChange={(e) => setUsername(e.target.value)}
+                          placeholder="Enter your name"
                           required
+                          value={username}
                         />
                       </div>
                       <div className="space-y-2">
                         <Label
+                          className="font-bold text-sm uppercase"
                           htmlFor="join-slug"
-                          className="text-sm font-bold uppercase"
                         >
                           Session Code
                         </Label>
                         <Input
+                          className="h-12 rounded-xl border-2 border-border bg-background px-4 font-mono text-base shadow-sm"
                           id="join-slug"
-                          placeholder="swift-falcon-123"
-                          value={joinForm.slug}
                           onChange={(e) =>
                             setJoinForm({ ...joinForm, slug: e.target.value })
                           }
-                          className="h-12 rounded-xl border-2 border-border bg-background px-4 text-base font-mono shadow-sm"
+                          placeholder="swift-falcon-123"
                           required
+                          value={joinForm.slug}
                         />
                       </div>
                       {error && (
                         <div className="rounded-xl border-2 border-primary/20 bg-primary/10 px-4 py-3">
-                          <p className="text-sm font-bold text-primary">
+                          <p className="font-bold text-primary text-sm">
                             {error}
                           </p>
                         </div>
                       )}
                       <Button
-                        type="submit"
+                        className="w-full rounded-xl border-2 border-border bg-accent py-6 font-bold text-accent-foreground text-base uppercase shadow-md transition-all hover:shadow-lg hover:brightness-105"
                         disabled={isJoining || authLoading || !userId}
-                        className="w-full rounded-xl border-2 border-border bg-accent py-6 text-base font-bold uppercase text-accent-foreground shadow-md transition-all hover:shadow-lg hover:brightness-105"
+                        type="submit"
                       >
                         {isJoining ? "Joining..." : "Join Session"}
                       </Button>

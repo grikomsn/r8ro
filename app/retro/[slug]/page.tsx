@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import RetroPageClient from "./RetroPageClient";
 import { createClient } from "@/lib/supabase/server";
+import RetroPageClient from "./RetroPageClient";
 
 export async function generateMetadata({
   params,

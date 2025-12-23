@@ -1,27 +1,27 @@
-import type { Metadata } from "next"
-import PokerSessionClient from "./PokerSessionClient"
-import { createClient } from "@/lib/supabase/server"
+import type { Metadata } from "next";
+import { createClient } from "@/lib/supabase/server";
+import PokerSessionClient from "./PokerSessionClient";
 
 export async function generateMetadata({
   params,
 }: {
-  params: Promise<{ slug: string }>
+  params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
-  const { slug } = await params
+  const { slug } = await params;
 
-  const supabase = await createClient()
+  const supabase = await createClient();
   const { data: session } = await supabase
     .from("poker_sessions")
     .select("title")
     .eq("slug", slug)
-    .single()
+    .single();
 
   const title =
     session?.title ||
     slug
       .split("-")
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(" ")
+      .join(" ");
 
   return {
     title: `${title} - Poker Session`,
@@ -54,10 +54,9 @@ export async function generateMetadata({
       description: `Join the "${title}" planning poker session on r8ro.`,
       images: ["/opengraph.png"],
     },
-  }
+  };
 }
 
 export default function PokerSessionPage() {
-  return <PokerSessionClient />
+  return <PokerSessionClient />;
 }
-

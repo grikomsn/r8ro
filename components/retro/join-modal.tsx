@@ -2,11 +2,11 @@
 
 import type React from "react";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/hooks/use-auth";
 
 interface JoinModalProps {
@@ -26,7 +26,9 @@ export function JoinModal({ onJoin }: JoinModalProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username.trim()) return;
+    if (!username.trim()) {
+      return;
+    }
 
     setIsSubmitting(true);
 
@@ -40,32 +42,32 @@ export function JoinModal({ onJoin }: JoinModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4">
-      <Card className="w-full max-w-md border-2 border-border shadow-lg rounded-2xl overflow-hidden">
-        <CardHeader className="border-b-2 border-border bg-primary text-primary-foreground rounded-none py-5">
-          <CardTitle className="text-2xl font-bold uppercase">
+      <Card className="w-full max-w-md overflow-hidden rounded-2xl border-2 border-border shadow-lg">
+        <CardHeader className="rounded-none border-border border-b-2 bg-primary py-5 text-primary-foreground">
+          <CardTitle className="font-bold text-2xl uppercase">
             Join Session
           </CardTitle>
         </CardHeader>
         <CardContent className="p-8">
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form className="space-y-6" onSubmit={handleSubmit}>
             <div className="space-y-3">
-              <Label htmlFor="username" className="text-sm font-bold uppercase">
+              <Label className="font-bold text-sm uppercase" htmlFor="username">
                 Your Name
               </Label>
               <Input
-                id="username"
-                placeholder="Enter your name"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="h-12 rounded-xl border-2 border-border text-base shadow-sm"
                 autoFocus
+                className="h-12 rounded-xl border-2 border-border text-base shadow-sm"
+                id="username"
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="Enter your name"
                 required
+                value={username}
               />
             </div>
             <Button
-              type="submit"
+              className="w-full rounded-xl border-2 border-border bg-primary py-6 font-bold text-base uppercase shadow-md transition-all hover:shadow-lg"
               disabled={isSubmitting || !isInitialized}
-              className="w-full rounded-xl border-2 border-border bg-primary py-6 text-base font-bold uppercase shadow-md transition-all hover:shadow-lg"
+              type="submit"
             >
               {isSubmitting ? "Joining..." : "Join Retro"}
             </Button>

@@ -25,4 +25,3 @@ export const metadata: Metadata = {
 export default function PokerPage() {
   return <PokerClientPage />;
 }
-

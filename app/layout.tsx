@@ -1,14 +1,13 @@
-import type React from "react";
-import type { Metadata } from "next";
-
 import { Analytics } from "@vercel/analytics/next";
+import type { Metadata } from "next";
+import type React from "react";
 import "./globals.css";
 
 import {
   Lato,
   Lato as V0_Font_Lato,
-  Space_Mono as V0_Font_Space_Mono,
   Libre_Baskerville as V0_Font_Libre_Baskerville,
+  Space_Mono as V0_Font_Space_Mono,
 } from "next/font/google";
 
 // Initialize fonts

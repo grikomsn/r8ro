@@ -1,28 +1,29 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { ChevronLeft, ChevronRight, Users } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-import type {
-  RetroBoard,
-  RetroCard,
-  RetroParticipant,
-  ColumnType,
-} from "@/lib/types";
-import { JoinModal } from "@/components/retro/join-modal";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { BoardBottomNav } from "@/components/retro/board-bottom-nav";
 import { BoardHeader } from "@/components/retro/board-header";
-import { RetroColumn } from "@/components/retro/retro-column";
+import { JoinModal } from "@/components/retro/join-modal";
 import { ParticipantsList } from "@/components/retro/participants-list";
 import { PrivateBoardOverlay } from "@/components/retro/private-board-overlay";
-import { addRecentBoard } from "@/lib/utils/recent-boards";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { RetroColumn } from "@/components/retro/retro-column";
 import {
   Tooltip,
   TooltipContent,
-  TooltipTrigger,
   TooltipProvider,
+  TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/use-auth";
+import { createClient } from "@/lib/supabase/client";
+import type {
+  ColumnType,
+  RetroBoard,
+  RetroCard,
+  RetroParticipant,
+} from "@/lib/types";
+import { addRecentBoard } from "@/lib/utils/recent-boards";
 
 export default function RetroPageClient() {
   const params = useParams();
@@ -49,7 +50,9 @@ export default function RetroPageClient() {
   const isAuthor = board && userId === board.author_id;
 
   useEffect(() => {
-    if (!authInitialized) return;
+    if (!authInitialized) {
+      return;
+    }
 
     // Use display name from auth, or show join modal if missing
     if (displayName) {
@@ -62,7 +65,9 @@ export default function RetroPageClient() {
   }, [authInitialized, displayName, userId]);
 
   useEffect(() => {
-    if (!userId || !userName) return;
+    if (!(userId && userName)) {
+      return;
+    }
 
     let cancelled = false;
     const supabase = createClient();
@@ -74,7 +79,9 @@ export default function RetroPageClient() {
         .eq("slug", slug)
         .single();
 
-      if (cancelled) return;
+      if (cancelled) {
+        return;
+      }
       if (!boardData) {
         setError("Board not found");
         setLoading(false);
@@ -105,16 +112,18 @@ export default function RetroPageClient() {
           .eq("board_id", boardData.id),
       ]);
 
-      if (cancelled) return;
+      if (cancelled) {
+        return;
+      }
 
       // Count votes per card
       const voteCounts = new Map<string, number>();
-      (votesRes.data || []).forEach((vote: any) => {
+      for (const vote of votesRes.data || []) {
         voteCounts.set(vote.card_id, (voteCounts.get(vote.card_id) || 0) + 1);
-      });
+      }
 
       // Transform cards to include vote count
-      const cardsWithVotes = (cardsRes.data || []).map((card: any) => ({
+      const cardsWithVotes = (cardsRes.data || []).map((card) => ({
         ...card,
         votes: voteCounts.get(card.id) || 0,
       }));
@@ -124,17 +133,17 @@ export default function RetroPageClient() {
 
       const existing = participantsRes.data?.find((p) => p.user_id === userId);
       if (!existing) {
-        await supabase
-          .from("retro_participants")
-          .upsert({
-            board_id: boardData.id,
-            user_id: userId,
-            username: userName,
-            is_online: true,
-          });
+        await supabase.from("retro_participants").upsert({
+          board_id: boardData.id,
+          user_id: userId,
+          username: userName,
+          is_online: true,
+        });
       }
 
-      if (!cancelled) setLoading(false);
+      if (!cancelled) {
+        setLoading(false);
+      }
     }
 
     load();
@@ -145,7 +154,9 @@ export default function RetroPageClient() {
 
   // Set up realtime subscriptions after board is loaded
   useEffect(() => {
-    if (!board || !userId) return;
+    if (!(board && userId)) {
+      return;
+    }
 
     const supabase = createClient();
     const channel = supabase
@@ -164,7 +175,7 @@ export default function RetroPageClient() {
           } else if (payload.eventType === "DELETE") {
             router.push("/");
           }
-        },
+        }
       )
       .on(
         "postgres_changes",
@@ -174,7 +185,7 @@ export default function RetroPageClient() {
           table: "retro_cards",
           filter: `board_id=eq.${board.id}`,
         },
-        async (payload) => {
+        (payload) => {
           if (payload.eventType === "INSERT" && payload.new) {
             // New card - add with 0 votes initially
             setCards((p) => [
@@ -186,13 +197,13 @@ export default function RetroPageClient() {
               p.map((c) =>
                 c.id === payload.new.id
                   ? { ...(payload.new as RetroCard), votes: c.votes }
-                  : c,
-              ),
+                  : c
+              )
             );
           } else if (payload.eventType === "DELETE") {
             setCards((p) => p.filter((c) => c.id !== payload.old.id));
           }
-        },
+        }
       )
       .on(
         "postgres_changes",
@@ -212,10 +223,10 @@ export default function RetroPageClient() {
 
             const voteCount = votes?.length || 0;
             setCards((p) =>
-              p.map((c) => (c.id === cardId ? { ...c, votes: voteCount } : c)),
+              p.map((c) => (c.id === cardId ? { ...c, votes: voteCount } : c))
             );
           }
-        },
+        }
       )
       .on(
         "postgres_changes",
@@ -233,15 +244,15 @@ export default function RetroPageClient() {
               p.map((part) =>
                 part.id === payload.new.id
                   ? (payload.new as RetroParticipant)
-                  : part,
-              ),
+                  : part
+              )
             );
           } else if (payload.eventType === "DELETE") {
             setParticipants((p) =>
-              p.filter((part) => part.id !== payload.old.id),
+              p.filter((part) => part.id !== payload.old.id)
             );
           }
-        },
+        }
       )
       .subscribe();
 
@@ -252,17 +263,21 @@ export default function RetroPageClient() {
 
   const handleJoin = useCallback(
     (username: string) => {
-      if (!userId) return;
+      if (!userId) {
+        return;
+      }
       setUserName(username);
       setShowJoinModal(false);
       setLoading(true);
     },
-    [userId],
+    [userId]
   );
 
   const handleToggleVisibility = useCallback(async () => {
     const b = boardRef.current;
-    if (!b) return;
+    if (!b) {
+      return;
+    }
     setBoard((p) => (p ? { ...p, is_public: !p.is_public } : null));
     await createClient()
       .from("retro_boards")
@@ -272,7 +287,9 @@ export default function RetroPageClient() {
 
   const handleToggleLock = useCallback(async () => {
     const b = boardRef.current;
-    if (!b) return;
+    if (!b) {
+      return;
+    }
     setBoard((p) => (p ? { ...p, is_locked: !p.is_locked } : null));
     await createClient()
       .from("retro_boards")
@@ -283,7 +300,9 @@ export default function RetroPageClient() {
   const handleAddCard = useCallback(
     async (columnType: ColumnType, content: string) => {
       const b = boardRef.current;
-      if (!b || !userId || !userName) return;
+      if (!(b && userId && userName)) {
+        return;
+      }
       const tempId = `temp-${Date.now()}`;
       setCards((p) => [
         ...p,
@@ -312,16 +331,18 @@ export default function RetroPageClient() {
       if (data) {
         // Add vote count of 0 for new card
         setCards((p) =>
-          p.map((c) => (c.id === tempId ? { ...data, votes: 0 } : c)),
+          p.map((c) => (c.id === tempId ? { ...data, votes: 0 } : c))
         );
       }
     },
-    [userId, userName],
+    [userId, userName]
   );
 
   const handleVoteCard = useCallback(
     async (cardId: string) => {
-      if (!userId) return;
+      if (!userId) {
+        return;
+      }
 
       const supabase = createClient();
 
@@ -345,7 +366,7 @@ export default function RetroPageClient() {
               return { ...c, votes: Math.max(0, c.votes - 1) };
             }
             return c;
-          }),
+          })
         );
       } else {
         // Vote
@@ -358,11 +379,11 @@ export default function RetroPageClient() {
               return { ...c, votes: c.votes + 1 };
             }
             return c;
-          }),
+          })
         );
       }
     },
-    [userId],
+    [userId]
   );
 
   const handleDeleteCard = useCallback(async (cardId: string) => {
@@ -378,43 +399,49 @@ export default function RetroPageClient() {
         .update({ content })
         .eq("id", cardId);
     },
-    [],
+    []
   );
 
   const handleMoveCard = useCallback(
     async (cardId: string, columnType: ColumnType) => {
       setCards((p) =>
-        p.map((c) => (c.id === cardId ? { ...c, column_type: columnType } : c)),
+        p.map((c) => (c.id === cardId ? { ...c, column_type: columnType } : c))
       );
       await createClient()
         .from("retro_cards")
         .update({ column_type: columnType })
         .eq("id", cardId);
     },
-    [],
+    []
   );
 
   const handleEditBoardTitle = useCallback(async (title: string) => {
     const b = boardRef.current;
-    if (!b) return;
+    if (!b) {
+      return;
+    }
     setBoard((p) => (p ? { ...p, title } : null));
     await createClient().from("retro_boards").update({ title }).eq("id", b.id);
   }, []);
 
   const handleDeleteBoard = useCallback(async () => {
     const b = boardRef.current;
-    if (!b) return;
+    if (!b) {
+      return;
+    }
     await createClient().from("retro_boards").delete().eq("id", b.id);
     router.push("/");
   }, [router]);
 
   const handleTimerToggle = useCallback(async () => {
     const b = boardRef.current;
-    if (!b) return;
+    if (!b) {
+      return;
+    }
     const running = !b.timer_running;
     const startedAt = running ? new Date().toISOString() : null;
     setBoard((p) =>
-      p ? { ...p, timer_running: running, timer_started_at: startedAt } : null,
+      p ? { ...p, timer_running: running, timer_started_at: startedAt } : null
     );
     await createClient()
       .from("retro_boards")
@@ -424,7 +451,9 @@ export default function RetroPageClient() {
 
   const handleTimerReset = useCallback(async () => {
     const b = boardRef.current;
-    if (!b) return;
+    if (!b) {
+      return;
+    }
     setBoard((p) =>
       p
         ? {
@@ -433,7 +462,7 @@ export default function RetroPageClient() {
             timer_seconds: 300,
             timer_started_at: null,
           }
-        : null,
+        : null
     );
     await createClient()
       .from("retro_boards")
@@ -447,7 +476,9 @@ export default function RetroPageClient() {
 
   const handleSetTimer = useCallback(async (seconds: number) => {
     const b = boardRef.current;
-    if (!b) return;
+    if (!b) {
+      return;
+    }
     setBoard((p) => (p ? { ...p, timer_seconds: seconds } : null));
     await createClient()
       .from("retro_boards")
@@ -458,25 +489,27 @@ export default function RetroPageClient() {
   if (!authInitialized) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-secondary">
-        <div className="border-2 border-border bg-background p-8 shadow-md rounded-2xl">
+        <div className="rounded-2xl border-2 border-border bg-background p-8 shadow-md">
           <div className="flex items-center gap-3">
             <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-            <p className="text-xl font-bold">Loading...</p>
+            <p className="font-bold text-xl">Loading...</p>
           </div>
         </div>
       </div>
     );
   }
 
-  if (showJoinModal) return <JoinModal onJoin={handleJoin} />;
+  if (showJoinModal) {
+    return <JoinModal onJoin={handleJoin} />;
+  }
 
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-secondary">
-        <div className="border-2 border-border bg-background p-8 shadow-md rounded-2xl">
+        <div className="rounded-2xl border-2 border-border bg-background p-8 shadow-md">
           <div className="flex items-center gap-3">
             <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-            <p className="text-xl font-bold">Loading...</p>
+            <p className="font-bold text-xl">Loading...</p>
           </div>
         </div>
       </div>
@@ -486,11 +519,15 @@ export default function RetroPageClient() {
   if (error || !board) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-secondary">
-        <div className="border-2 border-border bg-background p-8 shadow-md rounded-2xl">
-          <p className="text-xl font-bold text-primary">
+        <div className="rounded-2xl border-2 border-border bg-background p-8 shadow-md">
+          <p className="font-bold text-primary text-xl">
             {error || "Board not found"}
           </p>
-          <button onClick={() => router.push("/")} className="mt-4 underline">
+          <button
+            className="mt-4 underline"
+            onClick={() => router.push("/")}
+            type="button"
+          >
             Go back home
           </button>
         </div>
@@ -498,83 +535,83 @@ export default function RetroPageClient() {
     );
   }
 
-  if (!board.is_public && !isAuthor)
+  if (!(board.is_public || isAuthor)) {
     return <PrivateBoardOverlay onGoHome={() => router.push("/")} />;
+  }
 
   return (
-    <div className="flex h-screen flex-col bg-secondary overflow-hidden">
+    <div className="flex h-screen flex-col overflow-hidden bg-secondary">
       <BoardHeader
         board={board}
-        isAuthor={isAuthor || false}
-        onToggleVisibility={handleToggleVisibility}
-        onToggleLock={handleToggleLock}
-        onDeleteBoard={handleDeleteBoard}
-        onTimerToggle={handleTimerToggle}
-        onTimerReset={handleTimerReset}
-        onSetTimer={handleSetTimer}
-        onTitleUpdate={handleEditBoardTitle}
-        showSidebar={showSidebar}
-        onToggleSidebar={() => setShowSidebar(!showSidebar)}
-        participantCount={participants.length}
         currentUserId={userId}
+        isAuthor={isAuthor}
+        onDeleteBoard={handleDeleteBoard}
+        onSetTimer={handleSetTimer}
+        onTimerReset={handleTimerReset}
+        onTimerToggle={handleTimerToggle}
+        onTitleUpdate={handleEditBoardTitle}
+        onToggleLock={handleToggleLock}
+        onToggleSidebar={() => setShowSidebar(!showSidebar)}
+        onToggleVisibility={handleToggleVisibility}
+        participantCount={participants.length}
+        showSidebar={showSidebar}
       />
       <div className="relative flex flex-1 overflow-x-hidden">
         {/* Main content area */}
         <main
-          className={`flex flex-1 gap-4 overflow-x-auto overflow-y-auto p-4 md:gap-6 md:p-6 transition-all duration-300 ease-in-out ${showSidebar ? "xl:pr-0" : "xl:pr-6"}`}
-          data-board-capture
-          role="main"
           aria-label="Retro board columns"
+          className={`flex flex-1 gap-4 overflow-x-auto overflow-y-auto p-4 pb-20 transition-all duration-300 ease-in-out md:gap-6 md:p-6 md:pb-24 ${showSidebar ? "xl:pr-0" : "xl:pr-6"}`}
+          data-board-capture
         >
           <div className="min-w-[280px] flex-1 md:min-w-0">
             <RetroColumn
-              title="Went Well"
-              columnType="went_well"
-              cards={cards.filter((c) => c.column_type === "went_well")}
-              currentUserId={userId || ""}
-              isLocked={board.is_locked || false}
               bgColor="bg-green-600"
+              cards={cards.filter((c) => c.column_type === "went_well")}
+              columnType="went_well"
+              currentUserId={userId || ""}
+              draggedCard={draggedCard}
+              isLocked={board.is_locked}
               onAddCard={handleAddCard}
-              onVoteCard={(cardId) => handleVoteCard(cardId)}
               onDeleteCard={handleDeleteCard}
               onEditCard={handleEditCard}
               onMoveCard={handleMoveCard}
-              draggedCard={draggedCard}
+              onVoteCard={(cardId) => handleVoteCard(cardId)}
               setDraggedCard={setDraggedCard}
+              title="Went Well"
             />
           </div>
           <div className="min-w-[280px] flex-1 md:min-w-0">
             <RetroColumn
-              title="To Improve"
-              columnType="to_improve"
-              cards={cards.filter((c) => c.column_type === "to_improve")}
-              currentUserId={userId || ""}
-              isLocked={board.is_locked || false}
               bgColor="bg-red-700"
+              cards={cards.filter((c) => c.column_type === "to_improve")}
+              columnType="to_improve"
+              currentUserId={userId || ""}
+              draggedCard={draggedCard}
+              isLocked={board.is_locked}
               onAddCard={handleAddCard}
-              onVoteCard={(cardId) => handleVoteCard(cardId)}
               onDeleteCard={handleDeleteCard}
               onEditCard={handleEditCard}
               onMoveCard={handleMoveCard}
-              draggedCard={draggedCard}
+              onVoteCard={(cardId) => handleVoteCard(cardId)}
               setDraggedCard={setDraggedCard}
+              title="To Improve"
             />
           </div>
           <div className="min-w-[280px] flex-1 md:min-w-0">
             <RetroColumn
-              title="Action Items"
-              columnType="action_items"
-              cards={cards.filter((c) => c.column_type === "action_items")}
-              currentUserId={userId || ""}
-              isLocked={board.is_locked || false}
               bgColor="bg-blue-700"
+              cards={cards.filter((c) => c.column_type === "action_items")}
+              columnType="action_items"
+              currentUserId={userId || ""}
+              draggedCard={draggedCard}
+              isLocked={board.is_locked}
               onAddCard={handleAddCard}
-              onVoteCard={(cardId) => handleVoteCard(cardId)}
               onDeleteCard={handleDeleteCard}
               onEditCard={handleEditCard}
               onMoveCard={handleMoveCard}
-              draggedCard={draggedCard}
+              onVoteCard={(cardId) => handleVoteCard(cardId)}
               setDraggedCard={setDraggedCard}
+              title="Action Items"
             />
           </div>
         </main>
@@ -582,9 +619,9 @@ export default function RetroPageClient() {
         {/* Mobile overlay backdrop */}
         {showSidebar && (
           <div
+            aria-hidden="true"
             className="fixed inset-0 z-40 bg-foreground/50 xl:hidden"
             onClick={() => setShowSidebar(false)}
-            aria-hidden="true"
           />
         )}
 
@@ -592,21 +629,18 @@ export default function RetroPageClient() {
           <Tooltip>
             <TooltipTrigger asChild>
               <button
-                onClick={() => setShowSidebar(!showSidebar)}
-                className={`fixed top-1/2 -translate-y-1/2 z-50 flex items-center justify-center w-6 h-16 transition-all duration-300 ease-in-out rounded-l-lg border-2 border-r-0 border-border bg-background hover:bg-muted shadow-md xl:hidden ${showSidebar ? "right-80" : "right-0"}`}
+                aria-controls="participants-sidebar-mobile"
+                aria-expanded={showSidebar}
                 aria-label={
                   showSidebar
                     ? "Hide participants sidebar"
                     : "Show participants sidebar"
                 }
-                aria-expanded={showSidebar}
-                aria-controls="participants-sidebar-mobile"
+                className={`fixed top-1/2 z-50 flex h-16 w-6 -translate-y-1/2 items-center justify-center rounded-l-lg border-2 border-border border-r-0 bg-background shadow-md transition-all duration-300 ease-in-out hover:bg-muted xl:hidden ${showSidebar ? "right-80" : "right-0"}`}
+                onClick={() => setShowSidebar(!showSidebar)}
+                type="button"
               >
-                {showSidebar ? (
-                  <ChevronRight className="h-4 w-4" aria-hidden="true" />
-                ) : (
-                  <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-                )}
+                <Users aria-hidden="true" className="h-4 w-4" />
                 <span className="sr-only">
                   {showSidebar ? "Hide sidebar" : "Show sidebar"}
                 </span>
@@ -618,30 +652,31 @@ export default function RetroPageClient() {
           </Tooltip>
 
           <div
-            className={`hidden xl:block flex-shrink-0 relative transition-[width,margin] duration-300 ease-in-out my-4 md:my-6 mr-6 ${showSidebar ? "w-[300px] ml-2" : "w-0 ml-0"}`}
+            className={`relative my-4 mr-6 hidden flex-shrink-0 transition-[width,margin] duration-300 ease-in-out md:my-6 xl:block ${showSidebar ? "ml-2 w-[300px]" : "ml-0 w-0"}`}
           >
             {/* Sidebar container - fixed width, uses translate for slide */}
             <div
-              className={`absolute right-0 top-0 bottom-0 w-[300px] flex transition-transform duration-300 ease-in-out mr-[-24px] ${showSidebar ? "translate-x-0" : "translate-x-full"}`}
+              className={`absolute top-0 right-0 bottom-0 mr-[-24px] flex w-[300px] transition-transform duration-300 ease-in-out ${showSidebar ? "translate-x-0" : "translate-x-full"}`}
             >
               {/* Toggle button - attached to left edge of sidebar */}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button
-                    onClick={() => setShowSidebar(!showSidebar)}
-                    className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-full z-20 flex items-center justify-center w-5 h-14 rounded-l-md border-2 border-r-0 border-border bg-background hover:bg-muted transition-colors duration-200 shadow-sm"
+                    aria-controls="participants-sidebar"
+                    aria-expanded={showSidebar}
                     aria-label={
                       showSidebar
                         ? "Hide participants sidebar"
                         : "Show participants sidebar"
                     }
-                    aria-expanded={showSidebar}
-                    aria-controls="participants-sidebar"
+                    className="absolute top-1/2 left-0 z-20 flex h-14 w-5 -translate-x-full -translate-y-1/2 items-center justify-center rounded-l-md border-2 border-border border-r-0 bg-background shadow-sm transition-colors duration-200 hover:bg-muted"
+                    onClick={() => setShowSidebar(!showSidebar)}
+                    type="button"
                   >
                     {showSidebar ? (
-                      <ChevronRight className="h-3 w-3" aria-hidden="true" />
+                      <ChevronRight aria-hidden="true" className="h-3 w-3" />
                     ) : (
-                      <ChevronLeft className="h-3 w-3" aria-hidden="true" />
+                      <ChevronLeft aria-hidden="true" className="h-3 w-3" />
                     )}
                     <span className="sr-only">
                       {showSidebar ? "Hide sidebar" : "Show sidebar"}
@@ -655,35 +690,40 @@ export default function RetroPageClient() {
 
               {/* Sidebar content */}
               <aside
-                className="flex-1 rounded-l-xl border-2 border-r-0 border-border bg-background shadow-sm overflow-hidden"
-                role="complementary"
                 aria-label="Participants sidebar"
+                className="flex-1 overflow-hidden rounded-l-xl border-2 border-border border-r-0 bg-background shadow-sm"
                 id="participants-sidebar"
               >
                 <ParticipantsList
-                  participants={participants}
                   authorId={board.author_id}
                   onClose={() => setShowSidebar(false)}
+                  participants={participants}
                 />
               </aside>
             </div>
           </div>
 
           <aside
-            className={`fixed right-0 top-0 z-50 h-full w-80 min-w-80 border-l-2 border-border bg-background transition-transform duration-300 ease-in-out xl:hidden ${showSidebar ? "translate-x-0" : "translate-x-full"}`}
-            role="complementary"
-            aria-label="Participants sidebar"
             aria-hidden={!showSidebar}
+            aria-label="Participants sidebar"
+            className={`fixed top-0 right-0 z-50 h-full w-80 min-w-80 border-border border-l-2 bg-background transition-transform duration-300 ease-in-out xl:hidden ${showSidebar ? "translate-x-0" : "translate-x-full"}`}
             id="participants-sidebar-mobile"
           >
             <ParticipantsList
-              participants={participants}
               authorId={board.author_id}
               onClose={() => setShowSidebar(false)}
+              participants={participants}
             />
           </aside>
         </TooltipProvider>
       </div>
+      <BoardBottomNav
+        board={board}
+        isAuthor={isAuthor}
+        onSetTimer={handleSetTimer}
+        onTimerReset={handleTimerReset}
+        onTimerToggle={handleTimerToggle}
+      />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { generateSlug, generateRandomUsername } from "@/lib/utils/slug";
+import { generateRandomUsername, generateSlug } from "@/lib/utils/slug";
 
 export async function GET() {
   try {
@@ -35,7 +35,9 @@ export async function GET() {
       .select("id")
       .single();
 
-    if (insertError) throw insertError;
+    if (insertError) {
+      throw insertError;
+    }
 
     // Add creator as participant
     await supabase.from("retro_participants").insert({
@@ -50,7 +52,7 @@ export async function GET() {
       `/retro/${slug}`,
       process.env.VERCEL_URL
         ? `https://${process.env.VERCEL_URL}`
-        : "http://localhost:3000",
+        : "http://localhost:3000"
     );
 
     return NextResponse.redirect(url);
@@ -58,7 +60,7 @@ export async function GET() {
     console.error("Failed to create board:", error);
     return NextResponse.json(
       { error: "Failed to create board" },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

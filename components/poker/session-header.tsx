@@ -1,17 +1,24 @@
 "use client";
 
-import type React from "react";
-import { UserAccountPopover } from "@/components/auth/user-account-popover";
-import { useState, useEffect, useRef } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import html2canvas from "html2canvas";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  Check,
+  Copy,
+  Eye,
+  EyeOff,
+  ImageIcon,
+  Pencil,
+  Settings,
+  Share,
+  Share2,
+  Sparkles,
+  Trash2,
+  Users,
+  X,
+} from "lucide-react";
+import type React from "react";
+import { useEffect, useState } from "react";
+import { UserAccountPopover } from "@/components/auth/user-account-popover";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -22,44 +29,31 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
 import {
-  TooltipProvider,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import {
   Tooltip,
   TooltipContent,
+  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import type { PokerSession } from "@/lib/types";
-import {
-  Play,
-  Pause,
-  Eye,
-  EyeOff,
-  Trash2,
-  Share2,
-  Settings,
-  Check,
-  Pencil,
-  X,
-  Copy,
-  ImageIcon,
-  Share,
-  Users,
-  RotateCcw,
-  Sparkles,
-} from "lucide-react";
-import html2canvas from "html2canvas";
 import {
   VOTING_SCALES,
   type VotingScaleType,
 } from "@/lib/constants/poker-scales";
+import type { PokerSession } from "@/lib/types";
 
 interface SessionHeaderProps {
   session: PokerSession;
   isAuthor: boolean;
   onToggleVisibility: () => void;
-  onToggleVoting: () => void;
-  onToggleReveal: () => void;
-  onClearVotes: () => void;
   onDeleteSession: () => void;
   onTitleUpdate: (newTitle: string) => void;
   onStoryUpdate: (story: string) => void;
@@ -74,9 +68,6 @@ export function SessionHeader({
   session,
   isAuthor,
   onToggleVisibility,
-  onToggleVoting,
-  onToggleReveal,
-  onClearVotes,
   onDeleteSession,
   onTitleUpdate,
   onStoryUpdate,
@@ -87,7 +78,7 @@ export function SessionHeader({
   currentUserId,
 }: SessionHeaderProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [_copied, _setCopied] = useState(false);
   const [shareStatus, setShareStatus] = useState<string | null>(null);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleInput, setTitleInput] = useState(session.title);
@@ -235,39 +226,36 @@ export function SessionHeader({
   return (
     <>
       <TooltipProvider>
-        <header
-          className="grid grid-cols-1 gap-4 rounded-t-xl border-b-2 border-border bg-background px-4 py-4 shadow-sm md:grid-cols-[1fr_auto_1fr] md:px-6"
-          role="banner"
-        >
-          {/* LEFT SECTION: Branding and Info */}
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-black uppercase md:text-3xl font-mono">
+        <header className="grid grid-cols-1 gap-4 rounded-b-xl border-border border-b-2 bg-background px-3 py-3 shadow-sm md:px-4 lg:grid-cols-[1fr_auto]">
+          {/* LEFT SECTION: Branding and Title */}
+          <div className="flex min-w-0 items-center gap-3">
+            <h1 className="shrink-0 font-black font-mono text-2xl uppercase md:text-3xl">
               r<span className="text-primary">8</span>ro
             </h1>
             {currentUserId && <UserAccountPopover variant="compact" />}
-            <div className="hidden border-l-2 border-border pl-4 sm:block">
+            <div className="hidden min-w-0 border-border border-l-2 pl-4 sm:block">
               {isEditingTitle ? (
                 <div
+                  aria-label="Edit session title"
                   className="flex items-center gap-2"
                   role="form"
-                  aria-label="Edit session title"
                 >
                   <Input
-                    value={titleInput}
+                    aria-label="Session title"
+                    autoFocus
+                    className="h-8 w-48 rounded-lg border border-border font-bold"
                     onChange={(e) => setTitleInput(e.target.value)}
                     onKeyDown={handleTitleKeyDown}
-                    className="h-8 w-48 border border-border font-bold rounded-lg"
-                    autoFocus
-                    aria-label="Session title"
+                    value={titleInput}
                   />
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
-                        onClick={saveTitle}
-                        className="h-8 w-8 p-0 border border-border bg-foreground text-background rounded-lg"
                         aria-label="Save title"
+                        className="h-8 w-8 rounded-lg border border-border bg-foreground p-0 text-background"
+                        onClick={saveTitle}
                       >
-                        <Check className="h-4 w-4" aria-hidden="true" />
+                        <Check aria-hidden="true" className="h-4 w-4" />
                         <span className="sr-only">Save title</span>
                       </Button>
                     </TooltipTrigger>
@@ -276,12 +264,12 @@ export function SessionHeader({
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
-                        variant="outline"
-                        onClick={cancelTitleEdit}
-                        className="h-8 w-8 p-0 border border-border bg-transparent rounded-lg"
                         aria-label="Cancel editing"
+                        className="h-8 w-8 rounded-lg border border-border bg-transparent p-0"
+                        onClick={cancelTitleEdit}
+                        variant="outline"
                       >
-                        <X className="h-4 w-4" aria-hidden="true" />
+                        <X aria-hidden="true" className="h-4 w-4" />
                         <span className="sr-only">Cancel editing</span>
                       </Button>
                     </TooltipTrigger>
@@ -291,7 +279,7 @@ export function SessionHeader({
               ) : (
                 <div className="group flex items-center gap-2">
                   <h1
-                    className={`text-lg font-bold ${isAuthor ? "cursor-pointer hover:text-primary transition-colors" : ""}`}
+                    className={`font-bold text-lg ${isAuthor ? "cursor-pointer transition-colors hover:text-primary" : ""}`}
                     onClick={() => isAuthor && setIsEditingTitle(true)}
                   >
                     {session.title}
@@ -300,12 +288,12 @@ export function SessionHeader({
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
-                          variant="ghost"
-                          onClick={() => setIsEditingTitle(true)}
-                          className="h-6 w-6 p-0 opacity-0 transition-opacity group-hover:opacity-100 rounded-lg"
                           aria-label="Edit session title"
+                          className="h-6 w-6 rounded-lg p-0 opacity-0 transition-opacity group-hover:opacity-100"
+                          onClick={() => setIsEditingTitle(true)}
+                          variant="ghost"
                         >
-                          <Pencil className="h-3 w-3" aria-hidden="true" />
+                          <Pencil aria-hidden="true" className="h-3 w-3" />
                           <span className="sr-only">Edit session title</span>
                         </Button>
                       </TooltipTrigger>
@@ -316,304 +304,287 @@ export function SessionHeader({
                   )}
                 </div>
               )}
-              <p className="text-sm text-muted-foreground">{session.slug}</p>
+              <p className="text-muted-foreground text-sm">{session.slug}</p>
             </div>
           </div>
 
-          {/* CENTER SECTION: Current Story */}
-          <div className="flex items-center justify-center gap-2">
-            {isEditingStory ? (
-              <div className="flex items-center gap-2">
-                <Input
-                  value={storyInput}
-                  onChange={(e) => setStoryInput(e.target.value)}
-                  onKeyDown={handleStoryKeyDown}
-                  placeholder="Enter story/task name"
-                  className="h-10 w-64 border border-border font-bold rounded-lg"
-                  autoFocus
-                  aria-label="Current story"
-                />
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      onClick={saveStory}
-                      className="h-10 w-10 p-0 border border-border bg-foreground text-background rounded-lg"
-                      aria-label="Save story"
-                    >
-                      <Check className="h-4 w-4" aria-hidden="true" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Save story</TooltipContent>
-                </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="outline"
-                      onClick={cancelStoryEdit}
-                      className="h-10 w-10 p-0 border border-border bg-transparent rounded-lg"
-                      aria-label="Cancel editing"
-                    >
-                      <X className="h-4 w-4" aria-hidden="true" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Cancel</TooltipContent>
-                </Tooltip>
-              </div>
-            ) : (
-              <div className="group flex items-center gap-2">
-                {session.current_story ? (
-                  <h2
-                    className={`text-lg font-bold ${isAuthor ? "cursor-pointer hover:text-primary transition-colors" : ""}`}
-                    onClick={() => isAuthor && setIsEditingStory(true)}
-                  >
-                    {session.current_story}
-                  </h2>
-                ) : (
-                  <button
-                    onClick={() => isAuthor && setIsEditingStory(true)}
-                    className={`text-lg font-bold text-muted-foreground hover:text-primary transition-colors ${isAuthor ? "cursor-pointer" : "cursor-default"}`}
-                  >
-                    {isAuthor ? "Click to add story..." : "No story set"}
-                  </button>
-                )}
-                {isAuthor && (
+          {/* RIGHT SECTION: Current Story and Actions */}
+          <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+            {/* Current Story */}
+            <div className="flex min-w-0 flex-shrink items-center gap-2">
+              {isEditingStory ? (
+                <div className="flex items-center gap-2">
+                  <Input
+                    aria-label="Current story"
+                    autoFocus
+                    className="h-10 w-64 rounded-lg border border-border font-bold"
+                    onChange={(e) => setStoryInput(e.target.value)}
+                    onKeyDown={handleStoryKeyDown}
+                    placeholder="Enter story/task name"
+                    value={storyInput}
+                  />
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
-                        variant="ghost"
-                        onClick={() => setIsEditingStory(true)}
-                        className="h-6 w-6 p-0 opacity-0 transition-opacity group-hover:opacity-100 rounded-lg"
-                        aria-label="Edit story"
+                        aria-label="Save story"
+                        className="h-10 w-10 rounded-lg border border-border bg-foreground p-0 text-background"
+                        onClick={saveStory}
                       >
-                        <Pencil className="h-3 w-3" aria-hidden="true" />
+                        <Check aria-hidden="true" className="h-4 w-4" />
                       </Button>
                     </TooltipTrigger>
-                    <TooltipContent>Edit story</TooltipContent>
+                    <TooltipContent>Save story</TooltipContent>
                   </Tooltip>
-                )}
-              </div>
-            )}
-            {participantCount > 0 && (
-              <div className="flex items-center gap-1 border border-border px-2 py-1 rounded-lg bg-muted">
-                <Users className="h-4 w-4" />
-                <span className="text-sm font-bold">{participantCount}</span>
-              </div>
-            )}
-          </div>
-
-          {/* RIGHT SECTION: Actions */}
-          <div
-            className="flex items-center justify-end gap-2"
-            role="group"
-            aria-label="Session actions"
-          >
-            {onToggleSidebar && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    onClick={onToggleSidebar}
-                    className="relative h-9 border-2 border-border font-bold shadow-sm bg-transparent xl:hidden md:h-10 rounded-lg"
-                    aria-label={`Participants (${participantCount})`}
-                    aria-expanded={showSidebar}
-                  >
-                    <Users className="h-4 w-4 md:mr-2" aria-hidden="true" />
-                    <span className="hidden md:inline">Participants</span>
-                    {participantCount > 0 && (
-                      <span
-                        className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center border border-border bg-primary text-xs font-bold text-primary-foreground rounded-full"
-                        aria-hidden="true"
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        aria-label="Cancel editing"
+                        className="h-10 w-10 rounded-lg border border-border bg-transparent p-0"
+                        onClick={cancelStoryEdit}
+                        variant="outline"
                       >
-                        {participantCount}
-                      </span>
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent className="xl:hidden">
-                  Participants ({participantCount})
-                </TooltipContent>
-              </Tooltip>
-            )}
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  onClick={() => {}}
-                  className="h-9 border-2 border-border font-bold shadow-sm bg-transparent md:h-10 rounded-lg"
-                  aria-label="Share options"
-                >
-                  {shareStatus ? (
-                    <Check className="h-4 w-4 md:mr-2" aria-hidden="true" />
+                        <X aria-hidden="true" className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Cancel</TooltipContent>
+                  </Tooltip>
+                </div>
+              ) : (
+                <div className="group flex items-center gap-2">
+                  {session.current_story ? (
+                    <h2
+                      className={`font-bold text-lg ${isAuthor ? "cursor-pointer transition-colors hover:text-primary" : ""}`}
+                      onClick={() => isAuthor && setIsEditingStory(true)}
+                    >
+                      {session.current_story}
+                    </h2>
                   ) : (
-                    <Share2 className="h-4 w-4 md:mr-2" aria-hidden="true" />
+                    <button
+                      className={`font-bold text-lg text-muted-foreground transition-colors hover:text-primary ${isAuthor ? "cursor-pointer" : "cursor-default"}`}
+                      onClick={() => isAuthor && setIsEditingStory(true)}
+                      type="button"
+                    >
+                      {isAuthor ? "Click to add story..." : "No story set"}
+                    </button>
                   )}
-                  <span className="hidden md:inline">{getShareLabel()}</span>
-                  <span className="sr-only md:hidden">{getShareLabel()}</span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                className="border-2 border-border rounded-xl"
-                align="end"
-              >
-                <DropdownMenuItem onClick={copyToClipboard}>
-                  <Copy className="mr-2 h-4 w-4" aria-hidden="true" />
-                  Copy Link
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={shareNative}>
-                  <Share className="mr-2 h-4 w-4" aria-hidden="true" />
-                  Share via...
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={captureAsImage}>
-                  <ImageIcon className="mr-2 h-4 w-4" aria-hidden="true" />
-                  Copy as Image
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  {isAuthor && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          aria-label="Edit story"
+                          className="h-6 w-6 rounded-lg p-0 opacity-0 transition-opacity group-hover:opacity-100"
+                          onClick={() => setIsEditingStory(true)}
+                          variant="ghost"
+                        >
+                          <Pencil aria-hidden="true" className="h-3 w-3" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Edit story</TooltipContent>
+                    </Tooltip>
+                  )}
+                </div>
+              )}
+              {participantCount > 0 && (
+                <div className="flex items-center gap-1 rounded-lg border border-border bg-muted px-2 py-1">
+                  <Users className="h-4 w-4" />
+                  <span className="font-bold text-sm">{participantCount}</span>
+                </div>
+              )}
+            </div>
 
-            {isAuthor && (
+            {/* Actions */}
+            <div
+              aria-label="Session actions"
+              className="flex flex-wrap items-center gap-2"
+              role="group"
+            >
+              {onToggleSidebar && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      aria-expanded={showSidebar}
+                      aria-label={`Participants (${participantCount})`}
+                      className="relative h-9 rounded-lg border-2 border-border bg-transparent font-bold shadow-sm md:h-10 xl:hidden"
+                      onClick={onToggleSidebar}
+                      variant="outline"
+                    >
+                      <Users aria-hidden="true" className="h-4 w-4 md:mr-2" />
+                      <span className="hidden md:inline">Participants</span>
+                      {participantCount > 0 && (
+                        <span
+                          aria-hidden="true"
+                          className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full border border-border bg-primary font-bold text-primary-foreground text-xs"
+                        >
+                          {participantCount}
+                        </span>
+                      )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent className="md:hidden xl:hidden">
+                    Participants ({participantCount})
+                  </TooltipContent>
+                </Tooltip>
+              )}
+
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
+                    aria-label="Share options"
+                    className="h-9 rounded-lg border-2 border-border bg-transparent font-bold shadow-sm md:h-10"
+                    onClick={() => {
+                      // TODO: Implement share functionality
+                    }}
                     variant="outline"
-                    className="h-9 border-2 border-border font-bold shadow-sm bg-transparent md:h-10 rounded-lg"
-                    aria-label="Session management options"
-                    aria-haspopup="menu"
                   >
-                    <Settings className="h-4 w-4 md:mr-2" aria-hidden="true" />
-                    <span className="hidden md:inline">Manage</span>
-                    <span className="sr-only md:hidden">Manage session</span>
+                    {shareStatus ? (
+                      <Check aria-hidden="true" className="h-4 w-4 md:mr-2" />
+                    ) : (
+                      <Share2 aria-hidden="true" className="h-4 w-4 md:mr-2" />
+                    )}
+                    <span className="hidden md:inline">{getShareLabel()}</span>
+                    <span className="sr-only md:hidden">{getShareLabel()}</span>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
-                  className="border-2 border-border rounded-xl"
                   align="end"
+                  className="rounded-xl border-2 border-border"
                 >
-                  <DropdownMenuItem onClick={onToggleVoting}>
-                    {session.is_voting_active ? (
-                      <>
-                        <Pause className="mr-2 h-4 w-4" aria-hidden="true" />
-                        Stop Voting
-                      </>
-                    ) : (
-                      <>
-                        <Play className="mr-2 h-4 w-4" aria-hidden="true" />
-                        Start Voting
-                      </>
-                    )}
+                  <DropdownMenuItem onClick={copyToClipboard}>
+                    <Copy aria-hidden="true" className="mr-2 h-4 w-4" />
+                    Copy Link
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={onToggleReveal}>
-                    {session.votes_revealed ? (
-                      <>
-                        <EyeOff className="mr-2 h-4 w-4" aria-hidden="true" />
-                        Hide Cards
-                      </>
-                    ) : (
-                      <>
-                        <Eye className="mr-2 h-4 w-4" aria-hidden="true" />
-                        Reveal Cards
-                      </>
-                    )}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={onClearVotes}>
-                    <RotateCcw className="mr-2 h-4 w-4" aria-hidden="true" />
-                    Clear Votes
+                  <DropdownMenuItem onClick={shareNative}>
+                    <Share aria-hidden="true" className="mr-2 h-4 w-4" />
+                    Share via...
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                        <Sparkles className="mr-2 h-4 w-4" aria-hidden="true" />
-                        Change Scale
-                      </DropdownMenuItem>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent className="border-2 border-border rounded-xl">
-                      <DropdownMenuItem
-                        onClick={() => handleScaleChange("fibonacci")}
-                      >
-                        Fibonacci
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => handleScaleChange("tshirt")}
-                      >
-                        T-shirt
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => handleScaleChange("linear")}
-                      >
-                        Linear
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={onToggleVisibility}>
-                    {session.is_public ? (
-                      <>
-                        <EyeOff className="mr-2 h-4 w-4" aria-hidden="true" />
-                        Make Private
-                      </>
-                    ) : (
-                      <>
-                        <Eye className="mr-2 h-4 w-4" aria-hidden="true" />
-                        Make Public
-                      </>
-                    )}
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => setShowDeleteDialog(true)}
-                    className="text-red-600 focus:text-red-600 focus:bg-red-50"
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" aria-hidden="true" />
-                    Delete Session
+                  <DropdownMenuItem onClick={captureAsImage}>
+                    <ImageIcon aria-hidden="true" className="mr-2 h-4 w-4" />
+                    Copy as Image
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-            )}
 
-            <Button
-              variant={session.is_public ? "outline" : "secondary"}
-              className={`h-9 border-2 font-bold shadow-sm md:h-10 rounded-lg ${
-                session.is_public
-                  ? "border-border bg-transparent"
-                  : "border-chart-4 bg-chart-4"
-              }`}
-              aria-label={
-                session.is_public ? "Session is public" : "Session is private"
-              }
-              aria-pressed={!session.is_public}
-            >
-              {session.is_public ? (
-                <>
-                  <Eye className="h-4 w-4 md:mr-2" aria-hidden="true" />
-                  <span className="hidden md:inline">Public</span>
-                  <span className="sr-only md:hidden">Public session</span>
-                </>
-              ) : (
-                <>
-                  <EyeOff className="h-4 w-4 md:mr-2" aria-hidden="true" />
-                  <span className="hidden md:inline">Private</span>
-                  <span className="sr-only md:hidden">Private session</span>
-                </>
+              {isAuthor && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      aria-haspopup="menu"
+                      aria-label="Session settings"
+                      className="h-9 rounded-lg border-2 border-border bg-transparent font-bold shadow-sm md:h-10"
+                      variant="outline"
+                    >
+                      <Settings
+                        aria-hidden="true"
+                        className="h-4 w-4 md:mr-2"
+                      />
+                      <span className="hidden md:inline">Settings</span>
+                      <span className="sr-only md:hidden">
+                        Session settings
+                      </span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent
+                    align="end"
+                    className="rounded-xl border-2 border-border"
+                  >
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                          <Sparkles
+                            aria-hidden="true"
+                            className="mr-2 h-4 w-4"
+                          />
+                          Change Scale
+                        </DropdownMenuItem>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent className="rounded-xl border-2 border-border">
+                        <DropdownMenuItem
+                          onClick={() => handleScaleChange("fibonacci")}
+                        >
+                          Fibonacci
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => handleScaleChange("tshirt")}
+                        >
+                          T-shirt
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => handleScaleChange("linear")}
+                        >
+                          Linear
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={onToggleVisibility}>
+                      {session.is_public ? (
+                        <>
+                          <EyeOff aria-hidden="true" className="mr-2 h-4 w-4" />
+                          Make Private
+                        </>
+                      ) : (
+                        <>
+                          <Eye aria-hidden="true" className="mr-2 h-4 w-4" />
+                          Make Public
+                        </>
+                      )}
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="text-red-600 focus:bg-red-50 focus:text-red-600"
+                      onClick={() => setShowDeleteDialog(true)}
+                    >
+                      <Trash2 aria-hidden="true" className="mr-2 h-4 w-4" />
+                      Delete Session
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
-            </Button>
+
+              <Button
+                aria-label={
+                  session.is_public ? "Session is public" : "Session is private"
+                }
+                aria-pressed={!session.is_public}
+                className={`h-9 rounded-lg border-2 font-bold shadow-sm md:h-10 ${
+                  session.is_public
+                    ? "border-border bg-transparent"
+                    : "border-chart-4 bg-chart-4"
+                }`}
+                variant={session.is_public ? "outline" : "secondary"}
+              >
+                {session.is_public ? (
+                  <>
+                    <Eye aria-hidden="true" className="h-4 w-4 md:mr-2" />
+                    <span className="hidden md:inline">Public</span>
+                    <span className="sr-only md:hidden">Public session</span>
+                  </>
+                ) : (
+                  <>
+                    <EyeOff aria-hidden="true" className="h-4 w-4 md:mr-2" />
+                    <span className="hidden md:inline">Private</span>
+                    <span className="sr-only md:hidden">Private session</span>
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </header>
       </TooltipProvider>
 
       {/* Delete confirmation dialog */}
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+      <AlertDialog onOpenChange={setShowDeleteDialog} open={showDeleteDialog}>
         <AlertDialogContent
-          className="border-2 border-border rounded-2xl"
-          role="alertdialog"
-          aria-labelledby="delete-dialog-title"
           aria-describedby="delete-dialog-description"
+          aria-labelledby="delete-dialog-title"
+          className="rounded-2xl border-2 border-border"
+          role="alertdialog"
         >
           <AlertDialogHeader>
             <AlertDialogTitle
+              className="font-black text-xl uppercase"
               id="delete-dialog-title"
-              className="text-xl font-black uppercase"
             >
               Delete Session?
             </AlertDialogTitle>
@@ -623,12 +594,12 @@ export function SessionHeader({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel className="h-10 border-2 border-border font-bold rounded-lg">
+            <AlertDialogCancel className="h-10 rounded-lg border-2 border-border font-bold">
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
+              className="h-10 rounded-lg border-2 border-red-600 bg-red-600 font-bold text-white hover:bg-red-700"
               onClick={onDeleteSession}
-              className="h-10 border-2 border-red-600 bg-red-600 font-bold text-white hover:bg-red-700 rounded-lg"
             >
               Delete
             </AlertDialogAction>
