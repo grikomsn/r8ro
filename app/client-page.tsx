@@ -62,7 +62,10 @@ export default function ClientPage() {
       const slug = generateSlug()
 
       if (username.trim() !== displayName) {
-        await updateDisplayName(username.trim())
+        const success = await updateDisplayName(username.trim())
+        if (!success) {
+          console.warn("Failed to update display name, continuing with current name")
+        }
       }
 
       const boardData = {
@@ -140,7 +143,10 @@ export default function ClientPage() {
       }
 
       if (username.trim() !== displayName) {
-        await updateDisplayName(username.trim())
+        const success = await updateDisplayName(username.trim())
+        if (!success) {
+          console.warn("Failed to update display name, continuing with current name")
+        }
       }
 
       addRecentBoard(joinForm.slug.trim().toLowerCase(), board.title)
@@ -243,20 +249,20 @@ export default function ClientPage() {
             )}
 
             {/* Main action card */}
-            <Card className="rounded-2xl shadow-lg overflow-hidden p-0 gap-0 border-0">
+            <Card className="rounded-2xl border-2 border-border shadow-lg overflow-hidden p-0 gap-0">
               <CardContent className="p-0">
                 <Tabs defaultValue="create" className="w-full">
-                  <TabsList className="grid h-auto w-full grid-cols-2 p-0 rounded-tl-2xl rounded-tr-2xl bg-muted">
+                  <TabsList className="grid h-auto w-full grid-cols-2 border-b-2 border-border p-0 rounded-none bg-muted">
                     <TabsTrigger
                       value="create"
-                      className="rounded-tl-xl rounded-tr-none rounded-br-none rounded-bl-none border-2 border-border py-4 text-base font-bold uppercase data-[state=active]:border-primary data-[state=active]:bg-background data-[state=active]:text-foreground gap-2"
+                      className="rounded-none border-b-4 border-transparent py-4 text-base font-bold uppercase data-[state=active]:border-primary data-[state=active]:bg-background data-[state=active]:text-foreground gap-2"
                     >
                       <Plus className="h-5 w-5" />
                       Create
                     </TabsTrigger>
                     <TabsTrigger
                       value="join"
-                      className="rounded-tl-none rounded-tr-xl rounded-br-none rounded-bl-none border-2 border-border py-4 text-base font-bold uppercase data-[state=active]:border-accent data-[state=active]:bg-background data-[state=active]:text-foreground gap-2"
+                      className="rounded-none border-b-4 border-transparent py-4 text-base font-bold uppercase data-[state=active]:border-accent data-[state=active]:bg-background data-[state=active]:text-foreground gap-2"
                     >
                       <LogIn className="h-5 w-5" />
                       Join
@@ -298,9 +304,7 @@ export default function ClientPage() {
                       <Button
                         type="submit"
                         disabled={isCreating || authLoading || !userId}
-                        variant="default"
-                        size="xl"
-                        className="w-full border-2 border-border font-bold uppercase shadow-md transition-all hover:shadow-lg rounded-xl"
+                        className="w-full rounded-xl border-2 border-border bg-primary py-6 text-base font-bold uppercase shadow-md transition-all hover:shadow-lg hover:brightness-105"
                       >
                         {isCreating ? "Creating..." : "Start New Retro"}
                       </Button>
@@ -343,9 +347,7 @@ export default function ClientPage() {
                       <Button
                         type="submit"
                         disabled={isJoining || authLoading || !userId}
-                        variant="default"
-                        size="xl"
-                        className="w-full border-2 border-border font-bold uppercase shadow-md transition-all hover:shadow-lg rounded-xl"
+                        className="w-full rounded-xl border-2 border-border bg-accent py-6 text-base font-bold uppercase text-accent-foreground shadow-md transition-all hover:shadow-lg hover:brightness-105"
                       >
                         {isJoining ? "Joining..." : "Join Session"}
                       </Button>

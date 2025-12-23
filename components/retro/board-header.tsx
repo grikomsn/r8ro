@@ -276,20 +276,16 @@ export function BoardHeader({
     <>
       <TooltipProvider>
         <header
-          className="grid grid-cols-[auto_1fr_auto] items-center gap-2 rounded-b-xl border-2 border-t-0 border-border bg-background px-3 py-3 shadow-sm md:gap-3 md:px-4 lg:gap-4 lg:px-6 xl:grid-cols-[1fr_auto_1fr]"
+          className="grid grid-cols-1 gap-4 rounded-t-xl border-b-2 border-border bg-background px-4 py-4 shadow-sm md:grid-cols-[1fr_auto_1fr] md:px-6"
           role="banner"
         >
           {/* LEFT SECTION: Branding and Info */}
-          <div className="flex items-center gap-2 md:gap-3">
-            <h1 className="text-xl font-black uppercase md:text-2xl lg:text-3xl font-mono whitespace-nowrap">
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-black uppercase md:text-3xl font-mono">
               r<span className="text-primary">8</span>ro
             </h1>
-            {currentUserId && (
-              <div className="hidden md:block">
-                <UserAccountPopover variant="compact" />
-              </div>
-            )}
-            <div className="hidden border-l-2 border-border pl-3 xl:block">
+            {currentUserId && <UserAccountPopover variant="compact" />}
+            <div className="hidden border-l-2 border-border pl-4 sm:block">
               {isEditingTitle ? (
                 <div className="flex items-center gap-2" role="form" aria-label="Edit board title">
                   <Input
@@ -304,9 +300,7 @@ export function BoardHeader({
                     <TooltipTrigger asChild>
                       <Button
                         onClick={saveTitle}
-                        variant="inverse"
-                        size="icon-sm"
-                        className="rounded-lg"
+                        className="h-8 w-8 p-0 border border-border bg-foreground text-background rounded-lg"
                         aria-label="Save title"
                       >
                         <Check className="h-4 w-4" aria-hidden="true" />
@@ -320,8 +314,7 @@ export function BoardHeader({
                       <Button
                         variant="outline"
                         onClick={cancelTitleEdit}
-                        size="icon-sm"
-                        className="rounded-lg bg-transparent"
+                        className="h-8 w-8 p-0 border border-border bg-transparent rounded-lg"
                         aria-label="Cancel editing"
                       >
                         <X className="h-4 w-4" aria-hidden="true" />
@@ -345,7 +338,6 @@ export function BoardHeader({
                         <Button
                           variant="ghost"
                           onClick={() => setIsEditingTitle(true)}
-                          size="icon-sm"
                           className="h-6 w-6 p-0 opacity-0 transition-opacity group-hover:opacity-100 rounded-lg"
                           aria-label="Edit board title"
                         >
@@ -363,9 +355,9 @@ export function BoardHeader({
           </div>
 
           {/* CENTER SECTION: Timer and Controls */}
-          <div className="flex items-center justify-center gap-1 md:gap-2 xl:col-start-2">
+          <div className="flex items-center justify-center gap-2">
             <div
-              className={`flex items-center gap-1.5 border-2 border-border px-2 py-1.5 text-base font-black shadow-sm rounded-lg md:gap-2 md:px-3 md:py-2 md:text-xl lg:text-2xl md:rounded-xl ${
+              className={`flex items-center gap-2 border-2 border-border px-4 py-2 text-2xl font-black shadow-sm rounded-xl ${
                 board.timer_running && remainingTime <= 10
                   ? "animate-pulse bg-primary text-primary-foreground"
                   : board.timer_running
@@ -376,7 +368,7 @@ export function BoardHeader({
               aria-label={`Timer: ${formatTime(remainingTime)}`}
               aria-live="polite"
             >
-              <Clock className="h-3.5 w-3.5 md:h-5 md:w-5" aria-hidden="true" />
+              <Clock className="h-5 w-5" aria-hidden="true" />
               <span>{formatTime(remainingTime)}</span>
             </div>
 
@@ -387,15 +379,14 @@ export function BoardHeader({
                     <Button
                       variant="outline"
                       onClick={onTimerToggle}
-                      size="icon-sm"
-                      className="h-9 w-9 rounded-lg bg-transparent md:h-10 md:w-10"
+                      className="h-10 w-10 p-0 border-2 border-border shadow-sm bg-transparent rounded-lg"
                       aria-label={board.timer_running ? "Pause timer" : "Start timer"}
                       aria-pressed={board.timer_running}
                     >
                       {board.timer_running ? (
-                        <Pause className="h-3.5 w-3.5 md:h-4 md:w-4" aria-hidden="true" />
+                        <Pause className="h-4 w-4" aria-hidden="true" />
                       ) : (
-                        <Play className="h-3.5 w-3.5 md:h-4 md:w-4" aria-hidden="true" />
+                        <Play className="h-4 w-4" aria-hidden="true" />
                       )}
                       <span className="sr-only">{board.timer_running ? "Pause timer" : "Start timer"}</span>
                     </Button>
@@ -407,11 +398,10 @@ export function BoardHeader({
                     <Button
                       variant="outline"
                       onClick={handleTimerReset}
-                      size="icon-sm"
-                      className="h-9 w-9 rounded-lg bg-transparent md:h-10 md:w-10"
+                      className="hidden h-10 w-10 p-0 border-2 border-border shadow-sm bg-transparent sm:flex rounded-lg"
                       aria-label="Reset timer"
                     >
-                      <RotateCcw className="h-3.5 w-3.5 md:h-4 md:w-4" aria-hidden="true" />
+                      <RotateCcw className="h-4 w-4" aria-hidden="true" />
                       <span className="sr-only">Reset timer</span>
                     </Button>
                   </TooltipTrigger>
@@ -423,11 +413,10 @@ export function BoardHeader({
                       <DropdownMenuTrigger asChild>
                         <Button
                           variant="outline"
-                          size="icon-sm"
-                          className="h-9 w-9 rounded-lg bg-transparent md:h-10 md:w-10"
+                          className="hidden h-10 w-10 p-0 border-2 border-border shadow-sm bg-transparent sm:flex rounded-lg"
                           aria-label="Timer settings"
                         >
-                          <Settings className="h-3.5 w-3.5 md:h-4 md:w-4" aria-hidden="true" />
+                          <Settings className="h-4 w-4" aria-hidden="true" />
                           <span className="sr-only">Timer settings</span>
                         </Button>
                       </DropdownMenuTrigger>
@@ -453,7 +442,10 @@ export function BoardHeader({
                           aria-labelledby="timer-input-label"
                           min="1"
                         />
-                        <Button onClick={handleSetTimer} variant="accent" size="lg" className="rounded-lg">
+                        <Button
+                          onClick={handleSetTimer}
+                          className="h-10 border border-border bg-accent font-bold text-accent-foreground rounded-lg"
+                        >
                           Set
                         </Button>
                       </div>
@@ -477,15 +469,14 @@ export function BoardHeader({
           </div>
 
           {/* RIGHT SECTION: Actions */}
-          <div className="flex items-center justify-end gap-1 md:gap-2" role="group" aria-label="Board actions">
+          <div className="flex items-center justify-end gap-2" role="group" aria-label="Board actions">
             {onToggleSidebar && (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
                     variant="outline"
                     onClick={onToggleSidebar}
-                    size="icon-sm"
-                    className="relative h-9 w-9 rounded-lg bg-transparent md:h-10 md:w-auto md:px-4 xl:hidden"
+                    className="relative h-9 border-2 border-border font-bold shadow-sm bg-transparent xl:hidden md:h-10 rounded-lg"
                     aria-label={`Participants (${participantCount})`}
                     aria-expanded={showSidebar}
                   >
@@ -493,7 +484,7 @@ export function BoardHeader({
                     <span className="hidden md:inline">Participants</span>
                     {participantCount > 0 && (
                       <span
-                        className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center border border-border bg-primary text-xs font-bold text-primary-foreground rounded-full"
+                        className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center border border-border bg-primary text-xs font-bold text-primary-foreground rounded-full"
                         aria-hidden="true"
                       >
                         {participantCount}
@@ -501,7 +492,7 @@ export function BoardHeader({
                     )}
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent className="md:hidden">Participants ({participantCount})</TooltipContent>
+                <TooltipContent className="xl:hidden">Participants ({participantCount})</TooltipContent>
               </Tooltip>
             )}
 
@@ -510,8 +501,7 @@ export function BoardHeader({
                 <Button
                   variant="outline"
                   onClick={() => {}}
-                  size="icon-sm"
-                  className="h-9 w-9 rounded-lg bg-transparent md:h-10 md:w-auto md:px-4"
+                  className="h-9 border-2 border-border font-bold shadow-sm bg-transparent md:h-10 rounded-lg"
                   aria-label="Share options"
                 >
                   {shareStatus ? (
@@ -545,9 +535,9 @@ export function BoardHeader({
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="outline"
-                    size="icon-sm"
-                    className="h-9 w-9 rounded-lg bg-transparent md:h-10 md:w-auto md:px-4"
-                    aria-label="Manage board"
+                    className="h-9 border-2 border-border font-bold shadow-sm bg-transparent md:h-10 rounded-lg"
+                    aria-label="Board management options"
+                    aria-haspopup="menu"
                   >
                     <Settings className="h-4 w-4 md:mr-2" aria-hidden="true" />
                     <span className="hidden md:inline">Manage</span>
@@ -555,19 +545,6 @@ export function BoardHeader({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="border-2 border-border rounded-xl" align="end">
-                  <DropdownMenuItem onClick={onToggleLock}>
-                    {board.is_locked ? (
-                      <>
-                        <Unlock className="mr-2 h-4 w-4" aria-hidden="true" />
-                        Unlock Board
-                      </>
-                    ) : (
-                      <>
-                        <Lock className="mr-2 h-4 w-4" aria-hidden="true" />
-                        Lock Board
-                      </>
-                    )}
-                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={onToggleVisibility}>
                     {board.is_public ? (
                       <>
@@ -581,8 +558,24 @@ export function BoardHeader({
                       </>
                     )}
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={onToggleLock}>
+                    {board.is_locked ? (
+                      <>
+                        <Unlock className="mr-2 h-4 w-4" aria-hidden="true" />
+                        Unlock Board
+                      </>
+                    ) : (
+                      <>
+                        <Lock className="mr-2 h-4 w-4" aria-hidden="true" />
+                        Lock Board
+                      </>
+                    )}
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => setShowDeleteDialog(true)} className="text-destructive">
+                  <DropdownMenuItem
+                    onClick={() => setShowDeleteDialog(true)}
+                    className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                  >
                     <Trash2 className="mr-2 h-4 w-4" aria-hidden="true" />
                     Delete Board
                   </DropdownMenuItem>
@@ -590,19 +583,28 @@ export function BoardHeader({
               </DropdownMenu>
             )}
 
-            <div className="hidden items-center gap-1 rounded-lg border-2 border-border bg-muted px-2 py-1 text-sm font-bold md:flex md:h-10 lg:px-3">
+            <Button
+              variant={board.is_public ? "outline" : "secondary"}
+              className={`h-9 border-2 font-bold shadow-sm md:h-10 rounded-lg ${
+                board.is_public ? "border-border bg-transparent" : "border-chart-4 bg-chart-4"
+              }`}
+              aria-label={board.is_public ? "Board is public" : "Board is private"}
+              aria-pressed={!board.is_public}
+            >
               {board.is_public ? (
                 <>
-                  <Eye className="h-4 w-4" aria-hidden="true" />
-                  <span className="hidden lg:inline">Public</span>
+                  <Eye className="h-4 w-4 md:mr-2" aria-hidden="true" />
+                  <span className="hidden md:inline">Public</span>
+                  <span className="sr-only md:hidden">Public board</span>
                 </>
               ) : (
                 <>
-                  <EyeOff className="h-4 w-4" aria-hidden="true" />
-                  <span className="hidden lg:inline">Private</span>
+                  <EyeOff className="h-4 w-4 md:mr-2" aria-hidden="true" />
+                  <span className="hidden md:inline">Private</span>
+                  <span className="sr-only md:hidden">Private board</span>
                 </>
               )}
-            </div>
+            </Button>
           </div>
         </header>
       </TooltipProvider>
