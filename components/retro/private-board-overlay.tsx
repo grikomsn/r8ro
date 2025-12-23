@@ -1,11 +1,11 @@
-"use client"
+"use client";
 
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Lock } from "lucide-react"
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Lock } from "lucide-react";
 
 interface PrivateBoardOverlayProps {
-  onGoHome: () => void
+  onGoHome: () => void;
 }
 
 export function PrivateBoardOverlay({ onGoHome }: PrivateBoardOverlayProps) {
@@ -20,7 +20,8 @@ export function PrivateBoardOverlay({ onGoHome }: PrivateBoardOverlayProps) {
         </CardHeader>
         <CardContent className="p-6">
           <p className="mb-6">
-            This retro board is currently set to private. Only the session author can view and access it.
+            This retro board is currently set to private. Only the session
+            author can view and access it.
           </p>
           <Button
             onClick={onGoHome}
@@ -31,5 +32,5 @@ export function PrivateBoardOverlay({ onGoHome }: PrivateBoardOverlayProps) {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

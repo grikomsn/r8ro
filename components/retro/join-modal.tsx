@@ -1,48 +1,50 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { useAuth } from "@/hooks/use-auth"
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useAuth } from "@/hooks/use-auth";
 
 interface JoinModalProps {
-  onJoin: (username: string) => void
+  onJoin: (username: string) => void;
 }
 
 export function JoinModal({ onJoin }: JoinModalProps) {
-  const { displayName, updateDisplayName, isInitialized } = useAuth()
-  const [username, setUsername] = useState("")
-  const [isSubmitting, setIsSubmitting] = useState(false)
+  const { displayName, updateDisplayName, isInitialized } = useAuth();
+  const [username, setUsername] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (isInitialized && displayName) {
-      setUsername(displayName)
+      setUsername(displayName);
     }
-  }, [isInitialized, displayName])
+  }, [isInitialized, displayName]);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!username.trim()) return
+    e.preventDefault();
+    if (!username.trim()) return;
 
-    setIsSubmitting(true)
+    setIsSubmitting(true);
 
     if (username.trim() !== displayName) {
-      await updateDisplayName(username.trim())
+      await updateDisplayName(username.trim());
     }
 
-    onJoin(username.trim())
-    setIsSubmitting(false)
-  }
+    onJoin(username.trim());
+    setIsSubmitting(false);
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4">
       <Card className="w-full max-w-md border-2 border-border shadow-lg rounded-2xl overflow-hidden">
         <CardHeader className="border-b-2 border-border bg-primary text-primary-foreground rounded-none py-5">
-          <CardTitle className="text-2xl font-bold uppercase">Join Session</CardTitle>
+          <CardTitle className="text-2xl font-bold uppercase">
+            Join Session
+          </CardTitle>
         </CardHeader>
         <CardContent className="p-8">
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -71,5 +73,5 @@ export function JoinModal({ onJoin }: JoinModalProps) {
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

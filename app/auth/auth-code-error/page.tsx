@@ -1,14 +1,17 @@
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
 export default function AuthCodeErrorPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <div className="w-full max-w-md space-y-6 rounded-xl border-2 border-border bg-card p-8 text-center shadow-lg">
         <div className="space-y-2">
-          <h1 className="text-3xl font-bold text-foreground">Authentication Error</h1>
+          <h1 className="text-3xl font-bold text-foreground">
+            Authentication Error
+          </h1>
           <p className="text-muted-foreground">
-            There was an error linking your GitHub account. This could be because:
+            There was an error linking your GitHub account. This could be
+            because:
           </p>
         </div>
 
@@ -31,9 +34,11 @@ export default function AuthCodeErrorPage() {
           <Button asChild className="w-full" size="lg">
             <Link href="/">Return to Home</Link>
           </Button>
-          <p className="text-xs text-muted-foreground">You can try linking your account again from your profile.</p>
+          <p className="text-xs text-muted-foreground">
+            You can try linking your account again from your profile.
+          </p>
         </div>
       </div>
     </div>
-  )
+  );
 }

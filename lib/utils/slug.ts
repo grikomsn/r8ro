@@ -23,7 +23,7 @@ const adjectives = [
   "vivid",
   "witty",
   "zesty",
-]
+];
 
 const nouns = [
   "falcon",
@@ -50,7 +50,7 @@ const nouns = [
   "fox",
   "owl",
   "crane",
-]
+];
 
 const usernameAdjectives = [
   "Happy",
@@ -73,7 +73,7 @@ const usernameAdjectives = [
   "Witty",
   "Zesty",
   "Cool",
-]
+];
 
 const usernameNouns = [
   "Panda",
@@ -96,21 +96,20 @@ const usernameNouns = [
   "Lion",
   "Shark",
   "Whale",
-]
+];
 
 export function generateSlug(): string {
-  const adj = adjectives[Math.floor(Math.random() * adjectives.length)]
-  const noun = nouns[Math.floor(Math.random() * nouns.length)]
-  const num = Math.floor(Math.random() * 1000)
-  return `${adj}-${noun}-${num}`
+  const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
+  const noun = nouns[Math.floor(Math.random() * nouns.length)];
+  const num = Math.floor(Math.random() * 1000);
+  return `${adj}-${noun}-${num}`;
 }
 
-export function generateUserId(): string {
-  return `user_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
-}
+// Removed generateUserId() - now using Supabase Auth UUIDs (auth.uid())
 
 export function generateRandomUsername(): string {
-  const adj = usernameAdjectives[Math.floor(Math.random() * usernameAdjectives.length)]
-  const noun = usernameNouns[Math.floor(Math.random() * usernameNouns.length)]
-  return `${adj}${noun}`
+  const adj =
+    usernameAdjectives[Math.floor(Math.random() * usernameAdjectives.length)];
+  const noun = usernameNouns[Math.floor(Math.random() * usernameNouns.length)];
+  return `${adj}${noun}`;
 }

@@ -1,5 +1,5 @@
-import type { Metadata } from "next"
-import ClientPage from "./client-page"
+import type { Metadata } from "next";
+import ClientPage from "./client-page";
 
 export const metadata: Metadata = {
   title: "r8ro - Real-time Collaborative Retrospectives",
@@ -20,8 +20,8 @@ export const metadata: Metadata = {
       },
     ],
   },
-}
+};
 
 export default function Page() {
-  return <ClientPage />
+  return <ClientPage />;
 }

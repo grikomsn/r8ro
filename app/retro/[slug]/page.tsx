@@ -1,19 +1,27 @@
-import type { Metadata } from "next"
-import RetroPageClient from "./RetroPageClient"
-import { createClient } from "@/lib/supabase/server"
+import type { Metadata } from "next";
+import RetroPageClient from "./RetroPageClient";
+import { createClient } from "@/lib/supabase/server";
 
-export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
-  const { slug } = await params
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
 
-  const supabase = await createClient()
-  const { data: board } = await supabase.from("retro_boards").select("title").eq("slug", slug).single()
+  const supabase = await createClient();
+  const { data: board } = await supabase
+    .from("retro_boards")
+    .select("title")
+    .eq("slug", slug)
+    .single();
 
   const title =
     board?.title ||
     slug
       .split("-")
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(" ")
+      .join(" ");
 
   return {
     title: `${title} - Retro Session`,
@@ -46,9 +54,9 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
       description: `Join the "${title}" retrospective session on r8ro.`,
       images: ["/opengraph.png"],
     },
-  }
+  };
 }
 
 export default function RetroPage() {
-  return <RetroPageClient />
+  return <RetroPageClient />;
 }
