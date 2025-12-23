@@ -23,7 +23,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { TooltipProvider, Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
-import type { RetroBoard } from "@/lib/types"
+import type { RetroBoard, RetroCard, RetroParticipant } from "@/lib/types"
 import {
   Play,
   Pause,
@@ -43,6 +43,7 @@ import {
   ImageIcon,
   Share,
   Users,
+  FileText,
 } from "lucide-react"
 import html2canvas from "html2canvas"
 
@@ -60,6 +61,8 @@ interface BoardHeaderProps {
   onToggleSidebar?: () => void
   participantCount?: number
   currentUserId?: string
+  cards?: RetroCard[]
+  participants?: RetroParticipant[]
 }
 
 export function BoardHeader({
@@ -76,6 +79,8 @@ export function BoardHeader({
   onToggleSidebar,
   participantCount = 0,
   currentUserId,
+  cards = [],
+  participants = [],
 }: BoardHeaderProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [remainingTime, setRemainingTime] = useState(board.timer_seconds || 300)
@@ -233,6 +238,8 @@ export function BoardHeader({
         return "Image Copied!"
       case "image-downloaded":
         return "Downloaded!"
+      case "markdown-copied":
+        return "Markdown Copied!"
       default:
         return "Share"
     }
@@ -272,6 +279,68 @@ export function BoardHeader({
     onTimerReset()
   }
 
+  const copyAsMarkdown = async () => {
+    const url = window.location.href
+    const date = new Date(board.created_at).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+    })
+
+    const wentWellCards = cards.filter((c) => c.column_type === "went_well")
+    const toImproveCards = cards.filter((c) => c.column_type === "to_improve")
+    const actionItemsCards = cards.filter((c) => c.column_type === "action_items")
+
+    let markdown = `# ${board.title}\n\n`
+    markdown += `## Session Details\n\n`
+    markdown += `- **Date**: ${date}\n`
+    markdown += `- **Participants**: ${participants.map((p) => p.username).join(", ")}\n`
+    markdown += `- **Board URL**: ${url}\n\n`
+    markdown += `---\n\n`
+
+    markdown += `## What Went Well ✅\n\n`
+    if (wentWellCards.length > 0) {
+      markdown += `| Card | Author | Votes |\n`
+      markdown += `|------|--------|-------|\n`
+      wentWellCards.forEach((card) => {
+        const content = card.content.replace(/\|/g, "\\|").replace(/\n/g, " ")
+        markdown += `| ${content} | ${card.author_name} | ${card.votes} |\n`
+      })
+    } else {
+      markdown += `*No cards added*\n`
+    }
+    markdown += `\n`
+
+    markdown += `## What Needs Improvement 🔧\n\n`
+    if (toImproveCards.length > 0) {
+      markdown += `| Card | Author | Votes |\n`
+      markdown += `|------|--------|-------|\n`
+      toImproveCards.forEach((card) => {
+        const content = card.content.replace(/\|/g, "\\|").replace(/\n/g, " ")
+        markdown += `| ${content} | ${card.author_name} | ${card.votes} |\n`
+      })
+    } else {
+      markdown += `*No cards added*\n`
+    }
+    markdown += `\n`
+
+    markdown += `## Action Items 🎯\n\n`
+    if (actionItemsCards.length > 0) {
+      markdown += `| Card | Author | Votes |\n`
+      markdown += `|------|--------|-------|\n`
+      actionItemsCards.forEach((card) => {
+        const content = card.content.replace(/\|/g, "\\|").replace(/\n/g, " ")
+        markdown += `| ${content} | ${card.author_name} | ${card.votes} |\n`
+      })
+    } else {
+      markdown += `*No cards added*\n`
+    }
+
+    await navigator.clipboard.writeText(markdown)
+    setShareStatus("markdown-copied")
+    setTimeout(() => setShareStatus(null), 2000)
+  }
+
   return (
     <>
       <TooltipProvider>
@@ -279,7 +348,6 @@ export function BoardHeader({
           className="grid grid-cols-[auto_1fr_auto] items-center gap-2 rounded-b-xl border-2 border-t-0 border-border bg-background px-3 py-3 shadow-sm md:gap-3 md:px-4 lg:gap-4 lg:px-6 xl:grid-cols-[1fr_auto_1fr]"
           role="banner"
         >
-          {/* LEFT SECTION: Branding and Info */}
           <div className="flex items-center gap-2 md:gap-3">
             <h1 className="text-xl font-black uppercase md:text-2xl lg:text-3xl font-mono whitespace-nowrap">
               r<span className="text-primary">8</span>ro
@@ -362,7 +430,6 @@ export function BoardHeader({
             </div>
           </div>
 
-          {/* CENTER SECTION: Timer and Controls */}
           <div className="flex items-center justify-center gap-1 md:gap-2 xl:col-start-2">
             <div
               className={`flex items-center gap-1.5 border-2 border-border px-2 py-1.5 text-base font-black shadow-sm rounded-lg md:gap-2 md:px-3 md:py-2 md:text-xl lg:text-2xl md:rounded-xl ${
@@ -423,6 +490,7 @@ export function BoardHeader({
                       <DropdownMenuTrigger asChild>
                         <Button
                           variant="outline"
+                          onClick={() => {}}
                           size="icon-sm"
                           className="h-9 w-9 rounded-lg bg-transparent md:h-10 md:w-10"
                           aria-label="Timer settings"
@@ -476,7 +544,6 @@ export function BoardHeader({
             )}
           </div>
 
-          {/* RIGHT SECTION: Actions */}
           <div className="flex items-center justify-end gap-1 md:gap-2" role="group" aria-label="Board actions">
             {onToggleSidebar && (
               <Tooltip>
@@ -527,6 +594,10 @@ export function BoardHeader({
                 <DropdownMenuItem onClick={copyToClipboard}>
                   <Copy className="mr-2 h-4 w-4" aria-hidden="true" />
                   Copy Link
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={copyAsMarkdown}>
+                  <FileText className="mr-2 h-4 w-4" aria-hidden="true" />
+                  Copy as Markdown
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={shareNative}>
                   <Share className="mr-2 h-4 w-4" aria-hidden="true" />
@@ -607,7 +678,6 @@ export function BoardHeader({
         </header>
       </TooltipProvider>
 
-      {/* Delete confirmation dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent
           className="border-2 border-border rounded-2xl"

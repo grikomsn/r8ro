@@ -4,12 +4,12 @@ import type { Metadata } from "next"
 import { Analytics } from "@vercel/analytics/next"
 import "./globals.css"
 
-import { Lato, Lato as V0_Font_Lato, Space_Mono as V0_Font_Space_Mono, Source_Serif_4 as V0_Font_Source_Serif_4 } from 'next/font/google'
+import { Lato, Lato as V0_Font_Lato, Space_Mono as V0_Font_Space_Mono, Libre_Baskerville as V0_Font_Libre_Baskerville } from 'next/font/google'
 
 // Initialize fonts
 const _lato = V0_Font_Lato({ subsets: ['latin'], weight: ["100","300","400","700","900"] })
 const _spaceMono = V0_Font_Space_Mono({ subsets: ['latin'], weight: ["400","700"] })
-const _sourceSerif_4 = V0_Font_Source_Serif_4({ subsets: ['latin'], weight: ["200","300","400","500","600","700","800","900"] })
+const _libreBaskerville = V0_Font_Libre_Baskerville({ subsets: ['latin'], weight: ["400","700"] })
 
 const lato = Lato({ subsets: ["latin"], weight: ["100", "300", "400", "700", "900"] })
 
