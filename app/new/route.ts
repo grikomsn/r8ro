@@ -1,13 +1,24 @@
-import { NextResponse } from "next/server"
-import { createClient } from "@/lib/supabase/server"
-import { generateSlug, generateUserId, generateRandomUsername } from "@/lib/utils/slug"
+import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import { generateSlug, generateRandomUsername } from "@/lib/utils/slug";
 
 export async function GET() {
   try {
-    const supabase = await createClient()
-    const slug = generateSlug()
-    const authorId = generateUserId()
-    const authorName = generateRandomUsername()
+    const supabase = await createClient();
+
+    // Get authenticated user
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    }
+
+    const slug = generateSlug();
+    const authorId = user.id; // Use auth.uid()
+    const authorName =
+      user.user_metadata?.display_name || generateRandomUsername();
 
     // Create the board
     const { data: board, error: insertError } = await supabase
@@ -22,9 +33,9 @@ export async function GET() {
         timer_seconds: 300, // Default 5 minutes
       })
       .select("id")
-      .single()
+      .single();
 
-    if (insertError) throw insertError
+    if (insertError) throw insertError;
 
     // Add creator as participant
     await supabase.from("retro_participants").insert({
@@ -32,19 +43,22 @@ export async function GET() {
       user_id: authorId,
       username: authorName,
       is_online: true,
-    })
+    });
 
-    // Redirect to the new board with user info in query params (client will store in localStorage)
+    // Redirect to the new board (no need for query params since auth handles user identity)
     const url = new URL(
       `/retro/${slug}`,
-      process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000",
-    )
-    url.searchParams.set("uid", authorId)
-    url.searchParams.set("uname", authorName)
+      process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : "http://localhost:3000",
+    );
 
-    return NextResponse.redirect(url)
+    return NextResponse.redirect(url);
   } catch (error) {
-    console.error("Failed to create board:", error)
-    return NextResponse.json({ error: "Failed to create board" }, { status: 500 })
+    console.error("Failed to create board:", error);
+    return NextResponse.json(
+      { error: "Failed to create board" },
+      { status: 500 },
+    );
   }
 }
