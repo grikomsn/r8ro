@@ -1,0 +1,58 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "extends": ["ultracite/core", "ultracite/react", "ultracite/next"],
+  "linter": {
+    "rules": {
+      "a11y": {
+        "noNoninteractiveElementInteractions": {
+          "level": "off"
+        },
+        "useKeyWithClickEvents": {
+          "level": "off"
+        },
+        "useSemanticElements": {
+          "level": "off"
+        }
+      },
+      "complexity": {
+        "noExcessiveCognitiveComplexity": {
+          "level": "off"
+        }
+      },
+      "performance": {
+        "noNamespaceImport": {
+          "level": "off"
+        }
+      },
+      "security": {
+        "noDangerouslySetInnerHtml": {
+          "level": "off"
+        }
+      },
+      "style": {
+        "noNestedTernary": {
+          "level": "off"
+        },
+        "noNonNullAssertion": {
+          "level": "off"
+        },
+        "useFilenamingConvention": {
+          "level": "off"
+        }
+      },
+      "suspicious": {
+        "noArrayIndexKey": {
+          "level": "off"
+        }
+      }
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["components/ui/**/*.{ts,tsx}"],
+      "linter": {
+        "enabled": false
+      }
+    }
+  ]
+}
