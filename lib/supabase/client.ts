@@ -1,11 +1,14 @@
+/** biome-ignore-all lint/complexity/noForEach: we need to use Object.keys to get the keys of the localStorage */
+
 import { createBrowserClient } from "@supabase/ssr";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 // Synchronously clear potentially corrupted tokens BEFORE any Supabase code runs
 if (typeof window !== "undefined") {
   try {
     const keys = Object.keys(localStorage);
     const authTokenKey = keys.find(
-      (key) => key.startsWith("sb-") && key.includes("-auth-token"),
+      (key) => key.startsWith("sb-") && key.includes("-auth-token")
     );
 
     if (authTokenKey) {
@@ -45,13 +48,13 @@ if (typeof window !== "undefined") {
   }
 }
 
-let clientInstance: ReturnType<typeof createBrowserClient> | null = null;
+let clientInstance: SupabaseClient | null = null;
 
 export function createClient() {
   if (!clientInstance) {
     clientInstance = createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
   }
   return clientInstance;

@@ -1,3 +1,5 @@
+/** biome-ignore-all lint/suspicious/noDocumentCookie: we need to use document.cookie to store the recent poker sessions */
+
 interface RecentPokerSession {
   slug: string;
   title: string;
@@ -5,7 +7,9 @@ interface RecentPokerSession {
 }
 
 export function getRecentPokerSessions(): RecentPokerSession[] {
-  if (typeof window === "undefined") return [];
+  if (typeof window === "undefined") {
+    return [];
+  }
   try {
     const stored = document.cookie
       .split("; ")
@@ -39,4 +43,3 @@ export function removeRecentPokerSession(slug: string) {
 }
 
 export type { RecentPokerSession };
-

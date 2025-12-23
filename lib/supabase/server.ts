@@ -1,3 +1,5 @@
+/** biome-ignore-all lint/complexity/noForEach: we need to use cookieStore.set to set the cookies */
+
 import { createServerClient as supabaseCreateServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
@@ -14,15 +16,15 @@ export async function createClient() {
         },
         setAll(cookiesToSet) {
           try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options),
-            );
+            cookiesToSet.forEach(({ name, value, options }) => {
+              cookieStore.set(name, value, options);
+            });
           } catch {
             // Server Component - can be ignored
           }
         },
       },
-    },
+    }
   );
 }
 

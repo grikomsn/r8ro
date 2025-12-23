@@ -1,3 +1,5 @@
+/** biome-ignore-all lint/suspicious/noDocumentCookie: we need to use document.cookie to store the recent boards */
+
 interface RecentBoard {
   slug: string;
   title: string;
@@ -5,7 +7,9 @@ interface RecentBoard {
 }
 
 export function getRecentBoards(): RecentBoard[] {
-  if (typeof window === "undefined") return [];
+  if (typeof window === "undefined") {
+    return [];
+  }
   try {
     const stored = document.cookie
       .split("; ")
