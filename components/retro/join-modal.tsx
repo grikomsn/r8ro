@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/use-auth";
 
 interface JoinModalProps {
@@ -39,6 +40,27 @@ export function JoinModal({ onJoin }: JoinModalProps) {
     onJoin(username.trim());
     setIsSubmitting(false);
   };
+
+  if (!isInitialized) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4">
+        <Card className="w-full max-w-md overflow-hidden rounded-2xl border-2 border-border shadow-lg">
+          <CardHeader className="rounded-none border-border border-b-2 bg-primary py-5 text-primary-foreground">
+            <CardTitle className="font-bold text-2xl uppercase">
+              Join Session
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6 p-8">
+            <div className="space-y-3">
+              <Skeleton className="h-4 w-20" />
+              <Skeleton className="h-12 w-full rounded-xl" />
+            </div>
+            <Skeleton className="h-14 w-full rounded-xl" />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/50 p-4">

@@ -36,9 +36,13 @@ export default function PokerSessionClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [showSidebar, setShowSidebar] = useState(true);
+  const [pendingActions, setPendingActions] = useState<Record<string, boolean>>(
+    {}
+  );
 
   const sessionRef = useRef(session);
   const votesRef = useRef(votes);
+  const channelRef = useRef<unknown>(null);
   sessionRef.current = session;
   votesRef.current = votes;
 
@@ -129,20 +133,30 @@ export default function PokerSessionClient() {
 
   // Set up realtime subscriptions after session is loaded
   useEffect(() => {
-    if (!(session && userId)) {
+    const sessionId = session?.id;
+    if (!(sessionId && userId && userName)) {
       return;
     }
 
     const supabase = createClient();
-    const channel = supabase
-      .channel(`poker-${slug}`)
+    const channel = supabase.channel(`poker-${slug}`, {
+      config: {
+        presence: {
+          key: userId,
+        },
+      },
+    });
+
+    channelRef.current = channel;
+
+    channel
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
           table: "poker_sessions",
-          filter: `id=eq.${session.id}`,
+          filter: `id=eq.${sessionId}`,
         },
         (payload) => {
           if (payload.eventType === "UPDATE" && payload.new) {
@@ -158,11 +172,22 @@ export default function PokerSessionClient() {
           event: "*",
           schema: "public",
           table: "poker_participants",
-          filter: `session_id=eq.${session.id}`,
+          filter: `session_id=eq.${sessionId}`,
         },
         (payload) => {
           if (payload.eventType === "INSERT" && payload.new) {
-            setParticipants((p) => [...p, payload.new as PokerParticipant]);
+            setParticipants((p) => {
+              const participant = payload.new as PokerParticipant;
+              const existingIndex = p.findIndex(
+                (part) => part.id === participant.id
+              );
+              if (existingIndex !== -1) {
+                const updated = [...p];
+                updated[existingIndex] = participant;
+                return updated;
+              }
+              return [...p, participant];
+            });
           } else if (payload.eventType === "UPDATE" && payload.new) {
             setParticipants((p) =>
               p.map((part) =>
@@ -184,11 +209,20 @@ export default function PokerSessionClient() {
           event: "*",
           schema: "public",
           table: "poker_votes",
-          filter: `session_id=eq.${session.id}`,
+          filter: `session_id=eq.${sessionId}`,
         },
         (payload) => {
           if (payload.eventType === "INSERT" && payload.new) {
-            setVotes((v) => [...v, payload.new as PokerVote]);
+            setVotes((v) => {
+              const vote = payload.new as PokerVote;
+              const existingIndex = v.findIndex((item) => item.id === vote.id);
+              if (existingIndex !== -1) {
+                const updated = [...v];
+                updated[existingIndex] = vote;
+                return updated;
+              }
+              return [...v, vote];
+            });
           } else if (payload.eventType === "UPDATE" && payload.new) {
             setVotes((v) =>
               v.map((vote) =>
@@ -200,12 +234,77 @@ export default function PokerSessionClient() {
           }
         }
       )
-      .subscribe();
+      .on("presence", { event: "sync" }, () => {
+        const presenceState = channel.presenceState<{
+          user_id: string;
+          username: string;
+          online_at: number;
+        }>();
+        const onlineUserIds = new Set<string>();
+
+        for (const key of Object.keys(presenceState)) {
+          const presences = presenceState[key];
+          if (presences && presences.length > 0) {
+            const presence = presences[0];
+            if (presence?.user_id) {
+              onlineUserIds.add(presence.user_id);
+            }
+          }
+        }
+
+        setParticipants((prev) =>
+          prev.map((part) => ({
+            ...part,
+            is_online: onlineUserIds.has(part.user_id),
+          }))
+        );
+      })
+      .subscribe(async (status) => {
+        if (status === "SUBSCRIBED") {
+          await channel.track({
+            user_id: userId,
+            username: userName,
+            online_at: Date.now(),
+          });
+        }
+      });
+
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === "hidden") {
+        await supabase
+          .from("poker_participants")
+          .update({ is_online: false })
+          .eq("user_id", userId);
+        await channel.untrack();
+      } else if (document.visibilityState === "visible") {
+        await supabase
+          .from("poker_participants")
+          .update({ is_online: true })
+          .eq("user_id", userId);
+        await channel.track({
+          user_id: userId,
+          username: userName,
+          online_at: Date.now(),
+        });
+      }
+    };
+
+    const handleBeforeUnload = async () => {
+      await supabase
+        .from("poker_participants")
+        .update({ is_online: false })
+        .eq("user_id", userId);
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("beforeunload", handleBeforeUnload);
 
     return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
       channel.unsubscribe();
     };
-  }, [session, slug, userId, router]);
+  }, [session?.id, slug, userId, userName, router]);
 
   const handleJoin = useCallback(
     (username: string) => {
@@ -221,129 +320,211 @@ export default function PokerSessionClient() {
 
   const handleToggleVisibility = useCallback(async () => {
     const s = sessionRef.current;
-    if (!s) {
+    if (!s || pendingActions.toggleVisibility) {
       return;
     }
+    setPendingActions((p) => ({ ...p, toggleVisibility: true }));
+    const previousValue = s.is_public;
     setSession((p) => (p ? { ...p, is_public: !p.is_public } : null));
-    await createClient()
-      .from("poker_sessions")
-      .update({ is_public: !s.is_public })
-      .eq("id", s.id);
-  }, []);
+    try {
+      await createClient()
+        .from("poker_sessions")
+        .update({ is_public: !s.is_public })
+        .eq("id", s.id);
+    } catch (error) {
+      console.error("Failed to toggle visibility:", error);
+      setSession((p) => (p ? { ...p, is_public: previousValue } : null));
+    } finally {
+      setPendingActions((p) => ({ ...p, toggleVisibility: false }));
+    }
+  }, [pendingActions]);
 
   const handleToggleVoting = useCallback(async () => {
     const s = sessionRef.current;
-    if (!s) {
+    if (!s || pendingActions.toggleVoting) {
       return;
     }
+    setPendingActions((p) => ({ ...p, toggleVoting: true }));
+    const previousValue = s.is_voting_active;
     setSession((p) =>
       p ? { ...p, is_voting_active: !p.is_voting_active } : null
     );
-    await createClient()
-      .from("poker_sessions")
-      .update({ is_voting_active: !s.is_voting_active })
-      .eq("id", s.id);
-  }, []);
+    try {
+      await createClient()
+        .from("poker_sessions")
+        .update({ is_voting_active: !s.is_voting_active })
+        .eq("id", s.id);
+    } catch (error) {
+      console.error("Failed to toggle voting:", error);
+      setSession((p) => (p ? { ...p, is_voting_active: previousValue } : null));
+    } finally {
+      setPendingActions((p) => ({ ...p, toggleVoting: false }));
+    }
+  }, [pendingActions]);
 
   const handleToggleReveal = useCallback(async () => {
     const s = sessionRef.current;
-    if (!s) {
+    if (!s || pendingActions.toggleReveal) {
       return;
     }
+    setPendingActions((p) => ({ ...p, toggleReveal: true }));
+    const previousValue = s.votes_revealed;
     setSession((p) => (p ? { ...p, votes_revealed: !p.votes_revealed } : null));
-    await createClient()
-      .from("poker_sessions")
-      .update({ votes_revealed: !s.votes_revealed })
-      .eq("id", s.id);
-  }, []);
+    try {
+      await createClient()
+        .from("poker_sessions")
+        .update({ votes_revealed: !s.votes_revealed })
+        .eq("id", s.id);
+    } catch (error) {
+      console.error("Failed to toggle reveal:", error);
+      setSession((p) => (p ? { ...p, votes_revealed: previousValue } : null));
+    } finally {
+      setPendingActions((p) => ({ ...p, toggleReveal: false }));
+    }
+  }, [pendingActions]);
 
   const handleClearVotes = useCallback(async () => {
     const s = sessionRef.current;
-    if (!(s && userId)) {
+    if (!(s && userId) || pendingActions.clearVotes) {
       return;
     }
-    await createClient().from("poker_votes").delete().eq("session_id", s.id);
+    setPendingActions((p) => ({ ...p, clearVotes: true }));
+    const previousVotes = votesRef.current;
     setVotes([]);
-  }, [userId]);
+    try {
+      await createClient().from("poker_votes").delete().eq("session_id", s.id);
+    } catch (error) {
+      console.error("Failed to clear votes:", error);
+      setVotes(previousVotes);
+    } finally {
+      setPendingActions((p) => ({ ...p, clearVotes: false }));
+    }
+  }, [userId, pendingActions]);
 
   const handleVote = useCallback(
     async (voteValue: string) => {
-      if (!(userId && session)) {
+      const s = sessionRef.current;
+      if (!(userId && s) || pendingActions.vote) {
         return;
       }
-
+      setPendingActions((p) => ({ ...p, vote: true }));
       const supabase = createClient();
 
-      // Check if user already voted
-      const { data: existingVote } = await supabase
-        .from("poker_votes")
-        .select("id")
-        .eq("session_id", session.id)
-        .eq("user_id", userId)
-        .single();
-
-      if (existingVote) {
-        // Update vote
-        await supabase
+      try {
+        const { data: existingVote } = await supabase
           .from("poker_votes")
-          .update({ vote_value: voteValue })
-          .eq("id", existingVote.id);
-      } else {
-        // Insert new vote
-        await supabase.from("poker_votes").insert({
-          session_id: session.id,
-          user_id: userId,
-          vote_value: voteValue,
-        });
+          .select("id")
+          .eq("session_id", s.id)
+          .eq("user_id", userId)
+          .single();
+
+        if (existingVote) {
+          await supabase
+            .from("poker_votes")
+            .update({ vote_value: voteValue })
+            .eq("id", existingVote.id);
+        } else {
+          await supabase.from("poker_votes").insert({
+            session_id: s.id,
+            user_id: userId,
+            vote_value: voteValue,
+          });
+        }
+      } catch (error) {
+        console.error("Failed to submit vote:", error);
+      } finally {
+        setPendingActions((p) => ({ ...p, vote: false }));
       }
     },
-    [userId, session]
+    [userId, pendingActions]
   );
 
-  const handleEditSessionTitle = useCallback(async (title: string) => {
-    const s = sessionRef.current;
-    if (!s) {
-      return;
-    }
-    setSession((p) => (p ? { ...p, title } : null));
-    await createClient()
-      .from("poker_sessions")
-      .update({ title })
-      .eq("id", s.id);
-  }, []);
+  const handleEditSessionTitle = useCallback(
+    async (title: string) => {
+      const s = sessionRef.current;
+      if (!s || pendingActions.editTitle) {
+        return;
+      }
+      setPendingActions((p) => ({ ...p, editTitle: true }));
+      const previousTitle = s.title;
+      setSession((p) => (p ? { ...p, title } : null));
+      try {
+        await createClient()
+          .from("poker_sessions")
+          .update({ title })
+          .eq("id", s.id);
+      } catch (error) {
+        console.error("Failed to edit session title:", error);
+        setSession((p) => (p ? { ...p, title: previousTitle } : null));
+      } finally {
+        setPendingActions((p) => ({ ...p, editTitle: false }));
+      }
+    },
+    [pendingActions]
+  );
 
-  const handleEditStory = useCallback(async (story: string) => {
-    const s = sessionRef.current;
-    if (!s) {
-      return;
-    }
-    setSession((p) => (p ? { ...p, current_story: story || null } : null));
-    await createClient()
-      .from("poker_sessions")
-      .update({ current_story: story || null })
-      .eq("id", s.id);
-  }, []);
+  const handleEditStory = useCallback(
+    async (story: string) => {
+      const s = sessionRef.current;
+      if (!s || pendingActions.editStory) {
+        return;
+      }
+      setPendingActions((p) => ({ ...p, editStory: true }));
+      const previousStory = s.current_story;
+      setSession((p) => (p ? { ...p, current_story: story || null } : null));
+      try {
+        await createClient()
+          .from("poker_sessions")
+          .update({ current_story: story || null })
+          .eq("id", s.id);
+      } catch (error) {
+        console.error("Failed to edit story:", error);
+        setSession((p) => (p ? { ...p, current_story: previousStory } : null));
+      } finally {
+        setPendingActions((p) => ({ ...p, editStory: false }));
+      }
+    },
+    [pendingActions]
+  );
 
   const handleDeleteSession = useCallback(async () => {
     const s = sessionRef.current;
-    if (!s) {
+    if (!s || pendingActions.deleteSession) {
       return;
     }
-    await createClient().from("poker_sessions").delete().eq("id", s.id);
-    router.push("/poker");
-  }, [router]);
+    setPendingActions((p) => ({ ...p, deleteSession: true }));
+    try {
+      await createClient().from("poker_sessions").delete().eq("id", s.id);
+      router.push("/poker");
+    } catch (error) {
+      console.error("Failed to delete session:", error);
+      setPendingActions((p) => ({ ...p, deleteSession: false }));
+    }
+  }, [router, pendingActions]);
 
-  const handleUpdateScale = useCallback(async (scale: string[]) => {
-    const s = sessionRef.current;
-    if (!s) {
-      return;
-    }
-    setSession((p) => (p ? { ...p, voting_scale: scale } : null));
-    await createClient()
-      .from("poker_sessions")
-      .update({ voting_scale: scale })
-      .eq("id", s.id);
-  }, []);
+  const handleUpdateScale = useCallback(
+    async (scale: string[]) => {
+      const s = sessionRef.current;
+      if (!s || pendingActions.updateScale) {
+        return;
+      }
+      setPendingActions((p) => ({ ...p, updateScale: true }));
+      const previousScale = s.voting_scale;
+      setSession((p) => (p ? { ...p, voting_scale: scale } : null));
+      try {
+        await createClient()
+          .from("poker_sessions")
+          .update({ voting_scale: scale })
+          .eq("id", s.id);
+      } catch (error) {
+        console.error("Failed to update scale:", error);
+        setSession((p) => (p ? { ...p, voting_scale: previousScale } : null));
+      } finally {
+        setPendingActions((p) => ({ ...p, updateScale: false }));
+      }
+    },
+    [pendingActions]
+  );
 
   if (!authInitialized) {
     return (

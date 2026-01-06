@@ -50,35 +50,41 @@ export function BoardBottomNav({
   useEffect(() => {
     const playAlarm = () => {
       try {
-        const audioContext =
-          new // biome-ignore lint/suspicious/noExplicitAny: we need to use any to get the webkitAudioContext
-          (window.AudioContext || (window as any).webkitAudioContext)();
+        const AudioContextClass =
+          window.AudioContext ||
+          ("webkitAudioContext" in window
+            ? (window as unknown as { webkitAudioContext: typeof AudioContext })
+                .webkitAudioContext
+            : undefined);
+        if (AudioContextClass) {
+          const audioContext = new AudioContextClass();
 
-        const playBeep = (time: number) => {
-          const oscillator = audioContext.createOscillator();
-          const gainNode = audioContext.createGain();
+          const playBeep = (time: number) => {
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
 
-          oscillator.connect(gainNode);
-          gainNode.connect(audioContext.destination);
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
 
-          oscillator.frequency.value = 800;
-          oscillator.type = "square";
+            oscillator.frequency.value = 800;
+            oscillator.type = "square";
 
-          gainNode.gain.setValueAtTime(0.3, audioContext.currentTime + time);
-          gainNode.gain.exponentialRampToValueAtTime(
-            0.01,
-            audioContext.currentTime + time + 0.3
-          );
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime + time);
+            gainNode.gain.exponentialRampToValueAtTime(
+              0.01,
+              audioContext.currentTime + time + 0.3
+            );
 
-          oscillator.start(audioContext.currentTime + time);
-          oscillator.stop(audioContext.currentTime + time + 0.3);
-        };
+            oscillator.start(audioContext.currentTime + time);
+            oscillator.stop(audioContext.currentTime + time + 0.3);
+          };
 
-        playBeep(0);
-        playBeep(0.4);
-        playBeep(0.8);
+          playBeep(0);
+          playBeep(0.4);
+          playBeep(0.8);
+        }
       } catch (e) {
-        console.log("[v0] Audio playback failed:", e);
+        console.error("Audio playback failed:", e);
       }
     };
 

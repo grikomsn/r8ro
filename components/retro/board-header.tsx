@@ -21,6 +21,8 @@ import {
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { UserAccountPopover } from "@/components/auth/user-account-popover";
+import { TimerSettings } from "@/components/retro/timer-settings";
+import { ThemeToggle } from "@/components/theme-toggle";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -62,6 +64,7 @@ interface BoardHeaderProps {
   onToggleSidebar?: () => void;
   participantCount?: number;
   currentUserId?: string;
+  timerDuration?: number;
 }
 
 export function BoardHeader({
@@ -78,6 +81,7 @@ export function BoardHeader({
   onToggleSidebar,
   participantCount = 0,
   currentUserId,
+  timerDuration,
 }: BoardHeaderProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [remainingTime, setRemainingTime] = useState(
@@ -102,35 +106,41 @@ export function BoardHeader({
   useEffect(() => {
     const playAlarm = () => {
       try {
-        const audioContext =
-          new // biome-ignore lint/suspicious/noExplicitAny: we need to use any to get the webkitAudioContext
-          (window.AudioContext || (window as any).webkitAudioContext)();
+        const AudioContextClass =
+          window.AudioContext ||
+          ("webkitAudioContext" in window
+            ? (window as unknown as { webkitAudioContext: typeof AudioContext })
+                .webkitAudioContext
+            : undefined);
+        if (AudioContextClass) {
+          const audioContext = new AudioContextClass();
 
-        const playBeep = (time: number) => {
-          const oscillator = audioContext.createOscillator();
-          const gainNode = audioContext.createGain();
+          const playBeep = (time: number) => {
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
 
-          oscillator.connect(gainNode);
-          gainNode.connect(audioContext.destination);
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
 
-          oscillator.frequency.value = 800;
-          oscillator.type = "square";
+            oscillator.frequency.value = 800;
+            oscillator.type = "square";
 
-          gainNode.gain.setValueAtTime(0.3, audioContext.currentTime + time);
-          gainNode.gain.exponentialRampToValueAtTime(
-            0.01,
-            audioContext.currentTime + time + 0.3
-          );
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime + time);
+            gainNode.gain.exponentialRampToValueAtTime(
+              0.01,
+              audioContext.currentTime + time + 0.3
+            );
 
-          oscillator.start(audioContext.currentTime + time);
-          oscillator.stop(audioContext.currentTime + time + 0.3);
-        };
+            oscillator.start(audioContext.currentTime + time);
+            oscillator.stop(audioContext.currentTime + time + 0.3);
+          };
 
-        playBeep(0);
-        playBeep(0.4);
-        playBeep(0.8);
+          playBeep(0);
+          playBeep(0.4);
+          playBeep(0.8);
+        }
       } catch (e) {
-        console.log("[v0] Audio playback failed:", e);
+        console.error("Audio playback failed:", e);
       }
     };
 
@@ -141,7 +151,10 @@ export function BoardHeader({
     const startTime = new Date(board.timer_started_at).getTime();
     const targetSeconds = board.timer_seconds || 300;
 
-    const interval = setInterval(() => {
+    const updateTimer = () => {
+      if (document.hidden) {
+        return;
+      }
       const now = Date.now();
       const elapsed = Math.floor((now - startTime) / 1000);
       const remaining = Math.max(0, targetSeconds - elapsed);
@@ -151,7 +164,10 @@ export function BoardHeader({
         hasPlayedAlarm.current = true;
         playAlarm();
       }
-    }, 1000);
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
 
     return () => clearInterval(interval);
   }, [board.timer_running, board.timer_started_at, board.timer_seconds]);
@@ -181,7 +197,7 @@ export function BoardHeader({
         setTimeout(() => setShareStatus(null), 2000);
       } catch (err) {
         if ((err as Error).name !== "AbortError") {
-          console.log("[v0] Share failed:", err);
+          console.error("Share failed:", err);
         }
       }
     } else {
@@ -196,7 +212,6 @@ export function BoardHeader({
         "[data-board-capture]"
       ) as HTMLElement;
       if (!boardElement) {
-        console.log("[v0] Board element not found");
         return;
       }
 
@@ -226,7 +241,7 @@ export function BoardHeader({
         setTimeout(() => setShareStatus(null), 2000);
       }
     } catch (err) {
-      console.log("[v0] Capture failed:", err);
+      console.error("Capture failed:", err);
       setShareStatus(null);
     }
   };
@@ -278,6 +293,7 @@ export function BoardHeader({
             <h1 className="shrink-0 font-black font-mono text-2xl uppercase md:text-3xl">
               r<span className="text-primary">8</span>ro
             </h1>
+            <ThemeToggle />
             {currentUserId && <UserAccountPopover variant="compact" />}
             <div className="hidden min-w-0 border-border border-l-2 pl-4 sm:block">
               {isEditingTitle ? (
@@ -376,6 +392,12 @@ export function BoardHeader({
               <Clock aria-hidden="true" className="h-4 w-4 md:h-5 md:w-5" />
               <span>{formatTime(remainingTime)}</span>
             </div>
+            {isAuthor && timerDuration !== undefined && (
+              <TimerSettings
+                duration={timerDuration}
+                onDurationChange={_onSetTimer}
+              />
+            )}
             {onToggleSidebar && (
               <Tooltip>
                 <TooltipTrigger asChild>

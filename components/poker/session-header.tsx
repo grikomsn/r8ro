@@ -112,7 +112,7 @@ export function SessionHeader({
         setTimeout(() => setShareStatus(null), 2000);
       } catch (err) {
         if ((err as Error).name !== "AbortError") {
-          console.log("[v0] Share failed:", err);
+          console.error("Share failed:", err);
         }
       }
     } else {
@@ -127,7 +127,6 @@ export function SessionHeader({
         "[role='main']"
       ) as HTMLElement;
       if (!sessionElement) {
-        console.log("[v0] Session element not found");
         return;
       }
 
@@ -157,7 +156,7 @@ export function SessionHeader({
         setTimeout(() => setShareStatus(null), 2000);
       }
     } catch (err) {
-      console.log("[v0] Capture failed:", err);
+      console.error("Capture failed:", err);
       setShareStatus(null);
     }
   };
@@ -431,8 +430,16 @@ export function SessionHeader({
                   <Button
                     aria-label="Share options"
                     className="h-9 rounded-lg border-2 border-border bg-transparent font-bold shadow-sm md:h-10"
-                    onClick={() => {
-                      // TODO: Implement share functionality
+                    onClick={async () => {
+                      try {
+                        await navigator.share({
+                          title: session.title,
+                          text: `Join my poker session: ${session.title}`,
+                          url: window.location.href,
+                        });
+                      } catch {
+                        // User cancelled or share failed - silently handle
+                      }
                     }}
                     variant="outline"
                   >

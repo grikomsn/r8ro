@@ -28,6 +28,7 @@ export function useAuth() {
 
   const supabaseRef = useRef(createClient());
   const isRecoveringRef = useRef(false);
+  const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -148,28 +149,37 @@ export function useAuth() {
 
     const {
       data: { subscription },
-    } = supabaseRef.current.auth.onAuthStateChange(async (event, session) => {
+    } = supabaseRef.current.auth.onAuthStateChange((event, session) => {
       if (!mounted || isRecoveringRef.current) {
         return;
       }
 
-      if (event === "SIGNED_OUT") {
-        await signInAnonymously(supabaseRef.current, mounted);
-      } else if (session?.user) {
-        const isAnonymous = !!session.user.is_anonymous;
-        setState({
-          user: session.user,
-          userId: session.user.id,
-          displayName: session.user.user_metadata?.display_name || "",
-          isLoading: false,
-          isInitialized: true,
-          isAnonymous,
-        });
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
       }
+
+      updateTimeoutRef.current = setTimeout(async () => {
+        if (event === "SIGNED_OUT") {
+          await signInAnonymously(supabaseRef.current, mounted);
+        } else if (session?.user) {
+          const isAnonymous = !!session.user.is_anonymous;
+          setState({
+            user: session.user,
+            userId: session.user.id,
+            displayName: session.user.user_metadata?.display_name || "",
+            isLoading: false,
+            isInitialized: true,
+            isAnonymous,
+          });
+        }
+      }, 100);
     });
 
     return () => {
       mounted = false;
+      if (updateTimeoutRef.current) {
+        clearTimeout(updateTimeoutRef.current);
+      }
       subscription.unsubscribe();
     };
   }, []);

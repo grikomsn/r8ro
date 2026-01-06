@@ -37,6 +37,7 @@ interface RetroColumnProps {
   draggedCard: RetroCard | null;
   setDraggedCard: (card: RetroCard | null) => void;
   isLocked: boolean;
+  pendingActions?: Record<string, boolean>;
 }
 
 const columnColorConfig: Record<ColumnType, { bg: string; text: string }> = {
@@ -58,6 +59,7 @@ export function RetroColumn({
   draggedCard,
   setDraggedCard,
   isLocked,
+  pendingActions = {},
 }: RetroColumnProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [newCardContent, setNewCardContent] = useState("");
@@ -212,6 +214,7 @@ export function RetroColumn({
             <div className="flex gap-2">
               <Button
                 className="h-10 flex-1 rounded-lg border border-border bg-foreground font-bold text-background"
+                disabled={pendingActions.addCard}
                 onClick={handleSubmit}
               >
                 Add
@@ -241,6 +244,7 @@ export function RetroColumn({
           <Button
             aria-label={`Add card to ${title}`}
             className="mb-3 h-12 w-full rounded-lg border-2 border-border/50 border-dashed font-bold transition-all hover:border-border hover:bg-muted"
+            disabled={pendingActions.addCard}
             onClick={() => setIsAdding(true)}
             variant="outline"
           >
@@ -332,33 +336,33 @@ export function RetroColumn({
                   className="flex items-center gap-1"
                   role="group"
                 >
-                  {!isLocked &&
-                    card.author_id === currentUserId &&
-                    editingCardId !== card.id && (
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              aria-label="Edit card"
-                              className="h-8 w-8 rounded-lg p-0 opacity-0 transition-opacity group-hover:opacity-100"
-                              onClick={() => startEditing(card)}
-                              variant="ghost"
-                            >
-                              <Pencil aria-hidden="true" className="h-4 w-4" />
-                              <span className="sr-only">Edit card</span>
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>Edit</TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    )}
-                  {!isLocked && card.author_id === currentUserId && (
+                  {!isLocked && editingCardId !== card.id && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            aria-label="Edit card"
+                            className="h-8 w-8 rounded-lg p-0 opacity-0 transition-opacity group-hover:opacity-100"
+                            disabled={pendingActions[`edit-${card.id}`]}
+                            onClick={() => startEditing(card)}
+                            variant="ghost"
+                          >
+                            <Pencil aria-hidden="true" className="h-4 w-4" />
+                            <span className="sr-only">Edit card</span>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Edit</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
+                  {!isLocked && (
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <Button
                             aria-label="Delete card"
                             className="h-8 w-8 rounded-lg p-0 opacity-0 transition-opacity group-hover:opacity-100"
+                            disabled={pendingActions[`delete-${card.id}`]}
                             onClick={() => onDeleteCard(card.id)}
                             variant="ghost"
                           >
@@ -379,6 +383,9 @@ export function RetroColumn({
                         <Button
                           aria-label={`Vote for this card. Current votes: ${card.votes}`}
                           className="h-8 rounded-lg border border-border px-2 font-bold shadow-sm transition-all hover:bg-secondary"
+                          disabled={
+                            isLocked || pendingActions[`vote-${card.id}`]
+                          }
                           onClick={() => onVoteCard(card.id)}
                           variant="outline"
                         >
