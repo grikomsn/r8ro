@@ -16,6 +16,14 @@ Realtime collaborative retrospective boards. Anonymous-first with GitHub auth bi
 - **Timer** — Built-in session timer with play/pause/reset
 - **Recent boards** — Local history of visited boards
 
+### Scrum Poker
+
+- **Configurable voting scales** — Fibonacci, T-shirt sizes, and linear presets (extendable via `lib/constants/poker-scales.ts`)
+- **Admin controls** — Start/stop voting, reveal/hide cards, clear votes, and toggle public/private visibility
+- **Observer mode** — Participants can join read-only to watch estimates without voting
+- **Realtime participants & presence** — Mirrors retro flows with dedicated components under `components/poker/`
+- **Statistics** — After reveal, the table surfaces min/max/average and outlier cues for the current story
+
 ### Access Control
 
 - **Public boards** — Anyone can join, add cards, vote
@@ -192,13 +200,14 @@ r8ro/
 │   ├── retro/[slug]/
 │   │   ├── page.tsx              # Board page (server)
 │   │   └── RetroPageClient.tsx   # Board UI (client + realtime)
+│   ├── poker/[slug]/             # Scrum poker session route
+│   │   ├── page.tsx
+│   │   └── PokerSessionClient.tsx
 │   └── client-page.tsx           # Homepage
 ├── components/
 │   ├── ui/                       # shadcn/ui primitives
-│   └── retro/                    # Retro board components
-│       ├── retro-column.tsx      # Column with cards
-│       ├── retro-card.tsx        # Individual card
-│       └── ...
+│   ├── retro/                    # Retro board components
+│   └── poker/                    # Planning poker components
 ├── hooks/
 │   └── use-auth.ts               # Auth state hook
 ├── lib/
@@ -208,12 +217,21 @@ r8ro/
 │   │   └── proxy.ts              # Proxy for env vars
 │   ├── types.ts                  # TypeScript types
 │   └── utils/
-│       └── slug.ts               # Slug generation
+│       ├── slug.ts               # Slug generation
+│       └── recent-*.ts           # Local history helpers for retro/poker
 └── supabase/
     ├── schema.sql                # Complete schema dump
     ├── RLS_POLICIES.md           # RLS documentation
     └── README.md                 # Schema overview
 ```
+
+## Documentation
+
+- `docs/README.md` — index of every doc plus authoring conventions.
+- `docs/overview.md` — high-level product summary and architecture highlights.
+- `docs/features/retro.md` / `docs/features/poker.md` — deep dives into each realtime experience.
+- `docs/data-model/supabase.md` — canonical schema + RLS reference linked to migrations.
+- `docs/operations.md` — local setup, Supabase introspection steps, and documentation refresh checklist.
 
 ## Development
 
