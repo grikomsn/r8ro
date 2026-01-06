@@ -5,12 +5,14 @@ import { useRouter } from "next/navigation";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { UserAccountPopover } from "@/components/auth/user-account-popover";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/use-auth";
+import { ERROR_MESSAGES } from "@/lib/constants/error-messages";
 import {
   VOTING_SCALES,
   type VotingScaleType,
@@ -23,6 +25,9 @@ import {
   removeRecentPokerSession,
 } from "@/lib/utils/recent-poker-sessions";
 import { generateSlug } from "@/lib/utils/slug";
+
+const USERNAME_MAX_LENGTH = 30;
+const USERNAME_REGEX = /^[a-zA-Z0-9_-]+$/;
 
 export default function PokerClientPage() {
   const router = useRouter();
@@ -66,11 +71,21 @@ export default function PokerClientPage() {
   const handleCreateSession = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!username.trim()) {
-      setError("Please enter your name");
+      setError(ERROR_MESSAGES.USERNAME_REQUIRED);
+      return;
+    }
+    if (username.length > USERNAME_MAX_LENGTH) {
+      setError(`Name must be ${USERNAME_MAX_LENGTH} characters or less`);
+      return;
+    }
+    if (!USERNAME_REGEX.test(username)) {
+      setError(
+        "Name can only contain letters, numbers, underscores, and hyphens"
+      );
       return;
     }
     if (!userId) {
-      setError("Authentication not ready. Please wait...");
+      setError(ERROR_MESSAGES.AUTH_NOT_READY);
       return;
     }
 
@@ -108,7 +123,7 @@ export default function PokerClientPage() {
         .insert(sessionData);
 
       if (insertError) {
-        throw new Error(insertError.message || "Failed to create session");
+        throw new Error(insertError.message || ERROR_MESSAGES.CREATE_FAILED);
       }
 
       const { data: sessionDataResult, error: sessionError } = await supabase
@@ -118,9 +133,7 @@ export default function PokerClientPage() {
         .single();
 
       if (sessionError || !sessionDataResult) {
-        throw new Error(
-          sessionError?.message || "Failed to fetch created session"
-        );
+        throw new Error(sessionError?.message || ERROR_MESSAGES.CREATE_FAILED);
       }
 
       const { error: participantError } = await supabase
@@ -134,9 +147,7 @@ export default function PokerClientPage() {
         });
 
       if (participantError) {
-        throw new Error(
-          participantError.message || "Failed to join as participant"
-        );
+        throw new Error(participantError.message || ERROR_MESSAGES.JOIN_FAILED);
       }
 
       addRecentPokerSession(
@@ -146,9 +157,7 @@ export default function PokerClientPage() {
       router.push(`/poker/${slug}`);
     } catch (err) {
       const errorMessage =
-        err instanceof Error
-          ? err.message
-          : "Failed to create session. Please try again.";
+        err instanceof Error ? err.message : ERROR_MESSAGES.CREATE_FAILED;
       setError(errorMessage);
     } finally {
       setIsCreating(false);
@@ -162,7 +171,7 @@ export default function PokerClientPage() {
       return;
     }
     if (!userId) {
-      setError("Authentication not ready. Please wait...");
+      setError(ERROR_MESSAGES.AUTH_NOT_READY);
       return;
     }
 
@@ -178,7 +187,7 @@ export default function PokerClientPage() {
         .single();
 
       if (fetchError || !session) {
-        setError("Session not found. Check the code and try again.");
+        setError(ERROR_MESSAGES.SESSION_NOT_FOUND);
         return;
       }
 
@@ -195,7 +204,7 @@ export default function PokerClientPage() {
       router.push(`/poker/${joinForm.slug.trim().toLowerCase()}`);
     } catch (err) {
       console.error(err);
-      setError("Failed to join session. Please try again.");
+      setError(ERROR_MESSAGES.JOIN_FAILED);
     } finally {
       setIsJoining(false);
     }
@@ -249,7 +258,10 @@ export default function PokerClientPage() {
             <h1 className="font-black font-mono text-2xl uppercase tracking-tight">
               r<span className="text-primary">8</span>ro
             </h1>
-            {userId && <UserAccountPopover />}
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+              {userId && <UserAccountPopover />}
+            </div>
           </div>
         </header>
 

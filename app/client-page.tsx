@@ -5,12 +5,14 @@ import { useRouter } from "next/navigation";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { UserAccountPopover } from "@/components/auth/user-account-popover";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/use-auth";
+import { ERROR_MESSAGES } from "@/lib/constants/error-messages";
 import { createClient } from "@/lib/supabase/client";
 import {
   addRecentBoard,
@@ -20,7 +22,10 @@ import {
 } from "@/lib/utils/recent-boards";
 import { generateSlug } from "@/lib/utils/slug";
 
-export default function ClientPage() {
+const USERNAME_MAX_LENGTH = 30;
+const USERNAME_REGEX = /^[a-zA-Z0-9_-]+$/;
+
+export default function RetroClientPage() {
   const router = useRouter();
   const {
     userId,
@@ -57,11 +62,21 @@ export default function ClientPage() {
   const handleCreateSession = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!username.trim()) {
-      setError("Please enter your name");
+      setError(ERROR_MESSAGES.USERNAME_REQUIRED);
+      return;
+    }
+    if (username.length > USERNAME_MAX_LENGTH) {
+      setError(`Name must be ${USERNAME_MAX_LENGTH} characters or less`);
+      return;
+    }
+    if (!USERNAME_REGEX.test(username)) {
+      setError(
+        "Name can only contain letters, numbers, underscores, and hyphens"
+      );
       return;
     }
     if (!userId) {
-      setError("Authentication not ready. Please wait...");
+      setError(ERROR_MESSAGES.AUTH_NOT_READY);
       return;
     }
 
@@ -96,7 +111,7 @@ export default function ClientPage() {
         .insert(boardData);
 
       if (insertError) {
-        throw new Error(insertError.message || "Failed to create board");
+        throw new Error(insertError.message || ERROR_MESSAGES.CREATE_FAILED);
       }
 
       const { data: boardDataResult, error: boardError } = await supabase
@@ -106,7 +121,7 @@ export default function ClientPage() {
         .single();
 
       if (boardError || !boardDataResult) {
-        throw new Error(boardError?.message || "Failed to fetch created board");
+        throw new Error(boardError?.message || ERROR_MESSAGES.CREATE_FAILED);
       }
 
       const { error: participantError } = await supabase
@@ -119,18 +134,14 @@ export default function ClientPage() {
         });
 
       if (participantError) {
-        throw new Error(
-          participantError.message || "Failed to join as participant"
-        );
+        throw new Error(participantError.message || ERROR_MESSAGES.JOIN_FAILED);
       }
 
       addRecentBoard(slug, createForm.title.trim() || "Untitled Retro");
       router.push(`/retro/${slug}`);
     } catch (err) {
       const errorMessage =
-        err instanceof Error
-          ? err.message
-          : "Failed to create session. Please try again.";
+        err instanceof Error ? err.message : ERROR_MESSAGES.CREATE_FAILED;
       setError(errorMessage);
     } finally {
       setIsCreating(false);
@@ -144,7 +155,7 @@ export default function ClientPage() {
       return;
     }
     if (!userId) {
-      setError("Authentication not ready. Please wait...");
+      setError(ERROR_MESSAGES.AUTH_NOT_READY);
       return;
     }
 
@@ -160,7 +171,7 @@ export default function ClientPage() {
         .single();
 
       if (fetchError || !board) {
-        setError("Session not found. Check the URL and try again.");
+        setError(ERROR_MESSAGES.SESSION_NOT_FOUND);
         return;
       }
 
@@ -177,7 +188,7 @@ export default function ClientPage() {
       router.push(`/retro/${joinForm.slug.trim().toLowerCase()}`);
     } catch (err) {
       console.error(err);
-      setError("Failed to join session. Please try again.");
+      setError(ERROR_MESSAGES.JOIN_FAILED);
     } finally {
       setIsJoining(false);
     }
@@ -232,7 +243,10 @@ export default function ClientPage() {
             <h1 className="font-black font-mono text-2xl uppercase tracking-tight">
               r<span className="text-primary">8</span>ro
             </h1>
-            {userId && <UserAccountPopover />}
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+              {userId && <UserAccountPopover />}
+            </div>
           </div>
         </header>
 
