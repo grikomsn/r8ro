@@ -1,101 +1,84 @@
-# AGENTS.md
+# AGENTS GUIDE (v2)
 
-This guide is for agentic contributors to this repo. Follow scope and directory rules below. Update this file if conventions change.
+This file is the contract for all agentic contributors. Keep it updated if expectations change. (~150 lines.)
 
-## Build, Lint, Typecheck, Test
-- Install: `pnpm install`
-- Dev server: `pnpm dev`
-- Prod build: `pnpm build`
-- Prod start (after build): `pnpm start`
-- Typecheck: `pnpm check-types`
-- Format & lint: `pnpm fix` (Ultracite/Biome)
-- Ultracite direct: `pnpm dlx ultracite check` (no fixes), `pnpm dlx ultracite fix` (apply fixes)
-- Tests: No test framework configured; there is no single-test command. Prefer typecheck + build as validation. If you must verify logic, rely on targeted typecheck or manual flows.
+## 1. Build / Lint / Test Essentials
+1. `pnpm install` — install dependencies.
+2. `pnpm dev` — Next.js dev server with HMR.
+3. `pnpm build` — production build (includes type analysis).
+4. `pnpm start` — run the production bundle.
+5. `pnpm check-types` — strict TypeScript + Next.js validation; run frequently.
+6. `pnpm fix` — Biome/Ultracite auto format + lint (also triggered by Cursor hook).
+7. `pnpm dlx ultracite check` — lint only, no fixes.
+8. `pnpm dlx ultracite fix` — formatter-only invocation when hook misses a file.
 
-## Repo Structure
-- `app/` — Next.js 16 App Router routes and API handlers.
-- `components/ui/` — shadcn/ui primitives.
-- `components/retro/` — Retro board feature.
-- `components/poker/` — Poker planning feature.
-- `hooks/` — Custom hooks (`use-auth`, `use-mobile`, etc.).
-- `lib/` — Supabase clients, helpers, shared `types.ts`.
-- `supabase/migrations/` — SQL migrations and RLS policies.
-- `.cursor/` — Cursor automation and MCP config.
+> **Single-test command**: Not available. The repo ships without Jest/Vitest, so there is no per-test runner. Validate via `pnpm check-types`, `pnpm build`, and manual browser QA (two-tab realtime checks). Document new test commands here if you add a framework.
 
-## Cursor / Tooling Rules
-- `.cursor/hooks.json` runs `pnpm dlx ultracite fix` after file edits (auto-format). Expect formatting changes when saving.
-- `.cursor/mcp.json` configures Supabase MCP at `mcp.supabase.com` for project `dpdrtbkckcnedtbuwtiu`; prefer MCP/Supabase tools for DB inspection/changes.
-- `.cursor/plans/*` are historical plans; do not treat them as instructions.
+## 2. Repo & Tooling Overview
+- `app/` — Next.js 16 App Router routes + API handlers (`app/new/route.ts`).
+- `components/ui/` — shadcn/ui primitives. `components/retro/` and `components/poker/` contain feature modules.
+- `hooks/` — shared hooks such as `use-auth`, `use-mobile`.
+- `lib/` — Supabase clients (`lib/supabase/*`), shared `types.ts`, helper utilities.
+- `supabase/` — schema dump, migrations, RLS docs.
+- `docs/` — authoritative overview, feature, data-model, and operations guides.
+- `.cursor/` — automation + MCP config. `hooks.json` auto-runs `pnpm dlx ultracite fix` after edits. `mcp.json` points to Supabase MCP project `dpdrtbkckcnedtbuwtiu`. `.cursor/plans/*` are historical; ignore them as active instructions.
+- There are no `.cursor/rules` / `.cursorrules` files and no `.github/copilot-instructions.md` in this repo.
 
-## Tech Stack
-- Next.js 16 (App Router), React 19, TypeScript (strict), Tailwind CSS 4, shadcn/ui, Supabase (auth, realtime, RLS).
+## 3. Code Style (Biome/Ultracite)
+- **Formatting**: No semicolons. No trailing commas. Prefer double quotes. Formatter output is source of truth.
+- **Imports**: Order groups as (1) React/Next, (2) external packages, (3) `@/` aliases, (4) relative paths. Separate groups with single blank lines. Use `import type { Foo }` for type-only usage. Remove unused imports immediately.
+- **Naming**: camelCase vars/functions, PascalCase components/types, kebab-case filenames. Constants use descriptive names; reserve ALL_CAPS for immutable config arrays.
+- **Types**: Shared interfaces live in `lib/types.ts`. Interfaces for object shapes, type aliases for unions/primitives. Prefer `unknown` over `any`. Explicit return types for exported functions and hooks.
+- **Components**: Function components only. Never declare components inside other components. Hooks must live at the top level. Always provide complete dependency arrays. Keys must be stable (GUIDs or IDs, not indexes unless static).
+- **Styling**: Tailwind via `className`. Use `cn()` helper to merge conditional classes. Reach for shadcn/ui primitives before building bespoke controls.
+- **Strings**: Template literals for concatenation. Use const assertions (`as const`) for static arrays/objects that become union types.
+- **JS habits**: Default to `const`, use `let` when mutation is required. Prefer arrow callbacks. Use optional chaining/nullish coalescing for defensive logic. Avoid `.forEach()` where `await` is necessary; prefer `for...of`.
+- **Async**: Write `async/await` exclusively. `try/catch` around Supabase mutations. Propagate actionable errors using `throw new Error("message")` or UI-friendly notifications.
+- **Logging**: Production code may use `console.error` for genuine failures but must not contain `console.log`, `debugger`, or `alert`.
+- **Performance**: Avoid re-creating expensive objects inside render. Memoize derived data when re-renders are costly. Use top-level regex literals.
+- **Accessibility**: Semantic HTML, maintain heading hierarchy, label icon-only controls with `aria-label`, ensure focusable fallbacks for drag-and-drop interactions.
+- **Framework**: Favor Server Components for async data fetching when possible. React 19 uses “refs as props”; avoid `forwardRef` unless required by third-party APIs.
 
-## Code Style (Biome/Ultracite)
-- Formatting: No semicolons, no trailing commas, double quotes preferred.
-- Imports: React/Next hooks first, external libs next, `@/` internals last. Use `import type { ... }` for types. Keep unused imports out.
-- Naming: camelCase for vars/functions, PascalCase for components/types, kebab-case for files.
-- Types: Define shared shapes in `lib/types.ts`. Use interfaces for objects, type aliases for unions/primitives. Prefer `unknown` over `any`; add explicit return types for exported functions.
-- Components: Function components only. Do not nest component definitions. Include full dependency arrays for hooks. Use unique, stable keys (avoid indices).
-- Styling: Tailwind via className; prefer `cn()` utility when merging classes. Use shadcn/ui primitives where available.
-- Strings: Template literals over concatenation. Avoid implicit any. Use const assertions for immutable literals when appropriate.
-- JS habits: Arrow functions for callbacks, `for...of` over `.forEach()`, optional chaining/nullish coalescing, `const` by default (never `var`). Avoid spread in tight loops when it harms perf.
-- Errors & logging: `console.error` for logging; remove `console.log`, `debugger`, `alert` from production. Throw `Error` with messages when needed. Prefer early returns to reduce nesting.
-- Async: Always `await` promises; use `async/await` over `.then` chains. Handle failures with try/catch and minimal surface area.
-- Accessibility: Semantic HTML, ARIA labels, proper heading hierarchy, focusable controls, alt text for media.
-- Performance: Prefer top-level regex literals; avoid expensive recompute in render; consider memoization where justified; Next.js `<Image>` for images.
-- Framework specifics: Use Server Components for async data fetching where appropriate. React 19: pass `ref` as prop (no `forwardRef`).
+## 4. Supabase Playbook
+- Use `createClient` (`lib/supabase/client`) in browser contexts; server code should use `lib/supabase/server` or `proxy.ts` helpers.
+- Realtime channels follow `retro-${slug}` and `poker-${slug}` patterns with both presence and `postgres_changes`. Always unsubscribe and untrack on cleanup.
+- RLS policies depend on `auth.uid()`. Retro lock behavior updated in migration `20260106123000_update_retro_policies.sql` (participants may edit/vote while unlocked). Poker tables + policies defined in `20250101000000_create_poker_tables.sql`; default `is_voting_active` toggled in `20251223151027_alter_poker_sessions_default_voting_active.sql`.
+- Replication migration `20260106120000_enable_realtime_replication.sql` sets `REPLICA IDENTITY FULL` and adds tables to publication `supabase_realtime`—mirror this when adding new tables needing realtime.
+- Prefer Supabase MCP (`supabase_execute_sql`, etc.) for schema introspection. Update `docs/data-model/supabase.md` whenever migrations change behavior.
 
-## Supabase Guidance
-- Use `createClient` from `lib/supabase/client` on the client and server equivalents where applicable.
-- Realtime: Channels typically named `retro-${slug}` / `poker-${slug}` using presence + `postgres_changes`.
-- RLS: Policies enforce auth.uid(); ensure board lock (`is_locked`) affects writes. Recent migration `20260106123000_update_retro_policies.sql` allows participants to add/edit/delete cards and votes when unlocked; author retains control when locked.
-- Replication: Tables set to `REPLICA IDENTITY FULL` and added to `supabase_realtime` publication.
-- When changing schema/RLS, add SQL under `supabase/migrations/` and apply with Supabase tools; avoid hardcoding generated IDs in migrations.
+## 5. Working in App Code
+- `RetroPageClient.tsx` and `PokerSessionClient.tsx` orchestrate data fetching, presence tracking, realtime listeners, and optimistic updates. Keep state immutable, dedupe rows by id, and guard UI while data loads.
+- Hard deletes should redirect to home/poker index (`router.push`). Match existing behavior when adding destructive actions.
+- Respect RLS: UI should not bypass locks/visibility just because client-side state says so.
+- When implementing new features, update `docs/features/*.md` + `docs/operations.md` to maintain documentation as source of truth.
 
-## Working in App Code
-- Retro/poker pages are client components handling realtime presence and delta updates; favor immutable state updates and avoid re-fetch loops.
-- Keep error states user-friendly; route to home on hard deletes (see retro/poker clients).
-- Maintain optimistic UI carefully; respect new RLS (no author-only checks when board unlocked).
+## 6. Git & Review Guardrails
+- Default branch: `main`. Do **not** commit unless explicitly asked. Never change git config or run destructive commands (`reset --hard`, `push --force`) without approval.
+- If committing, run `pnpm fix` plus at least `pnpm check-types`. Mention any skipped validation steps in your final message.
+- Keep commit/PR summaries focused on intent (“add poker statistics panel”) rather than file lists.
 
-## Git & Review
-- Default branch is git repo root; do not commit unless user asks. Do not alter git config. Avoid destructive git commands.
-- Run `pnpm fix` before committing if you are asked to commit.
+## 7. Validation Strategy
+1. `pnpm check-types` — quick confidence signal.  
+2. `pnpm build` — catches integration issues or Next config mistakes.  
+3. Manual QA — open two browser contexts to validate realtime flows (presence, voting, locks, timers).  
+4. Tests — currently absent; if you add one, document the command for running single tests or directories.
 
-## Tests and Validation
-- No automated tests. Validation order: (1) targeted typecheck `pnpm check-types`, (2) `pnpm build` for integration sanity, (3) manual browser checks for realtime flows.
+## 8. Edge Cases & Cleanup
+- Guard for missing `userId` or `displayName`. Show the join modal when a user lacks a name (see existing pattern).
+- Presence hygiene: attach `visibilitychange` + `beforeunload` listeners to mark participants offline and untrack Supabase presence; detach listeners on unmount.
+- Prevent duplicate state entries when realtime inserts fire; check for existing ids before pushing into arrays.
+- Maintain retro card vote counts when card rows update (carry `votes` state forward instead of resetting to zero).
 
-## Error Handling & Edge Cases
-- Guard against missing auth (`userId`/`displayName`) and loading states.
-- Handle visibility/unload hooks for presence; ensure cleanup on unmount (unsubscribe channels, remove listeners).
-- Prevent duplicate state entries on realtime inserts; preserve vote counts on card updates.
+## 9. File / Folder Expectations
+- Prefer editing existing files. Only add new files when absolutely required—and check for nested `AGENTS.md` governing that subtree.
+- Feature logic must stay in its domain (`components/retro`, `components/poker`). Shared utilities belong in `lib/` or `components/shared`.
+- Store shared type definitions in `lib/types.ts` to avoid drift.
 
-## Accessibility & UX
-- Buttons must have `aria-label` where text not visible. Use proper roles/landmarks. Keep drag-and-drop accessible fallbacks where possible.
+## 10. Final Hand-Off Checklist
+- Ensure formatter has run (`pnpm fix` or Cursor hook).  
+- Rerun `pnpm check-types` (and `pnpm build` if changes are large).  
+- Call out remaining manual steps or unverified flows to the next agent.  
+- Never commit secrets. Required env vars: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`.  
+- Update docs (overview, features, data-model, operations) when behavior or schema changes.
 
-## File/Folder Expectations
-- Avoid adding new files unless necessary; prefer editing existing modules.
-- Shared types in `lib/types.ts`; avoid duplicating type definitions.
-- Keep feature-specific logic inside `components/retro` or `components/poker` rather than generic UI folders.
-
-## When Biome Can’t Decide
-- Favor correctness and readability over micro-optimizations.
-- Use clear naming instead of comments; avoid unnecessary abstractions.
-
-## Quick Reference (Do/Don’t)
-- Do: early returns, explicit dependencies, stable keys, `import type`, `await` promises.
-- Don’t: inline component defs, conditional hooks, console logs in prod, unused vars/imports, ref forwarding, index keys.
-
-## Single-File Notes
-- `RetroPageClient.tsx` / `PokerSessionClient.tsx`: manage Supabase channels; ensure cleanup and delta-based updates.
-- `components/retro/retro-column.tsx`: voting/edit/delete controls respect lock state; keep accessibility labels.
-
-## Asking for Credentials
-- Never add secrets. Environment variables expected: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
-
-## If You Need to Explore DB
-- Prefer Supabase MCP or `supabase_*` tools. For schema changes, create migrations (snake_case timestamp prefix) and apply via Supabase tools. Keep RLS consistent with app expectations.
-
-## Final Checklist Before Hand-off
-- Typecheck (`pnpm check-types`) and/or build if time allows.
-- Ensure formatting via Ultracite (auto-run on save or `pnpm fix`).
-- Mention any remaining validation gaps to the user.
+Happy shipping—stay precise, stay considerate.
