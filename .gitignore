@@ -8,3 +8,6 @@ package-lock.json
 yarn.lock
 
 !.env.example
+.env*.local
+.DS_Store
+.vscode/
