@@ -1,13 +1,14 @@
+.DS_Store
+.env*.local
 .next
 .turbo
 .vercel
+.vscode/
 *.env*
+*.tsbuildinfo
 next-env.d.ts
 node_modules/
 package-lock.json
 yarn.lock
 
 !.env.example
-.env*.local
-.DS_Store
-.vscode/
