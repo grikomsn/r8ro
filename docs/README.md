@@ -11,6 +11,7 @@ This folder is the canonical reference for r8ro's product behavior, architecture
 | `docs/features/poker.md` | Planning poker lifecycle, admin/participant capabilities, and realtime signaling. |
 | `docs/data-model/supabase.md` | Database tables, helper functions, RLS policies, and instructions for regenerating schema dumps. |
 | `docs/operations.md` | Local setup, validation order, Supabase introspection checklist, and documentation refresh workflow. |
+| `docs/deployment.md` | Comprehensive deployment guides for various platforms and self-hosting scenarios. |
 | `docs/images/` | Reference screenshots used by README and feature docs. |
 
 ## Authoring Guidelines

@@ -1,5 +1,8 @@
 # r8ro
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![r8ro.app](https://img.shields.io/badge/🌐-r8ro.app-blue)](https://r8ro.app)
+
 Realtime collaborative retrospective boards. Anonymous-first with GitHub auth binding.
 
 ![Homepage](docs/images/homepage.png)
@@ -232,6 +235,7 @@ r8ro/
 - `docs/features/retro.md` / `docs/features/poker.md` — deep dives into each realtime experience.
 - `docs/data-model/supabase.md` — canonical schema + RLS reference linked to migrations.
 - `docs/operations.md` — local setup, Supabase introspection steps, and documentation refresh checklist.
+- `docs/deployment.md` — comprehensive deployment guides for various platforms.
 
 ## Development
 
@@ -274,11 +278,42 @@ supabase db reset
 - `pnpm build` — Production build
 - `pnpm lint` — Run ESLint
 
+## Contributing
+
+Contributions are welcome! Please read our [Contributing Guidelines](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
+
+### Quick Start for Contributors
+
+1. **Fork** the repository
+2. **Clone** your fork locally
+3. **Create** a feature branch: `git checkout -b feature-name`
+4. **Set up** local development:
+
+   ```bash
+   pnpm install
+   cp .env.example .env.local
+   # Add your Supabase credentials
+   pnpm dev
+   ```
+
+5. **Make changes** and follow the code style in `AGENTS.md`
+6. **Submit** a pull request with clear description
+
+See [docs/operations.md](docs/operations.md) for detailed development setup.
+
 ## Deployment
 
-Deployed on Vercel: [vercel.com/nibras-enterprises/v0-r8ro](https://vercel.com/nibras-enterprises/v0-r8ro)
+r8ro can be deployed on various platforms. See [docs/deployment.md](docs/deployment.md) for comprehensive deployment guides including:
 
-Configure environment variables in Vercel dashboard before deploying.
+- **Vercel** (recommended for simplicity)
+- **Netlify**
+- **Docker containers**
+- **Self-hosted VPS**
+- **Cloud providers** (AWS, Google Cloud, etc.)
+
+## Author
+
+Created by **[Griko Nibras](https://grikomsn.com)** - a full-stack developer focused on collaborative tools and real-time applications.
 
 ## Security
 
