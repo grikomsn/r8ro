@@ -32,7 +32,6 @@ interface RetroColumnProps {
   onDeleteCard: (cardId: string) => void;
   onEditCard: (cardId: string, newContent: string) => void;
   onMoveCard: (cardId: string, newColumnType: ColumnType) => void;
-  currentUserId: string;
   bgColor: string;
   draggedCard: RetroCard | null;
   setDraggedCard: (card: RetroCard | null) => void;
@@ -55,7 +54,6 @@ export function RetroColumn({
   onDeleteCard,
   onEditCard,
   onMoveCard,
-  currentUserId,
   draggedCard,
   setDraggedCard,
   isLocked,

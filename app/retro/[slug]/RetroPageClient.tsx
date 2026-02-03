@@ -816,7 +816,6 @@ export default function RetroPageClient() {
               bgColor="bg-green-600"
               cards={cards.filter((c) => c.column_type === "went_well")}
               columnType="went_well"
-              currentUserId={userId || ""}
               draggedCard={draggedCard}
               isLocked={board.is_locked}
               onAddCard={handleAddCard}
@@ -834,7 +833,6 @@ export default function RetroPageClient() {
               bgColor="bg-red-700"
               cards={cards.filter((c) => c.column_type === "to_improve")}
               columnType="to_improve"
-              currentUserId={userId || ""}
               draggedCard={draggedCard}
               isLocked={board.is_locked}
               onAddCard={handleAddCard}
@@ -852,7 +850,6 @@ export default function RetroPageClient() {
               bgColor="bg-blue-700"
               cards={cards.filter((c) => c.column_type === "action_items")}
               columnType="action_items"
-              currentUserId={userId || ""}
               draggedCard={draggedCard}
               isLocked={board.is_locked}
               onAddCard={handleAddCard}
