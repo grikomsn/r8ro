@@ -10,11 +10,17 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/use-auth";
 
-interface JoinModalProps {
+interface JoinSessionModalProps {
   onJoin: (username: string) => void;
+  submitLabel: string;
+  title?: string;
 }
 
-export function JoinModal({ onJoin }: JoinModalProps) {
+export function JoinSessionModal({
+  onJoin,
+  submitLabel,
+  title = "Join Session",
+}: JoinSessionModalProps) {
   const { displayName, updateDisplayName, isInitialized } = useAuth();
   const [username, setUsername] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -47,7 +53,7 @@ export function JoinModal({ onJoin }: JoinModalProps) {
         <Card className="w-full max-w-md overflow-hidden rounded-2xl border-2 border-border shadow-lg">
           <CardHeader className="rounded-none border-border border-b-2 bg-primary py-5 text-primary-foreground">
             <CardTitle className="font-bold text-2xl uppercase">
-              Join Session
+              {title}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6 p-8">
@@ -67,7 +73,7 @@ export function JoinModal({ onJoin }: JoinModalProps) {
       <Card className="w-full max-w-md overflow-hidden rounded-2xl border-2 border-border shadow-lg">
         <CardHeader className="rounded-none border-border border-b-2 bg-primary py-5 text-primary-foreground">
           <CardTitle className="font-bold text-2xl uppercase">
-            Join Session
+            {title}
           </CardTitle>
         </CardHeader>
         <CardContent className="p-8">
@@ -92,7 +98,7 @@ export function JoinModal({ onJoin }: JoinModalProps) {
               disabled={isSubmitting || !isInitialized}
               type="submit"
             >
-              {isSubmitting ? "Joining…" : "Join Poker Session"}
+              {isSubmitting ? "Joining..." : submitLabel}
             </Button>
           </form>
         </CardContent>

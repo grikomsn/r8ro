@@ -4,13 +4,13 @@ import { ChevronLeft, ChevronRight, Users } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { JoinModal } from "@/components/poker/join-modal";
-import { ParticipantsList } from "@/components/poker/participants-list";
 import { ParticipantsTable } from "@/components/poker/participants-table";
-import { PrivateSessionOverlay } from "@/components/poker/private-session-overlay";
 import { SessionBottomNav } from "@/components/poker/session-bottom-nav";
 import { SessionHeader } from "@/components/poker/session-header";
 import { VotingCards } from "@/components/poker/voting-cards";
+import { JoinSessionModal } from "@/components/shared/join-session-modal";
+import { ParticipantsPanel } from "@/components/shared/participants-panel";
+import { PrivateAccessOverlay } from "@/components/shared/private-access-overlay";
 import {
   Tooltip,
   TooltipContent,
@@ -611,7 +611,9 @@ export default function PokerSessionClient() {
   }
 
   if (showJoinModal) {
-    return <JoinModal onJoin={handleJoin} />;
+    return (
+      <JoinSessionModal onJoin={handleJoin} submitLabel="Join Poker Session" />
+    );
   }
 
   if (loading) {
@@ -643,7 +645,13 @@ export default function PokerSessionClient() {
   }
 
   if (!(session.is_public || isAuthor)) {
-    return <PrivateSessionOverlay />;
+    return (
+      <PrivateAccessOverlay
+        description="This poker session is currently set to private. Only the session author can view and access it."
+        homeHref="/poker"
+        title="Private Session"
+      />
+    );
   }
 
   const myVote = votes.find((v) => v.user_id === userId);
@@ -769,10 +777,11 @@ export default function PokerSessionClient() {
                 className="flex-1 overflow-hidden rounded-l-xl border-2 border-border border-r-0 bg-background shadow-sm"
                 id="participants-sidebar"
               >
-                <ParticipantsList
+                <ParticipantsPanel
                   authorId={session.author_id}
                   onClose={() => setShowSidebar(false)}
                   participants={participants}
+                  showObservers
                 />
               </aside>
             </div>
@@ -784,10 +793,11 @@ export default function PokerSessionClient() {
             className={`fixed top-0 right-0 z-50 h-full w-80 min-w-80 border-border border-l-2 bg-background transition-transform duration-300 ease-in-out xl:hidden ${showSidebar ? "translate-x-0" : "translate-x-full"}`}
             id="participants-sidebar-mobile"
           >
-            <ParticipantsList
+            <ParticipantsPanel
               authorId={session.author_id}
               onClose={() => setShowSidebar(false)}
               participants={participants}
+              showObservers
             />
           </aside>
         </TooltipProvider>

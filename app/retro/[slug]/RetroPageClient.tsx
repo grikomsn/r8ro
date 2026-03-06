@@ -6,10 +6,10 @@ import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BoardBottomNav } from "@/components/retro/board-bottom-nav";
 import { BoardHeader } from "@/components/retro/board-header";
-import { JoinModal } from "@/components/retro/join-modal";
-import { ParticipantsList } from "@/components/retro/participants-list";
-import { PrivateBoardOverlay } from "@/components/retro/private-board-overlay";
 import { RetroColumn } from "@/components/retro/retro-column";
+import { JoinSessionModal } from "@/components/shared/join-session-modal";
+import { ParticipantsPanel } from "@/components/shared/participants-panel";
+import { PrivateAccessOverlay } from "@/components/shared/private-access-overlay";
 import {
   Tooltip,
   TooltipContent,
@@ -834,7 +834,7 @@ export default function RetroPageClient() {
   }
 
   if (showJoinModal) {
-    return <JoinModal onJoin={handleJoin} />;
+    return <JoinSessionModal onJoin={handleJoin} submitLabel="Join Retro" />;
   }
 
   if (loading) {
@@ -866,7 +866,13 @@ export default function RetroPageClient() {
   }
 
   if (!(board.is_public || isAuthor)) {
-    return <PrivateBoardOverlay />;
+    return (
+      <PrivateAccessOverlay
+        description="This retro board is currently set to private. Only the session author can view and access it."
+        homeHref="/"
+        title="Private Board"
+      />
+    );
   }
 
   return (
@@ -893,7 +899,6 @@ export default function RetroPageClient() {
         >
           <div className="min-w-[280px] flex-1 md:min-w-0">
             <RetroColumn
-              bgColor="bg-green-600"
               cards={cards.filter((c) => c.column_type === "went_well")}
               columnType="went_well"
               draggedCard={draggedCard}
@@ -910,7 +915,6 @@ export default function RetroPageClient() {
           </div>
           <div className="min-w-[280px] flex-1 md:min-w-0">
             <RetroColumn
-              bgColor="bg-red-700"
               cards={cards.filter((c) => c.column_type === "to_improve")}
               columnType="to_improve"
               draggedCard={draggedCard}
@@ -927,7 +931,6 @@ export default function RetroPageClient() {
           </div>
           <div className="min-w-[280px] flex-1 md:min-w-0">
             <RetroColumn
-              bgColor="bg-blue-700"
               cards={cards.filter((c) => c.column_type === "action_items")}
               columnType="action_items"
               draggedCard={draggedCard}
@@ -1019,7 +1022,7 @@ export default function RetroPageClient() {
                 className="flex-1 overflow-hidden rounded-l-xl border-2 border-border border-r-0 bg-background shadow-sm"
                 id="participants-sidebar"
               >
-                <ParticipantsList
+                <ParticipantsPanel
                   authorId={board.author_id || ""}
                   onClose={() => setShowSidebar(false)}
                   participants={participants}
@@ -1034,7 +1037,7 @@ export default function RetroPageClient() {
             className={`fixed top-0 right-0 z-50 h-full w-80 min-w-80 border-border border-l-2 bg-background transition-transform duration-300 ease-in-out xl:hidden ${showSidebar ? "translate-x-0" : "translate-x-full"}`}
             id="participants-sidebar-mobile"
           >
-            <ParticipantsList
+            <ParticipantsPanel
               authorId={board.author_id || ""}
               onClose={() => setShowSidebar(false)}
               participants={participants}
