@@ -28,9 +28,26 @@ import { addRecentBoard } from "@/lib/utils/recent-boards";
 const DEFAULT_TIMER_DURATION = 300;
 
 interface PresenceState {
+  online_at: number;
   user_id: string;
   username: string;
-  online_at: number;
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return fallback;
+}
+
+function throwIfSupabaseError(
+  error: { message?: string } | null,
+  fallback: string
+) {
+  if (error) {
+    throw new Error(error.message || fallback);
+  }
 }
 
 export default function RetroPageClient() {
@@ -56,7 +73,6 @@ export default function RetroPageClient() {
 
   const boardRef = useRef(board);
   const cardsRef = useRef(cards);
-  const channelRef = useRef<unknown>(null);
   boardRef.current = board;
   cardsRef.current = cards;
 
@@ -84,73 +100,97 @@ export default function RetroPageClient() {
     const supabase = createClient();
 
     async function load() {
-      const { data: boardData } = await supabase
-        .from("retro_boards")
-        .select("*")
-        .eq("slug", slug)
-        .single();
-
-      if (cancelled) {
-        return;
-      }
-      if (!boardData) {
-        setError("Board not found");
-        setLoading(false);
-        return;
-      }
-
-      setBoard(boardData);
-      addRecentBoard(boardData.slug, boardData.title);
-
-      const cardsRes = await supabase
-        .from("retro_cards")
-        .select("*")
-        .eq("board_id", boardData.id)
-        .order("created_at", { ascending: true });
-
-      const cardIds = (cardsRes.data || []).map((c) => c.id);
-      const [votesRes, participantsRes] = await Promise.all([
-        cardIds.length > 0
-          ? supabase
-              .from("retro_card_votes")
-              .select("card_id")
-              .in("card_id", cardIds)
-          : Promise.resolve({ data: [] }),
-        supabase
-          .from("retro_participants")
+      try {
+        const { data: boardData, error: boardError } = await supabase
+          .from("retro_boards")
           .select("*")
-          .eq("board_id", boardData.id),
-      ]);
+          .eq("slug", slug)
+          .maybeSingle();
 
-      if (cancelled) {
-        return;
-      }
+        if (cancelled) {
+          return;
+        }
 
-      const voteCounts = new Map<string, number>();
-      for (const vote of votesRes.data || []) {
-        voteCounts.set(vote.card_id, (voteCounts.get(vote.card_id) || 0) + 1);
-      }
+        throwIfSupabaseError(boardError, "Failed to load board");
 
-      const cardsWithVotes = (cardsRes.data || []).map((card) => ({
-        ...card,
-        votes: voteCounts.get(card.id) || 0,
-      }));
+        if (!boardData) {
+          setError("Board not found");
+          setLoading(false);
+          return;
+        }
 
-      setCards(cardsWithVotes);
-      setParticipants(participantsRes.data || []);
+        setBoard(boardData);
+        addRecentBoard(boardData.slug, boardData.title);
 
-      const existing = participantsRes.data?.find((p) => p.user_id === userId);
-      if (!existing) {
-        await supabase.from("retro_participants").upsert({
-          board_id: boardData.id,
-          user_id: userId,
-          username: userName,
-          is_online: true,
-        });
-      }
+        const cardsRes = await supabase
+          .from("retro_cards")
+          .select("*")
+          .eq("board_id", boardData.id)
+          .order("created_at", { ascending: true });
 
-      if (!cancelled) {
-        setLoading(false);
+        throwIfSupabaseError(cardsRes.error, "Failed to load cards");
+
+        const cardIds = (cardsRes.data || []).map((c) => c.id);
+        const [votesRes, participantsRes] = await Promise.all([
+          cardIds.length > 0
+            ? supabase
+                .from("retro_card_votes")
+                .select("card_id")
+                .in("card_id", cardIds)
+            : Promise.resolve({ data: [], error: null }),
+          supabase
+            .from("retro_participants")
+            .select("*")
+            .eq("board_id", boardData.id),
+        ]);
+
+        if (cancelled) {
+          return;
+        }
+
+        throwIfSupabaseError(votesRes.error, "Failed to load votes");
+        throwIfSupabaseError(
+          participantsRes.error,
+          "Failed to load participants"
+        );
+
+        const voteCounts = new Map<string, number>();
+        for (const vote of votesRes.data || []) {
+          voteCounts.set(vote.card_id, (voteCounts.get(vote.card_id) || 0) + 1);
+        }
+
+        const cardsWithVotes = (cardsRes.data || []).map((card) => ({
+          ...card,
+          votes: voteCounts.get(card.id) || 0,
+        }));
+
+        setCards(cardsWithVotes);
+        setParticipants(participantsRes.data || []);
+
+        const existing = participantsRes.data?.find(
+          (p) => p.user_id === userId
+        );
+        if (!existing) {
+          const { error: upsertError } = await supabase
+            .from("retro_participants")
+            .upsert({
+              board_id: boardData.id,
+              user_id: userId,
+              username: userName,
+              is_online: true,
+            });
+          throwIfSupabaseError(upsertError, "Failed to join board");
+        }
+
+        if (!cancelled) {
+          setLoading(false);
+        }
+      } catch (error: unknown) {
+        if (!cancelled) {
+          console.error("Failed to load retro board:", error);
+          setError(getErrorMessage(error, "Failed to load board"));
+          setLoading(false);
+        }
       }
     }
 
@@ -174,8 +214,6 @@ export default function RetroPageClient() {
         },
       },
     });
-
-    channelRef.current = channel;
 
     channel
       .on(
@@ -240,6 +278,13 @@ export default function RetroPageClient() {
           const payloadOld = payload.old as { card_id?: string } | null;
           const cardId = payloadNew?.card_id || payloadOld?.card_id;
           if (!cardId) {
+            return;
+          }
+
+          const isCardInCurrentBoard = cardsRef.current.some(
+            (card) => card.id === cardId
+          );
+          if (!isCardInCurrentBoard) {
             return;
           }
 
@@ -328,16 +373,24 @@ export default function RetroPageClient() {
 
     const handleVisibilityChange = async () => {
       if (document.visibilityState === "hidden") {
-        await supabase
+        const { error } = await supabase
           .from("retro_participants")
           .update({ is_online: false })
-          .eq("user_id", userId);
+          .eq("user_id", userId)
+          .eq("board_id", boardId);
+        if (error) {
+          console.error("Failed to update participant visibility:", error);
+        }
         await channel.untrack();
       } else if (document.visibilityState === "visible") {
-        await supabase
+        const { error } = await supabase
           .from("retro_participants")
           .update({ is_online: true })
-          .eq("user_id", userId);
+          .eq("user_id", userId)
+          .eq("board_id", boardId);
+        if (error) {
+          console.error("Failed to update participant visibility:", error);
+        }
         await channel.track({
           user_id: userId,
           username: userName,
@@ -347,10 +400,15 @@ export default function RetroPageClient() {
     };
 
     const handleBeforeUnload = async () => {
-      await supabase
+      const { error } = await supabase
         .from("retro_participants")
         .update({ is_online: false })
-        .eq("user_id", userId);
+        .eq("user_id", userId)
+        .eq("board_id", boardId);
+
+      if (error) {
+        console.error("Failed to set participant offline:", error);
+      }
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
@@ -359,6 +417,9 @@ export default function RetroPageClient() {
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("beforeunload", handleBeforeUnload);
+      channel.untrack().catch((error) => {
+        console.error("Failed to untrack presence:", error);
+      });
       channel.unsubscribe();
     };
   }, [board?.id, slug, userId, userName, router]);
@@ -384,10 +445,11 @@ export default function RetroPageClient() {
     const previousValue = b.is_public;
     setBoard((p) => (p ? { ...p, is_public: !p.is_public } : null));
     try {
-      await createClient()
+      const { error } = await createClient()
         .from("retro_boards")
         .update({ is_public: !b.is_public })
         .eq("id", b.id);
+      throwIfSupabaseError(error, "Failed to toggle visibility");
     } catch (error) {
       console.error("Failed to toggle visibility:", error);
       setBoard((p) => (p ? { ...p, is_public: previousValue } : null));
@@ -405,10 +467,11 @@ export default function RetroPageClient() {
     const previousValue = b.is_locked;
     setBoard((p) => (p ? { ...p, is_locked: !p.is_locked } : null));
     try {
-      await createClient()
+      const { error } = await createClient()
         .from("retro_boards")
         .update({ is_locked: !b.is_locked })
         .eq("id", b.id);
+      throwIfSupabaseError(error, "Failed to toggle lock");
     } catch (error) {
       console.error("Failed to toggle lock:", error);
       setBoard((p) => (p ? { ...p, is_locked: previousValue } : null));
@@ -439,7 +502,7 @@ export default function RetroPageClient() {
         },
       ]);
       try {
-        const { data } = await createClient()
+        const { data, error } = await createClient()
           .from("retro_cards")
           .insert({
             board_id: b.id,
@@ -450,6 +513,9 @@ export default function RetroPageClient() {
           })
           .select()
           .single();
+
+        throwIfSupabaseError(error, "Failed to add card");
+
         if (data) {
           setCards((p) =>
             p.map((c) => (c.id === tempId ? { ...data, votes: 0 } : c))
@@ -480,22 +546,26 @@ export default function RetroPageClient() {
       const supabase = createClient();
 
       try {
-        const { data: existingVote } = await supabase
+        const { data: existingVote, error: existingVoteError } = await supabase
           .from("retro_card_votes")
           .select("id")
           .eq("card_id", cardId)
           .eq("user_id", userId)
-          .single();
+          .maybeSingle();
+
+        throwIfSupabaseError(existingVoteError, "Failed to check vote state");
 
         if (existingVote) {
-          await supabase
+          const { error } = await supabase
             .from("retro_card_votes")
             .delete()
             .eq("id", existingVote.id);
+          throwIfSupabaseError(error, "Failed to remove vote");
         } else {
-          await supabase
+          const { error } = await supabase
             .from("retro_card_votes")
             .insert({ card_id: cardId, user_id: userId });
+          throwIfSupabaseError(error, "Failed to add vote");
         }
       } catch (error) {
         console.error("Failed to vote on card:", error);
@@ -518,7 +588,11 @@ export default function RetroPageClient() {
       setPendingActions((p) => ({ ...p, [actionKey]: true }));
       setCards((p) => p.filter((c) => c.id !== cardId));
       try {
-        await createClient().from("retro_cards").delete().eq("id", cardId);
+        const { error } = await createClient()
+          .from("retro_cards")
+          .delete()
+          .eq("id", cardId);
+        throwIfSupabaseError(error, "Failed to delete card");
       } catch (error) {
         console.error("Failed to delete card:", error);
         if (deletedCard) {
@@ -543,10 +617,11 @@ export default function RetroPageClient() {
       setPendingActions((p) => ({ ...p, [actionKey]: true }));
       setCards((p) => p.map((c) => (c.id === cardId ? { ...c, content } : c)));
       try {
-        await createClient()
+        const { error } = await createClient()
           .from("retro_cards")
           .update({ content })
           .eq("id", cardId);
+        throwIfSupabaseError(error, "Failed to edit card");
       } catch (error) {
         console.error("Failed to edit card:", error);
         if (previousContent !== undefined) {
@@ -577,10 +652,11 @@ export default function RetroPageClient() {
         p.map((c) => (c.id === cardId ? { ...c, column_type: columnType } : c))
       );
       try {
-        await createClient()
+        const { error } = await createClient()
           .from("retro_cards")
           .update({ column_type: columnType })
           .eq("id", cardId);
+        throwIfSupabaseError(error, "Failed to move card");
       } catch (error) {
         console.error("Failed to move card:", error);
         if (previousColumn !== undefined) {
@@ -607,10 +683,11 @@ export default function RetroPageClient() {
       const previousTitle = b.title;
       setBoard((p) => (p ? { ...p, title } : null));
       try {
-        await createClient()
+        const { error } = await createClient()
           .from("retro_boards")
           .update({ title })
           .eq("id", b.id);
+        throwIfSupabaseError(error, "Failed to edit board title");
       } catch (error) {
         console.error("Failed to edit board title:", error);
         setBoard((p) => (p ? { ...p, title: previousTitle } : null));
@@ -628,10 +705,15 @@ export default function RetroPageClient() {
     }
     setPendingActions((p) => ({ ...p, deleteBoard: true }));
     try {
-      await createClient().from("retro_boards").delete().eq("id", b.id);
+      const { error } = await createClient()
+        .from("retro_boards")
+        .delete()
+        .eq("id", b.id);
+      throwIfSupabaseError(error, "Failed to delete board");
       router.push("/");
     } catch (error) {
       console.error("Failed to delete board:", error);
+    } finally {
       setPendingActions((p) => ({ ...p, deleteBoard: false }));
     }
   }, [router, pendingActions]);
@@ -650,10 +732,11 @@ export default function RetroPageClient() {
       p ? { ...p, timer_running: running, timer_started_at: startedAt } : null
     );
     try {
-      await createClient()
+      const { error } = await createClient()
         .from("retro_boards")
         .update({ timer_running: running, timer_started_at: startedAt })
         .eq("id", b.id);
+      throwIfSupabaseError(error, "Failed to toggle timer");
     } catch (error) {
       console.error("Failed to toggle timer:", error);
       setBoard((p) =>
@@ -692,7 +775,7 @@ export default function RetroPageClient() {
         : null
     );
     try {
-      await createClient()
+      const { error } = await createClient()
         .from("retro_boards")
         .update({
           timer_running: false,
@@ -700,6 +783,7 @@ export default function RetroPageClient() {
           timer_started_at: null,
         })
         .eq("id", b.id);
+      throwIfSupabaseError(error, "Failed to reset timer");
     } catch (error) {
       console.error("Failed to reset timer:", error);
       setBoard((p) => (p ? { ...p, ...previousState } : null));
@@ -719,10 +803,11 @@ export default function RetroPageClient() {
       setTimerDuration(seconds);
       setBoard((p) => (p ? { ...p, timer_seconds: seconds } : null));
       try {
-        await createClient()
+        const { error } = await createClient()
           .from("retro_boards")
           .update({ timer_seconds: seconds })
           .eq("id", b.id);
+        throwIfSupabaseError(error, "Failed to set timer");
       } catch (error) {
         console.error("Failed to set timer:", error);
         setTimerDuration(previousSeconds);
@@ -795,8 +880,6 @@ export default function RetroPageClient() {
         isAuthor={!!isAuthor}
         onDeleteBoard={handleDeleteBoard}
         onSetTimer={handleSetTimer}
-        onTimerReset={handleTimerReset}
-        onTimerToggle={handleTimerToggle}
         onTitleUpdate={handleEditBoardTitle}
         onToggleLock={handleToggleLock}
         onToggleSidebar={() => setShowSidebar(!showSidebar)}

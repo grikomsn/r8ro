@@ -21,6 +21,23 @@ import { createClient } from "@/lib/supabase/client";
 import type { PokerParticipant, PokerSession, PokerVote } from "@/lib/types";
 import { addRecentPokerSession } from "@/lib/utils/recent-poker-sessions";
 
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return fallback;
+}
+
+function throwIfSupabaseError(
+  error: { message?: string } | null,
+  fallback: string
+) {
+  if (error) {
+    throw new Error(error.message || fallback);
+  }
+}
+
 export default function PokerSessionClient() {
   const params = useParams();
   const router = useRouter();
@@ -42,7 +59,6 @@ export default function PokerSessionClient() {
 
   const sessionRef = useRef(session);
   const votesRef = useRef(votes);
-  const channelRef = useRef<unknown>(null);
   sessionRef.current = session;
   votesRef.current = votes;
 
@@ -72,56 +88,77 @@ export default function PokerSessionClient() {
     const supabase = createClient();
 
     async function load() {
-      const { data: sessionData } = await supabase
-        .from("poker_sessions")
-        .select("*")
-        .eq("slug", slug)
-        .single();
-
-      if (cancelled) {
-        return;
-      }
-      if (!sessionData) {
-        setError("Session not found");
-        setLoading(false);
-        return;
-      }
-
-      setSession(sessionData);
-      addRecentPokerSession(sessionData.slug, sessionData.title);
-
-      // Load participants and votes
-      const [participantsRes, votesRes] = await Promise.all([
-        supabase
-          .from("poker_participants")
+      try {
+        const { data: sessionData, error: sessionError } = await supabase
+          .from("poker_sessions")
           .select("*")
-          .eq("session_id", sessionData.id),
-        supabase
-          .from("poker_votes")
-          .select("*")
-          .eq("session_id", sessionData.id),
-      ]);
+          .eq("slug", slug)
+          .maybeSingle();
 
-      if (cancelled) {
-        return;
-      }
+        if (cancelled) {
+          return;
+        }
 
-      setParticipants(participantsRes.data || []);
-      setVotes(votesRes.data || []);
+        throwIfSupabaseError(sessionError, "Failed to load session");
 
-      const existing = participantsRes.data?.find((p) => p.user_id === userId);
-      if (!existing) {
-        await supabase.from("poker_participants").upsert({
-          session_id: sessionData.id,
-          user_id: userId,
-          username: userName,
-          is_online: true,
-          is_observer: false,
-        });
-      }
+        if (!sessionData) {
+          setError("Session not found");
+          setLoading(false);
+          return;
+        }
 
-      if (!cancelled) {
-        setLoading(false);
+        setSession(sessionData);
+        addRecentPokerSession(sessionData.slug, sessionData.title);
+
+        const [participantsRes, votesRes] = await Promise.all([
+          supabase
+            .from("poker_participants")
+            .select("*")
+            .eq("session_id", sessionData.id),
+          supabase
+            .from("poker_votes")
+            .select("*")
+            .eq("session_id", sessionData.id),
+        ]);
+
+        if (cancelled) {
+          return;
+        }
+
+        throwIfSupabaseError(
+          participantsRes.error,
+          "Failed to load participants"
+        );
+        throwIfSupabaseError(votesRes.error, "Failed to load votes");
+
+        setParticipants(participantsRes.data || []);
+        setVotes(votesRes.data || []);
+
+        const existing = participantsRes.data?.find(
+          (p) => p.user_id === userId
+        );
+        if (!existing) {
+          const { error: upsertError } = await supabase
+            .from("poker_participants")
+            .upsert({
+              session_id: sessionData.id,
+              user_id: userId,
+              username: userName,
+              is_online: true,
+              is_observer: false,
+            });
+          throwIfSupabaseError(upsertError, "Failed to join session");
+        }
+
+        if (!cancelled) {
+          setLoading(false);
+        }
+      } catch (error: unknown) {
+        if (!cancelled) {
+          console.error("Failed to load poker session:", error);
+          setError(getErrorMessage(error, "Failed to load session"));
+          setLoading(false);
+        }
       }
     }
 
@@ -146,8 +183,6 @@ export default function PokerSessionClient() {
         },
       },
     });
-
-    channelRef.current = channel;
 
     channel
       .on(
@@ -271,16 +306,24 @@ export default function PokerSessionClient() {
 
     const handleVisibilityChange = async () => {
       if (document.visibilityState === "hidden") {
-        await supabase
+        const { error } = await supabase
           .from("poker_participants")
           .update({ is_online: false })
-          .eq("user_id", userId);
+          .eq("user_id", userId)
+          .eq("session_id", sessionId);
+        if (error) {
+          console.error("Failed to update participant visibility:", error);
+        }
         await channel.untrack();
       } else if (document.visibilityState === "visible") {
-        await supabase
+        const { error } = await supabase
           .from("poker_participants")
           .update({ is_online: true })
-          .eq("user_id", userId);
+          .eq("user_id", userId)
+          .eq("session_id", sessionId);
+        if (error) {
+          console.error("Failed to update participant visibility:", error);
+        }
         await channel.track({
           user_id: userId,
           username: userName,
@@ -290,10 +333,15 @@ export default function PokerSessionClient() {
     };
 
     const handleBeforeUnload = async () => {
-      await supabase
+      const { error } = await supabase
         .from("poker_participants")
         .update({ is_online: false })
-        .eq("user_id", userId);
+        .eq("user_id", userId)
+        .eq("session_id", sessionId);
+
+      if (error) {
+        console.error("Failed to set participant offline:", error);
+      }
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
@@ -302,6 +350,9 @@ export default function PokerSessionClient() {
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("beforeunload", handleBeforeUnload);
+      channel.untrack().catch((error) => {
+        console.error("Failed to untrack presence:", error);
+      });
       channel.unsubscribe();
     };
   }, [session?.id, slug, userId, userName, router]);
@@ -327,10 +378,11 @@ export default function PokerSessionClient() {
     const previousValue = s.is_public;
     setSession((p) => (p ? { ...p, is_public: !p.is_public } : null));
     try {
-      await createClient()
+      const { error } = await createClient()
         .from("poker_sessions")
         .update({ is_public: !s.is_public })
         .eq("id", s.id);
+      throwIfSupabaseError(error, "Failed to toggle visibility");
     } catch (error) {
       console.error("Failed to toggle visibility:", error);
       setSession((p) => (p ? { ...p, is_public: previousValue } : null));
@@ -350,10 +402,11 @@ export default function PokerSessionClient() {
       p ? { ...p, is_voting_active: !p.is_voting_active } : null
     );
     try {
-      await createClient()
+      const { error } = await createClient()
         .from("poker_sessions")
         .update({ is_voting_active: !s.is_voting_active })
         .eq("id", s.id);
+      throwIfSupabaseError(error, "Failed to toggle voting");
     } catch (error) {
       console.error("Failed to toggle voting:", error);
       setSession((p) => (p ? { ...p, is_voting_active: previousValue } : null));
@@ -371,10 +424,11 @@ export default function PokerSessionClient() {
     const previousValue = s.votes_revealed;
     setSession((p) => (p ? { ...p, votes_revealed: !p.votes_revealed } : null));
     try {
-      await createClient()
+      const { error } = await createClient()
         .from("poker_sessions")
         .update({ votes_revealed: !s.votes_revealed })
         .eq("id", s.id);
+      throwIfSupabaseError(error, "Failed to toggle reveal");
     } catch (error) {
       console.error("Failed to toggle reveal:", error);
       setSession((p) => (p ? { ...p, votes_revealed: previousValue } : null));
@@ -392,7 +446,11 @@ export default function PokerSessionClient() {
     const previousVotes = votesRef.current;
     setVotes([]);
     try {
-      await createClient().from("poker_votes").delete().eq("session_id", s.id);
+      const { error } = await createClient()
+        .from("poker_votes")
+        .delete()
+        .eq("session_id", s.id);
+      throwIfSupabaseError(error, "Failed to clear votes");
     } catch (error) {
       console.error("Failed to clear votes:", error);
       setVotes(previousVotes);
@@ -411,24 +469,28 @@ export default function PokerSessionClient() {
       const supabase = createClient();
 
       try {
-        const { data: existingVote } = await supabase
+        const { data: existingVote, error: existingVoteError } = await supabase
           .from("poker_votes")
           .select("id")
           .eq("session_id", s.id)
           .eq("user_id", userId)
-          .single();
+          .maybeSingle();
+
+        throwIfSupabaseError(existingVoteError, "Failed to check vote state");
 
         if (existingVote) {
-          await supabase
+          const { error } = await supabase
             .from("poker_votes")
             .update({ vote_value: voteValue })
             .eq("id", existingVote.id);
+          throwIfSupabaseError(error, "Failed to update vote");
         } else {
-          await supabase.from("poker_votes").insert({
+          const { error } = await supabase.from("poker_votes").insert({
             session_id: s.id,
             user_id: userId,
             vote_value: voteValue,
           });
+          throwIfSupabaseError(error, "Failed to submit vote");
         }
       } catch (error) {
         console.error("Failed to submit vote:", error);
@@ -449,10 +511,11 @@ export default function PokerSessionClient() {
       const previousTitle = s.title;
       setSession((p) => (p ? { ...p, title } : null));
       try {
-        await createClient()
+        const { error } = await createClient()
           .from("poker_sessions")
           .update({ title })
           .eq("id", s.id);
+        throwIfSupabaseError(error, "Failed to edit session title");
       } catch (error) {
         console.error("Failed to edit session title:", error);
         setSession((p) => (p ? { ...p, title: previousTitle } : null));
@@ -473,10 +536,11 @@ export default function PokerSessionClient() {
       const previousStory = s.current_story;
       setSession((p) => (p ? { ...p, current_story: story || null } : null));
       try {
-        await createClient()
+        const { error } = await createClient()
           .from("poker_sessions")
           .update({ current_story: story || null })
           .eq("id", s.id);
+        throwIfSupabaseError(error, "Failed to edit story");
       } catch (error) {
         console.error("Failed to edit story:", error);
         setSession((p) => (p ? { ...p, current_story: previousStory } : null));
@@ -494,10 +558,15 @@ export default function PokerSessionClient() {
     }
     setPendingActions((p) => ({ ...p, deleteSession: true }));
     try {
-      await createClient().from("poker_sessions").delete().eq("id", s.id);
+      const { error } = await createClient()
+        .from("poker_sessions")
+        .delete()
+        .eq("id", s.id);
+      throwIfSupabaseError(error, "Failed to delete session");
       router.push("/poker");
     } catch (error) {
       console.error("Failed to delete session:", error);
+    } finally {
       setPendingActions((p) => ({ ...p, deleteSession: false }));
     }
   }, [router, pendingActions]);
@@ -512,10 +581,11 @@ export default function PokerSessionClient() {
       const previousScale = s.voting_scale;
       setSession((p) => (p ? { ...p, voting_scale: scale } : null));
       try {
-        await createClient()
+        const { error } = await createClient()
           .from("poker_sessions")
           .update({ voting_scale: scale })
           .eq("id", s.id);
+        throwIfSupabaseError(error, "Failed to update scale");
       } catch (error) {
         console.error("Failed to update scale:", error);
         setSession((p) => (p ? { ...p, voting_scale: previousScale } : null));
@@ -602,6 +672,7 @@ export default function PokerSessionClient() {
         <main
           aria-label="Poker session"
           className={`flex flex-1 flex-col gap-6 overflow-y-auto p-4 transition-all duration-300 ease-in-out md:p-6 ${showSidebar ? "xl:pr-0" : "xl:pr-6"}`}
+          data-session-capture
         >
           <VotingCards
             isObserver={myParticipant?.is_observer ?? false}
