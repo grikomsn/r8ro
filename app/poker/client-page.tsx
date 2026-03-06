@@ -214,7 +214,7 @@ export default function PokerClientPage() {
       <main className="flex min-h-screen flex-col items-center justify-center bg-secondary p-4 md:p-8">
         <div className="flex flex-col items-center gap-4">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-          <p className="font-medium text-foreground/60 text-sm">Loading...</p>
+          <p className="font-medium text-foreground/60 text-sm">Loading…</p>
         </div>
       </main>
     );
@@ -278,7 +278,7 @@ export default function PokerClientPage() {
                   <div className="grid gap-2">
                     {recentSessions.map((session) => (
                       <div
-                        className="group flex items-center justify-between rounded-xl border-2 border-border bg-background px-4 py-3 font-bold shadow-sm transition-all hover:border-primary hover:shadow-md"
+                        className="group flex items-center justify-between rounded-xl border-2 border-border bg-background px-4 py-3 font-bold shadow-sm transition-[border-color,box-shadow] hover:border-primary hover:shadow-md"
                         key={session.slug}
                       >
                         <Link
@@ -292,7 +292,7 @@ export default function PokerClientPage() {
                         </Link>
                         <button
                           aria-label="Remove from recent"
-                          className="ml-2 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+                          className="ml-2 shrink-0 opacity-100 transition-opacity focus-visible:opacity-100 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100"
                           onClick={() => handleRemoveRecent(session.slug)}
                           type="button"
                         >
@@ -336,8 +336,10 @@ export default function PokerClientPage() {
                           Your Name
                         </Label>
                         <Input
+                          autoComplete="name"
                           className="h-12 rounded-xl border-2 border-border bg-background px-4 text-base shadow-sm"
                           id="create-username"
+                          name="username"
                           onChange={(e) => setUsername(e.target.value)}
                           placeholder="Enter your name"
                           required
@@ -353,8 +355,10 @@ export default function PokerClientPage() {
                           <span className="text-xs">(Optional)</span>
                         </Label>
                         <Input
+                          autoComplete="off"
                           className="h-12 rounded-xl border-2 border-border bg-background px-4 text-base shadow-sm"
                           id="create-title"
+                          name="sessionTitle"
                           onChange={(e) =>
                             setCreateForm({
                               ...createForm,
@@ -373,8 +377,9 @@ export default function PokerClientPage() {
                           Voting Scale
                         </Label>
                         <select
-                          className="h-12 w-full rounded-xl border-2 border-border bg-background px-4 text-base shadow-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                          className="h-12 w-full rounded-xl border-2 border-border bg-background px-4 text-base shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                           id="create-scale"
+                          name="votingScale"
                           onChange={(e) =>
                             setCreateForm({
                               ...createForm,
@@ -394,17 +399,20 @@ export default function PokerClientPage() {
                       </div>
                       {error && (
                         <div className="rounded-xl border-2 border-primary/20 bg-primary/10 px-4 py-3">
-                          <p className="font-bold text-primary text-sm">
+                          <p
+                            aria-live="polite"
+                            className="font-bold text-primary text-sm"
+                          >
                             {error}
                           </p>
                         </div>
                       )}
                       <Button
-                        className="w-full rounded-xl border-2 border-border bg-primary py-6 font-bold text-base uppercase shadow-md transition-all hover:shadow-lg hover:brightness-105"
+                        className="w-full rounded-xl border-2 border-border bg-primary py-6 font-bold text-base uppercase shadow-md transition-[box-shadow,filter] hover:shadow-lg hover:brightness-105"
                         disabled={isCreating || authLoading || !userId}
                         type="submit"
                       >
-                        {isCreating ? "Creating..." : "Start New Session"}
+                        {isCreating ? "Creating…" : "Start New Session"}
                       </Button>
                     </form>
                   </TabsContent>
@@ -419,8 +427,10 @@ export default function PokerClientPage() {
                           Your Name
                         </Label>
                         <Input
+                          autoComplete="name"
                           className="h-12 rounded-xl border-2 border-border bg-background px-4 text-base shadow-sm"
                           id="join-username"
+                          name="username"
                           onChange={(e) => setUsername(e.target.value)}
                           placeholder="Enter your name"
                           required
@@ -435,29 +445,35 @@ export default function PokerClientPage() {
                           Session Code
                         </Label>
                         <Input
+                          autoComplete="off"
                           className="h-12 rounded-xl border-2 border-border bg-background px-4 font-mono text-base shadow-sm"
                           id="join-slug"
+                          name="sessionCode"
                           onChange={(e) =>
                             setJoinForm({ ...joinForm, slug: e.target.value })
                           }
                           placeholder="swift-falcon-123"
                           required
+                          spellCheck={false}
                           value={joinForm.slug}
                         />
                       </div>
                       {error && (
                         <div className="rounded-xl border-2 border-primary/20 bg-primary/10 px-4 py-3">
-                          <p className="font-bold text-primary text-sm">
+                          <p
+                            aria-live="polite"
+                            className="font-bold text-primary text-sm"
+                          >
                             {error}
                           </p>
                         </div>
                       )}
                       <Button
-                        className="w-full rounded-xl border-2 border-border bg-accent py-6 font-bold text-accent-foreground text-base uppercase shadow-md transition-all hover:shadow-lg hover:brightness-105"
+                        className="w-full rounded-xl border-2 border-border bg-accent py-6 font-bold text-accent-foreground text-base uppercase shadow-md transition-[box-shadow,filter] hover:shadow-lg hover:brightness-105"
                         disabled={isJoining || authLoading || !userId}
                         type="submit"
                       >
-                        {isJoining ? "Joining..." : "Join Session"}
+                        {isJoining ? "Joining…" : "Join Session"}
                       </Button>
                     </form>
                   </TabsContent>

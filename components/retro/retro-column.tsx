@@ -184,7 +184,7 @@ export function RetroColumn({
         onDragLeave={handleDragLeave}
         onDragOver={handleDragOver}
         onDrop={handleDrop}
-        role="list"
+        role="region"
       >
         {isLocked ? (
           <div
@@ -198,11 +198,11 @@ export function RetroColumn({
           <div className="mb-3 rounded-lg border-2 border-border bg-muted p-3 shadow-sm">
             <Textarea
               aria-label="Card content"
-              autoFocus
               className="mb-2 min-h-[80px] rounded-lg border border-border shadow-sm"
+              name="cardContent"
               onChange={(e) => setNewCardContent(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Type your thought..."
+              placeholder="Type your thought…"
               value={newCardContent}
             />
             <div className="flex gap-2">
@@ -237,7 +237,7 @@ export function RetroColumn({
         ) : (
           <Button
             aria-label={`Add card to ${title}`}
-            className="mb-3 h-12 w-full rounded-lg border-2 border-border/50 border-dashed font-bold transition-all hover:border-border hover:bg-muted"
+            className="mb-3 h-12 w-full rounded-lg border-2 border-border/50 border-dashed font-bold transition-[border-color,background-color] hover:border-border hover:bg-muted"
             disabled={pendingActions.addCard}
             onClick={() => setIsAdding(true)}
             variant="outline"
@@ -248,11 +248,11 @@ export function RetroColumn({
         )}
 
         {/* Cards List */}
-        <div className="space-y-3" role="listitem">
+        <div className="space-y-3" role="list">
           {sortedCards.map((card) => (
             <article
               aria-label={`Card by ${card.author_name}: ${card.content}`}
-              className={`group rounded-xl border-2 border-border bg-background p-3 shadow-sm transition-all hover:shadow-md ${
+              className={`group rounded-xl border-2 border-border bg-background p-3 shadow-sm transition-shadow hover:shadow-md ${
                 isLocked
                   ? "cursor-default"
                   : "cursor-grab active:cursor-grabbing"
@@ -261,6 +261,7 @@ export function RetroColumn({
               key={card.id}
               onDragEnd={handleDragEnd}
               onDragStart={(e) => handleDragStart(e, card)}
+              role="listitem"
             >
               <div className="mb-2 flex items-start gap-2">
                 {!isLocked && (
@@ -274,8 +275,9 @@ export function RetroColumn({
                     <div className="space-y-2">
                       <Input
                         aria-label="Edit card content"
-                        autoFocus
+                        autoComplete="off"
                         className="rounded-lg border border-border"
+                        name="editCardContent"
                         onChange={(e) => setEditContent(e.target.value)}
                         onKeyDown={handleEditKeyDown}
                         value={editContent}
@@ -332,7 +334,7 @@ export function RetroColumn({
                         <TooltipTrigger asChild>
                           <Button
                             aria-label="Edit card"
-                            className="h-8 w-8 rounded-lg p-0 opacity-0 transition-opacity group-hover:opacity-100"
+                            className="h-8 w-8 rounded-lg p-0 opacity-0 transition-opacity focus-visible:opacity-100 group-focus-within:opacity-100 group-hover:opacity-100"
                             disabled={pendingActions[`edit-${card.id}`]}
                             onClick={() => startEditing(card)}
                             variant="ghost"
@@ -351,7 +353,7 @@ export function RetroColumn({
                         <TooltipTrigger asChild>
                           <Button
                             aria-label="Delete card"
-                            className="h-8 w-8 rounded-lg p-0 opacity-0 transition-opacity group-hover:opacity-100"
+                            className="h-8 w-8 rounded-lg p-0 opacity-0 transition-opacity focus-visible:opacity-100 group-focus-within:opacity-100 group-hover:opacity-100"
                             disabled={pendingActions[`delete-${card.id}`]}
                             onClick={() => onDeleteCard(card.id)}
                             variant="ghost"
@@ -372,7 +374,7 @@ export function RetroColumn({
                       <TooltipTrigger asChild>
                         <Button
                           aria-label={`Vote for this card. Current votes: ${card.votes}`}
-                          className="h-8 rounded-lg border border-border px-2 font-bold shadow-sm transition-all hover:bg-secondary"
+                          className="h-8 rounded-lg border border-border px-2 font-bold shadow-sm transition-[background-color,box-shadow] hover:bg-secondary"
                           disabled={
                             isLocked || pendingActions[`vote-${card.id}`]
                           }

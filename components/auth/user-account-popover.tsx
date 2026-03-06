@@ -37,7 +37,7 @@ export function UserAccountPopover({
       <PopoverTrigger asChild>
         <button
           aria-label="User account menu"
-          className={`group flex items-center gap-2 rounded-full border-2 transition-all hover:shadow-md ${
+          className={`group flex items-center gap-2 rounded-full border-2 transition-[border-color,background-color,box-shadow] hover:shadow-md ${
             isAnonymous
               ? "border-amber-400 bg-amber-50 hover:border-amber-500 hover:bg-amber-100"
               : "border-green-400 bg-green-50 hover:border-green-500 hover:bg-green-100"
@@ -106,7 +106,7 @@ export function UserAccountPopover({
                 User ID
               </span>
               <code className="font-mono font-semibold text-xs">
-                {userId.slice(0, 8)}...
+                {userId.slice(0, 8)}…
               </code>
             </div>
             <div className="flex items-center justify-between">

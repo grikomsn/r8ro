@@ -31,7 +31,7 @@ export function VotingCards({
     return (
       <div className="flex flex-col items-center justify-center rounded-xl border-2 border-border bg-muted px-4 py-12">
         <p className="font-bold text-lg text-muted-foreground">
-          Waiting for admin to start voting...
+          Waiting for admin to start voting…
         </p>
       </div>
     );
@@ -50,7 +50,7 @@ export function VotingCards({
               aria-label={`Vote ${value}`}
               aria-pressed={isSelected}
               className={cn(
-                "relative aspect-square rounded-xl border-2 shadow-md transition-all duration-200",
+                "relative aspect-square rounded-xl border-2 shadow-md transition-[transform,border-color,box-shadow,background-color,color] duration-200",
                 "flex items-center justify-center font-black text-4xl md:text-5xl",
                 isSelected && !isDisabled
                   ? "scale-105 border-primary bg-primary text-primary-foreground"

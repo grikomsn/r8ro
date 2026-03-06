@@ -77,9 +77,10 @@ export function JoinModal({ onJoin }: JoinModalProps) {
                 Your Name
               </Label>
               <Input
-                autoFocus
+                autoComplete="name"
                 className="h-12 rounded-xl border-2 border-border text-base shadow-sm"
                 id="username"
+                name="username"
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="Enter your name"
                 required
@@ -87,11 +88,11 @@ export function JoinModal({ onJoin }: JoinModalProps) {
               />
             </div>
             <Button
-              className="w-full rounded-xl border-2 border-border bg-primary py-6 font-bold text-base uppercase shadow-md transition-all hover:shadow-lg"
+              className="w-full rounded-xl border-2 border-border bg-primary py-6 font-bold text-base uppercase shadow-md transition-shadow hover:shadow-lg"
               disabled={isSubmitting || !isInitialized}
               type="submit"
             >
-              {isSubmitting ? "Joining..." : "Join Poker Session"}
+              {isSubmitting ? "Joining…" : "Join Poker Session"}
             </Button>
           </form>
         </CardContent>

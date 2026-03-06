@@ -250,7 +250,7 @@ export function BoardHeader({
       case "shared":
         return "Shared!";
       case "capturing":
-        return "Capturing...";
+        return "Capturing…";
       case "image-copied":
         return "Image Copied!";
       case "image-downloaded":
@@ -297,8 +297,10 @@ export function BoardHeader({
                 <div className="flex items-center gap-2">
                   <Input
                     aria-label="Board title"
+                    autoComplete="off"
                     autoFocus
                     className="h-8 w-48 rounded-lg border border-border font-bold"
+                    name="boardTitle"
                     onChange={(e) => setTitleInput(e.target.value)}
                     onKeyDown={handleTitleKeyDown}
                     value={titleInput}
@@ -349,7 +351,7 @@ export function BoardHeader({
                       <TooltipTrigger asChild>
                         <Button
                           aria-label="Edit board title"
-                          className="h-6 w-6 rounded-lg p-0 opacity-0 transition-opacity group-hover:opacity-100"
+                          className="h-6 w-6 rounded-lg p-0 opacity-0 transition-opacity focus-visible:opacity-100 group-focus-within:opacity-100 group-hover:opacity-100"
                           onClick={() => setIsEditingTitle(true)}
                           variant="ghost"
                         >
@@ -377,7 +379,6 @@ export function BoardHeader({
             {/* Timer Display (Read-only) */}
             <div
               aria-label={`Timer: ${formatTime(remainingTime)}`}
-              aria-live="polite"
               className={`flex items-center gap-2 rounded-xl border-2 border-border px-3 py-1.5 font-black text-lg shadow-sm md:px-4 md:py-2 md:text-2xl ${
                 board.timer_running && remainingTime <= 10
                   ? "animate-pulse bg-primary text-primary-foreground"
@@ -450,7 +451,7 @@ export function BoardHeader({
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={shareNative}>
                   <Share aria-hidden="true" className="mr-2 h-4 w-4" />
-                  Share via...
+                  Share via…
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={captureAsImage}>
@@ -506,7 +507,7 @@ export function BoardHeader({
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
-                    className="text-red-600 focus:bg-red-50 focus:text-red-600"
+                    className="text-red-600 focus-visible:bg-red-50 focus-visible:text-red-600"
                     onClick={() => setShowDeleteDialog(true)}
                   >
                     <Trash2 aria-hidden="true" className="mr-2 h-4 w-4" />

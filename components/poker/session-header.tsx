@@ -168,7 +168,7 @@ export function SessionHeader({
       case "shared":
         return "Shared!";
       case "capturing":
-        return "Capturing...";
+        return "Capturing…";
       case "image-copied":
         return "Image Copied!";
       case "image-downloaded":
@@ -237,8 +237,10 @@ export function SessionHeader({
                 <div className="flex items-center gap-2">
                   <Input
                     aria-label="Session title"
+                    autoComplete="off"
                     autoFocus
                     className="h-8 w-48 rounded-lg border border-border font-bold"
+                    name="sessionTitle"
                     onChange={(e) => setTitleInput(e.target.value)}
                     onKeyDown={handleTitleKeyDown}
                     value={titleInput}
@@ -289,7 +291,7 @@ export function SessionHeader({
                       <TooltipTrigger asChild>
                         <Button
                           aria-label="Edit session title"
-                          className="h-6 w-6 rounded-lg p-0 opacity-0 transition-opacity group-hover:opacity-100"
+                          className="h-6 w-6 rounded-lg p-0 opacity-0 transition-opacity focus-visible:opacity-100 group-focus-within:opacity-100 group-hover:opacity-100"
                           onClick={() => setIsEditingTitle(true)}
                           variant="ghost"
                         >
@@ -316,8 +318,9 @@ export function SessionHeader({
                 <div className="flex items-center gap-2">
                   <Input
                     aria-label="Current story"
-                    autoFocus
+                    autoComplete="off"
                     className="h-10 w-64 rounded-lg border border-border font-bold"
+                    name="currentStory"
                     onChange={(e) => setStoryInput(e.target.value)}
                     onKeyDown={handleStoryKeyDown}
                     placeholder="Enter story/task name"
@@ -371,7 +374,7 @@ export function SessionHeader({
                       onClick={() => isAuthor && setIsEditingStory(true)}
                       type="button"
                     >
-                      {isAuthor ? "Click to add story..." : "No story set"}
+                      {isAuthor ? "Click to add story…" : "No story set"}
                     </button>
                   )}
                   {isAuthor && (
@@ -379,7 +382,7 @@ export function SessionHeader({
                       <TooltipTrigger asChild>
                         <Button
                           aria-label="Edit story"
-                          className="h-6 w-6 rounded-lg p-0 opacity-0 transition-opacity group-hover:opacity-100"
+                          className="h-6 w-6 rounded-lg p-0 opacity-0 transition-opacity focus-visible:opacity-100 group-focus-within:opacity-100 group-hover:opacity-100"
                           onClick={() => setIsEditingStory(true)}
                           variant="ghost"
                         >
@@ -470,7 +473,7 @@ export function SessionHeader({
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={shareNative}>
                     <Share aria-hidden="true" className="mr-2 h-4 w-4" />
-                    Share via...
+                    Share via…
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={captureAsImage}>
@@ -547,7 +550,7 @@ export function SessionHeader({
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
-                      className="text-red-600 focus:bg-red-50 focus:text-red-600"
+                      className="text-red-600 focus-visible:bg-red-50 focus-visible:text-red-600"
                       onClick={() => setShowDeleteDialog(true)}
                     >
                       <Trash2 aria-hidden="true" className="mr-2 h-4 w-4" />
