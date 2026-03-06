@@ -247,9 +247,48 @@ function useAuthState(): AuthContextValue {
       }
 
       try {
+        const prepareResponse = await fetch("/auth/link/start", {
+          method: "POST",
+        });
+
+        if (!prepareResponse.ok) {
+          let errorMessage = "Failed to prepare GitHub account linking";
+
+          try {
+            const payload: unknown = await prepareResponse.json();
+            if (
+              typeof payload === "object" &&
+              payload !== null &&
+              "error" in payload &&
+              typeof payload.error === "string" &&
+              payload.error.length > 0
+            ) {
+              errorMessage = payload.error;
+            }
+          } catch {
+            // Ignore JSON parsing errors and keep fallback message.
+          }
+
+          console.error(
+            "Failed to prepare GitHub identity linking:",
+            errorMessage
+          );
+          return { success: false, error: errorMessage };
+        }
+
         const redirectUrl =
           typeof window !== "undefined"
-            ? `${window.location.origin}/auth/callback`
+            ? (() => {
+                const callbackUrl = new URL(
+                  "/auth/callback",
+                  window.location.origin
+                );
+                callbackUrl.searchParams.set(
+                  "next",
+                  `${window.location.pathname}${window.location.search}`
+                );
+                return callbackUrl.toString();
+              })()
             : "/auth/callback";
 
         const { error } = await supabaseRef.current.auth.linkIdentity({

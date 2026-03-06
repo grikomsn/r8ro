@@ -27,8 +27,9 @@ Defined initially by `supabase/migrations/20250101000000_create_poker_tables.sql
 
 - `can_access_board(board_uuid uuid)` (in `supabase/schema.sql`): SECURITY DEFINER shortcut to grant participant visibility without RLS recursion.
 - `can_access_poker_session(session_uuid uuid)` (created in `20250101000000_create_poker_tables.sql`): Mirrors the board helper but considers observer/author/public rules.
+- `merge_guest_account_into_current_user(source_user_id uuid, target_user_id uuid)` (created in `20260307113000_add_guest_account_merge_function.sql`): server-only merge helper used by auth callback fallback when GitHub identity is already linked elsewhere. It migrates retro + poker ownership/participation/votes and resolves poker vote conflicts by keeping the most recent `created_at`.
 
-Both helpers rely on `(SELECT auth.uid())` so RLS policies can check visibility with a single UID evaluation.
+The access helpers rely on `(SELECT auth.uid())` so RLS policies can check visibility with a single UID evaluation.
 
 ## Row Level Security Summary
 
