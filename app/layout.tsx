@@ -107,6 +107,12 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${lato.className} antialiased`}>
+        <a
+          className="sr-only focus-visible:not-sr-only focus-visible:absolute focus-visible:top-4 focus-visible:left-4 focus-visible:z-[100] focus-visible:rounded-md focus-visible:bg-background focus-visible:px-3 focus-visible:py-2 focus-visible:font-bold"
+          href="#main-content"
+        >
+          Skip to main content
+        </a>
         <ErrorBoundary
           fallback={<div className="p-8 text-center">App error</div>}
         >
@@ -116,7 +122,11 @@ export default function RootLayout({
             disableTransitionOnChange
             enableSystem
           >
-            <AuthProvider>{children}</AuthProvider>
+            <AuthProvider>
+              <div id="main-content" tabIndex={-1}>
+                {children}
+              </div>
+            </AuthProvider>
           </ThemeProvider>
         </ErrorBoundary>
         <Analytics />

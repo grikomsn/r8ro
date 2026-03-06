@@ -1,16 +1,11 @@
 "use client";
 
 import { Lock } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-interface PrivateSessionOverlayProps {
-  onGoHome: () => void;
-}
-
-export function PrivateSessionOverlay({
-  onGoHome,
-}: PrivateSessionOverlayProps) {
+export function PrivateSessionOverlay() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-secondary p-4">
       <Card className="w-full max-w-md rounded-2xl border-4 border-foreground shadow-lg">
@@ -26,10 +21,10 @@ export function PrivateSessionOverlay({
             author can view and access it.
           </p>
           <Button
-            className="w-full rounded-xl border-4 border-foreground bg-primary py-6 font-black text-lg uppercase shadow-md transition-all hover:shadow-lg hover:brightness-105"
-            onClick={onGoHome}
+            asChild
+            className="w-full rounded-xl border-4 border-foreground bg-primary py-6 font-black text-lg uppercase shadow-md transition-[box-shadow,filter] hover:shadow-lg hover:brightness-105"
           >
-            Go Back Home
+            <Link href="/poker">Go Back Home</Link>
           </Button>
         </CardContent>
       </Card>

@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronLeft, ChevronRight, Users } from "lucide-react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { JoinModal } from "@/components/poker/join-modal";
@@ -602,7 +603,7 @@ export default function PokerSessionClient() {
         <div className="rounded-2xl border-2 border-border bg-background p-8 shadow-md">
           <div className="flex items-center gap-3">
             <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-            <p className="font-bold text-xl">Loading...</p>
+            <p className="font-bold text-xl">Loading…</p>
           </div>
         </div>
       </div>
@@ -619,7 +620,7 @@ export default function PokerSessionClient() {
         <div className="rounded-2xl border-2 border-border bg-background p-8 shadow-md">
           <div className="flex items-center gap-3">
             <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-            <p className="font-bold text-xl">Loading...</p>
+            <p className="font-bold text-xl">Loading…</p>
           </div>
         </div>
       </div>
@@ -633,20 +634,16 @@ export default function PokerSessionClient() {
           <p className="font-bold text-primary text-xl">
             {error || "Session not found"}
           </p>
-          <button
-            className="mt-4 underline"
-            onClick={() => router.push("/poker")}
-            type="button"
-          >
+          <Link className="mt-4 inline-block underline" href="/poker">
             Go back home
-          </button>
+          </Link>
         </div>
       </div>
     );
   }
 
   if (!(session.is_public || isAuthor)) {
-    return <PrivateSessionOverlay onGoHome={() => router.push("/poker")} />;
+    return <PrivateSessionOverlay />;
   }
 
   const myVote = votes.find((v) => v.user_id === userId);
@@ -671,7 +668,7 @@ export default function PokerSessionClient() {
         {/* Main content area */}
         <main
           aria-label="Poker session"
-          className={`flex flex-1 flex-col gap-6 overflow-y-auto p-4 transition-all duration-300 ease-in-out md:p-6 ${showSidebar ? "xl:pr-0" : "xl:pr-6"}`}
+          className={`flex flex-1 flex-col gap-6 overflow-y-auto p-4 transition-[padding] duration-300 ease-in-out md:p-6 ${showSidebar ? "xl:pr-0" : "xl:pr-6"}`}
           data-session-capture
         >
           <VotingCards
@@ -695,10 +692,11 @@ export default function PokerSessionClient() {
 
         {/* Mobile overlay backdrop */}
         {showSidebar && (
-          <div
-            aria-hidden="true"
+          <button
+            aria-label="Close participants sidebar"
             className="fixed inset-0 z-40 bg-foreground/50 xl:hidden"
             onClick={() => setShowSidebar(false)}
+            type="button"
           />
         )}
 
@@ -713,7 +711,7 @@ export default function PokerSessionClient() {
                     ? "Hide participants sidebar"
                     : "Show participants sidebar"
                 }
-                className={`fixed top-1/2 z-50 flex h-16 w-6 -translate-y-1/2 items-center justify-center rounded-l-lg border-2 border-border border-r-0 bg-background shadow-md transition-all duration-300 ease-in-out hover:bg-muted xl:hidden ${showSidebar ? "right-80" : "right-0"}`}
+                className={`fixed top-1/2 z-50 flex h-16 w-6 -translate-y-1/2 items-center justify-center rounded-l-lg border-2 border-border border-r-0 bg-background shadow-md transition-[right,background-color] duration-300 ease-in-out hover:bg-muted xl:hidden ${showSidebar ? "right-80" : "right-0"}`}
                 onClick={() => setShowSidebar(!showSidebar)}
                 type="button"
               >

@@ -1,6 +1,7 @@
 "use client";
 
 import { ChevronLeft, ChevronRight, Users } from "lucide-react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BoardBottomNav } from "@/components/retro/board-bottom-nav";
@@ -825,7 +826,7 @@ export default function RetroPageClient() {
         <div className="rounded-2xl border-2 border-border bg-background p-8 shadow-md">
           <div className="flex items-center gap-3">
             <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-            <p className="font-bold text-xl">Loading...</p>
+            <p className="font-bold text-xl">Loading…</p>
           </div>
         </div>
       </div>
@@ -842,7 +843,7 @@ export default function RetroPageClient() {
         <div className="rounded-2xl border-2 border-border bg-background p-8 shadow-md">
           <div className="flex items-center gap-3">
             <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-            <p className="font-bold text-xl">Loading...</p>
+            <p className="font-bold text-xl">Loading…</p>
           </div>
         </div>
       </div>
@@ -856,20 +857,16 @@ export default function RetroPageClient() {
           <p className="font-bold text-primary text-xl">
             {error || "Board not found"}
           </p>
-          <button
-            className="mt-4 underline"
-            onClick={() => router.push("/")}
-            type="button"
-          >
+          <Link className="mt-4 inline-block underline" href="/">
             Go back home
-          </button>
+          </Link>
         </div>
       </div>
     );
   }
 
   if (!(board.is_public || isAuthor)) {
-    return <PrivateBoardOverlay onGoHome={() => router.push("/")} />;
+    return <PrivateBoardOverlay />;
   }
 
   return (
@@ -891,7 +888,7 @@ export default function RetroPageClient() {
       <div className="relative flex flex-1 overflow-x-hidden">
         <main
           aria-label="Retro board columns"
-          className={`flex flex-1 gap-4 overflow-x-auto overflow-y-auto p-4 pb-20 transition-all duration-300 ease-in-out md:gap-6 md:p-6 md:pb-24 ${showSidebar ? "xl:pr-0" : "xl:pr-6"}`}
+          className={`flex flex-1 gap-4 overflow-x-auto overflow-y-auto p-4 pb-20 transition-[padding] duration-300 ease-in-out md:gap-6 md:p-6 md:pb-24 ${showSidebar ? "xl:pr-0" : "xl:pr-6"}`}
           data-board-capture
         >
           <div className="min-w-[280px] flex-1 md:min-w-0">
@@ -948,10 +945,11 @@ export default function RetroPageClient() {
         </main>
 
         {showSidebar && (
-          <div
-            aria-hidden="true"
+          <button
+            aria-label="Close participants sidebar"
             className="fixed inset-0 z-40 bg-foreground/50 xl:hidden"
             onClick={() => setShowSidebar(false)}
+            type="button"
           />
         )}
 
@@ -966,7 +964,7 @@ export default function RetroPageClient() {
                     ? "Hide participants sidebar"
                     : "Show participants sidebar"
                 }
-                className={`fixed top-1/2 z-50 flex h-16 w-6 -translate-y-1/2 items-center justify-center rounded-l-lg border-2 border-border border-r-0 bg-background shadow-md transition-all duration-300 ease-in-out hover:bg-muted xl:hidden ${showSidebar ? "right-80" : "right-0"}`}
+                className={`fixed top-1/2 z-50 flex h-16 w-6 -translate-y-1/2 items-center justify-center rounded-l-lg border-2 border-border border-r-0 bg-background shadow-md transition-[right,background-color] duration-300 ease-in-out hover:bg-muted xl:hidden ${showSidebar ? "right-80" : "right-0"}`}
                 onClick={() => setShowSidebar(!showSidebar)}
                 type="button"
               >

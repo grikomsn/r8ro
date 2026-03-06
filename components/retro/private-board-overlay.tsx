@@ -1,14 +1,11 @@
 "use client";
 
 import { Lock } from "lucide-react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-interface PrivateBoardOverlayProps {
-  onGoHome: () => void;
-}
-
-export function PrivateBoardOverlay({ onGoHome }: PrivateBoardOverlayProps) {
+export function PrivateBoardOverlay() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-secondary p-4">
       <Card className="w-full max-w-md border-4 border-foreground shadow-lg">
@@ -24,10 +21,10 @@ export function PrivateBoardOverlay({ onGoHome }: PrivateBoardOverlayProps) {
             author can view and access it.
           </p>
           <Button
-            className="w-full border-4 border-foreground bg-primary py-6 font-black text-lg uppercase shadow-md transition-all hover:shadow-lg hover:brightness-105"
-            onClick={onGoHome}
+            asChild
+            className="w-full border-4 border-foreground bg-primary py-6 font-black text-lg uppercase shadow-md transition-[box-shadow,filter] hover:shadow-lg hover:brightness-105"
           >
-            Go Back Home
+            <Link href="/">Go Back Home</Link>
           </Button>
         </CardContent>
       </Card>
