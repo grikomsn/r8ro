@@ -287,6 +287,7 @@ function useAuthState(): AuthContextValue {
                   "next",
                   `${window.location.pathname}${window.location.search}`
                 );
+                callbackUrl.searchParams.set("link", "github");
                 return callbackUrl.toString();
               })()
             : "/auth/callback";

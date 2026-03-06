@@ -37,6 +37,7 @@ async function redirectToGitHubSignInFallback(
   const fallbackRedirect = new URL("/auth/callback", origin);
   fallbackRedirect.searchParams.set("mode", "signin-fallback");
   fallbackRedirect.searchParams.set("next", next);
+  fallbackRedirect.searchParams.set("link", "github");
 
   const { data: oauthData, error: oauthError } =
     await supabase.auth.signInWithOAuth({
@@ -59,6 +60,7 @@ export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
   const next = getSafeNextPath(searchParams.get("next"));
+  const isGitHubLinkFlow = searchParams.get("link") === "github";
   const attemptedFallbackSignIn =
     searchParams.get("mode") === "signin-fallback";
   const pendingSourceCookie = request.cookies.get(
@@ -75,7 +77,10 @@ export async function GET(request: NextRequest) {
   const supabase = await createServerClient();
 
   if (!code) {
-    if (pendingSourceUserId && !attemptedFallbackSignIn) {
+    if (
+      (isGitHubLinkFlow || hasPendingSourceCookie) &&
+      !attemptedFallbackSignIn
+    ) {
       const fallbackResponse = await redirectToGitHubSignInFallback(
         supabase,
         origin,
