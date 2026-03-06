@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import type React from "react";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { ThemeProvider } from "@/components/theme-provider";
+import { AuthProvider } from "@/hooks/use-auth";
 import "./globals.css";
 
 import {
@@ -115,7 +116,7 @@ export default function RootLayout({
             disableTransitionOnChange
             enableSystem
           >
-            {children}
+            <AuthProvider>{children}</AuthProvider>
           </ThemeProvider>
         </ErrorBoundary>
         <Analytics />

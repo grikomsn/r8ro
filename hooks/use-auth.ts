@@ -1,22 +1,49 @@
 "use client";
 
 import type { User } from "@supabase/supabase-js";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  createContext,
+  createElement,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   clearSessionAndRecreateClient,
   createClient,
 } from "@/lib/supabase/client";
 
 interface AuthState {
+  displayName: string;
+  isAnonymous: boolean;
+  isInitialized: boolean;
+  isLoading: boolean;
   user: User | null;
   userId: string | null;
-  displayName: string;
-  isLoading: boolean;
-  isInitialized: boolean;
-  isAnonymous: boolean;
 }
 
-export function useAuth() {
+interface LinkIdentityResult {
+  error?: string;
+  success: boolean;
+}
+
+interface AuthContextValue {
+  displayName: string;
+  isAnonymous: boolean;
+  isInitialized: boolean;
+  isLoading: boolean;
+  linkGitHubIdentity: () => Promise<LinkIdentityResult>;
+  updateDisplayName: (newName: string) => Promise<boolean>;
+  user: User | null;
+  userId: string | null;
+}
+
+const AuthContext = createContext<AuthContextValue | null>(null);
+
+function useAuthState(): AuthContextValue {
   const [state, setState] = useState<AuthState>({
     user: null,
     userId: null,
@@ -85,7 +112,6 @@ export function useAuth() {
       }
       isRecoveringRef.current = true;
 
-      // Clear tokens and get fresh client
       const freshClient = clearSessionAndRecreateClient();
       supabaseRef.current = freshClient;
 
@@ -213,42 +239,43 @@ export function useAuth() {
     return true;
   }, []);
 
-  const linkGitHubIdentity = useCallback(async () => {
-    if (!state.isAnonymous) {
-      console.error("User is not anonymous");
-      return { success: false, error: "User is not anonymous" };
-    }
-
-    try {
-      const redirectUrl =
-        typeof window !== "undefined"
-          ? `${window.location.origin}/auth/callback`
-          : "/auth/callback";
-
-      const { data, error } = await supabaseRef.current.auth.linkIdentity({
-        provider: "github",
-        options: {
-          redirectTo: redirectUrl,
-        },
-      });
-
-      if (error) {
-        console.error("Failed to link GitHub identity:", error);
-        return { success: false, error: error.message };
+  const linkGitHubIdentity =
+    useCallback(async (): Promise<LinkIdentityResult> => {
+      if (!state.isAnonymous) {
+        console.error("User is not anonymous");
+        return { success: false, error: "User is not anonymous" };
       }
 
-      return { success: true, data };
-    } catch (error: unknown) {
-      console.error("Failed to link GitHub identity:", error);
-      return {
-        success: false,
-        error:
-          error instanceof Error
-            ? error.message
-            : "Failed to link GitHub account",
-      };
-    }
-  }, [state.isAnonymous]);
+      try {
+        const redirectUrl =
+          typeof window !== "undefined"
+            ? `${window.location.origin}/auth/callback`
+            : "/auth/callback";
+
+        const { error } = await supabaseRef.current.auth.linkIdentity({
+          provider: "github",
+          options: {
+            redirectTo: redirectUrl,
+          },
+        });
+
+        if (error) {
+          console.error("Failed to link GitHub identity:", error);
+          return { success: false, error: error.message };
+        }
+
+        return { success: true };
+      } catch (error: unknown) {
+        console.error("Failed to link GitHub identity:", error);
+        return {
+          success: false,
+          error:
+            error instanceof Error
+              ? error.message
+              : "Failed to link GitHub account",
+        };
+      }
+    }, [state.isAnonymous]);
 
   return {
     user: state.user,
@@ -260,4 +287,24 @@ export function useAuth() {
     updateDisplayName,
     linkGitHubIdentity,
   };
+}
+
+interface AuthProviderProps {
+  children: ReactNode;
+}
+
+export function AuthProvider({ children }: AuthProviderProps) {
+  const auth = useAuthState();
+
+  return createElement(AuthContext.Provider, { value: auth }, children);
+}
+
+export function useAuth() {
+  const auth = useContext(AuthContext);
+
+  if (!auth) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+
+  return auth;
 }
