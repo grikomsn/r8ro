@@ -29,6 +29,32 @@ function clearPendingLinkCookie(response: NextResponse) {
   return response;
 }
 
+async function redirectToGitHubSignInFallback(
+  supabase: Awaited<ReturnType<typeof createServerClient>>,
+  origin: string,
+  next: string
+) {
+  const fallbackRedirect = new URL("/auth/callback", origin);
+  fallbackRedirect.searchParams.set("mode", "signin-fallback");
+  fallbackRedirect.searchParams.set("next", next);
+
+  const { data: oauthData, error: oauthError } =
+    await supabase.auth.signInWithOAuth({
+      provider: "github",
+      options: {
+        redirectTo: fallbackRedirect.toString(),
+        skipBrowserRedirect: true,
+      },
+    });
+
+  if (!oauthError && oauthData.url) {
+    return NextResponse.redirect(oauthData.url);
+  }
+
+  console.error("Failed to fallback to GitHub sign-in:", oauthError);
+  return null;
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
@@ -46,13 +72,25 @@ export async function GET(request: NextRequest) {
     console.error("Invalid account-link source cookie signature");
   }
 
+  const supabase = await createServerClient();
+
   if (!code) {
+    if (pendingSourceUserId && !attemptedFallbackSignIn) {
+      const fallbackResponse = await redirectToGitHubSignInFallback(
+        supabase,
+        origin,
+        next
+      );
+      if (fallbackResponse) {
+        return fallbackResponse;
+      }
+    }
+
     return clearPendingLinkCookie(
       NextResponse.redirect(`${origin}/auth/auth-code-error`)
     );
   }
 
-  const supabase = await createServerClient();
   const { error } = await supabase.auth.exchangeCodeForSession(code);
 
   if (!error) {
@@ -118,24 +156,14 @@ export async function GET(request: NextRequest) {
   }
 
   if (error.code === "identity_already_exists" && !attemptedFallbackSignIn) {
-    const fallbackRedirect = new URL("/auth/callback", origin);
-    fallbackRedirect.searchParams.set("mode", "signin-fallback");
-    fallbackRedirect.searchParams.set("next", next);
-
-    const { data: oauthData, error: oauthError } =
-      await supabase.auth.signInWithOAuth({
-        provider: "github",
-        options: {
-          redirectTo: fallbackRedirect.toString(),
-          skipBrowserRedirect: true,
-        },
-      });
-
-    if (!oauthError && oauthData.url) {
-      return NextResponse.redirect(oauthData.url);
+    const fallbackResponse = await redirectToGitHubSignInFallback(
+      supabase,
+      origin,
+      next
+    );
+    if (fallbackResponse) {
+      return fallbackResponse;
     }
-
-    console.error("Failed to fallback to GitHub sign-in:", oauthError);
   }
 
   console.error("GitHub auth callback failed:", error);
