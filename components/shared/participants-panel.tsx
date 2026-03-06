@@ -76,7 +76,7 @@ export function ParticipantsPanel({
                     />
                   )}
                   {participant.user_id === authorId && (
-                    <Crown className="h-4 w-4 fill-amber-500 text-amber-600" />
+                    <Crown className="h-4 w-4 fill-primary text-primary" />
                   )}
                 </div>
               ))}
@@ -106,7 +106,7 @@ export function ParticipantsPanel({
                     />
                   )}
                   {participant.user_id === authorId && (
-                    <Crown className="h-4 w-4 fill-amber-500 text-amber-600" />
+                    <Crown className="h-4 w-4 fill-primary text-primary" />
                   )}
                 </div>
               ))}

@@ -441,17 +441,6 @@ export function SessionHeader({
                   <Button
                     aria-label="Share options"
                     className="h-9 rounded-lg border-2 border-border bg-transparent font-bold shadow-sm md:h-10"
-                    onClick={async () => {
-                      try {
-                        await navigator.share({
-                          title: session.title,
-                          text: `Join my poker session: ${session.title}`,
-                          url: window.location.href,
-                        });
-                      } catch {
-                        // User cancelled or share failed - silently handle
-                      }
-                    }}
                     variant="outline"
                   >
                     {shareStatus ? (
@@ -550,7 +539,7 @@ export function SessionHeader({
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem
-                      className="text-red-600 focus-visible:bg-red-50 focus-visible:text-red-600"
+                      className="text-destructive focus-visible:bg-destructive/10 focus-visible:text-destructive"
                       onClick={() => setShowDeleteDialog(true)}
                     >
                       <Trash2 aria-hidden="true" className="mr-2 h-4 w-4" />
@@ -616,7 +605,7 @@ export function SessionHeader({
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
-              className="h-10 rounded-lg border-2 border-red-600 bg-red-600 font-bold text-white hover:bg-red-700"
+              className="h-10 rounded-lg border-2 border-destructive bg-destructive font-bold text-destructive-foreground hover:bg-destructive/90"
               onClick={onDeleteSession}
             >
               Delete

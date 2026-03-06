@@ -31,49 +31,56 @@ export function UserAccountPopover({
   }
 
   const isCompact = variant === "compact";
+  const toneClasses = isAnonymous
+    ? {
+        avatar: "bg-primary/20",
+        dot: "bg-primary",
+        icon: "text-primary",
+        label: "text-foreground",
+        trigger:
+          "border-primary/50 bg-primary/10 hover:border-primary hover:bg-primary/20",
+      }
+    : {
+        avatar: "bg-chart-4/50",
+        dot: "bg-chart-3",
+        icon: "text-chart-3",
+        label: "text-foreground",
+        trigger:
+          "border-chart-3/40 bg-chart-4/25 hover:border-chart-3 hover:bg-chart-4/40",
+      };
 
   return (
     <Popover>
       <PopoverTrigger asChild>
         <button
           aria-label="User account menu"
-          className={`group flex items-center gap-2 rounded-full border-2 transition-[border-color,background-color,box-shadow] hover:shadow-md ${
-            isAnonymous
-              ? "border-amber-400 bg-amber-50 hover:border-amber-500 hover:bg-amber-100"
-              : "border-green-400 bg-green-50 hover:border-green-500 hover:bg-green-100"
-          } ${isCompact ? "py-1 pr-2.5 pl-1" : "py-1.5 pr-3 pl-1.5"}`}
+          className={`group flex items-center gap-2 rounded-full border-2 transition-[border-color,background-color,box-shadow] hover:shadow-md ${toneClasses.trigger} ${isCompact ? "py-1 pr-2.5 pl-1" : "py-1.5 pr-3 pl-1.5"}`}
           type="button"
         >
           {/* Avatar circle with status indicator */}
           <div className="relative">
             <div
-              className={`flex items-center justify-center rounded-full ${
-                isAnonymous ? "bg-amber-200" : "bg-green-200"
-              } ${isCompact ? "h-6 w-6" : "h-7 w-7"}`}
+              className={`flex items-center justify-center rounded-full ${toneClasses.avatar} ${isCompact ? "h-6 w-6" : "h-7 w-7"}`}
             >
               {isAnonymous ? (
                 <UserCircle
-                  className={`text-amber-700 ${isCompact ? "h-4 w-4" : "h-5 w-5"}`}
+                  className={`${toneClasses.icon} ${isCompact ? "h-4 w-4" : "h-5 w-5"}`}
                 />
               ) : (
                 <Github
-                  className={`text-green-700 ${isCompact ? "h-3.5 w-3.5" : "h-4 w-4"}`}
+                  className={`${toneClasses.icon} ${isCompact ? "h-3.5 w-3.5" : "h-4 w-4"}`}
                 />
               )}
             </div>
             {/* Status dot */}
             <div
-              className={`absolute -right-0.5 -bottom-0.5 rounded-full border-2 border-white ${
-                isAnonymous ? "bg-amber-500" : "bg-green-500"
-              } ${isCompact ? "h-2.5 w-2.5" : "h-3 w-3"}`}
+              className={`absolute -right-0.5 -bottom-0.5 rounded-full border-2 border-background ${toneClasses.dot} ${isCompact ? "h-2.5 w-2.5" : "h-3 w-3"}`}
             />
           </div>
 
           {/* Display name or anonymous label */}
           <span
-            className={`max-w-[100px] truncate font-semibold ${
-              isAnonymous ? "text-amber-800" : "text-green-800"
-            } ${isCompact ? "text-xs" : "text-sm"}`}
+            className={`max-w-[100px] truncate font-semibold ${toneClasses.label} ${isCompact ? "text-xs" : "text-sm"}`}
           >
             {displayName || (isAnonymous ? "Guest" : "User")}
           </span>
@@ -116,8 +123,8 @@ export function UserAccountPopover({
               <div className="flex items-center gap-1.5">
                 {isAnonymous ? (
                   <>
-                    <div className="h-2 w-2 rounded-full bg-amber-500" />
-                    <span className="font-semibold text-amber-600 text-xs">
+                    <div className="h-2 w-2 rounded-full bg-primary" />
+                    <span className="font-semibold text-primary text-xs">
                       Anonymous
                     </span>
                   </>
@@ -125,9 +132,9 @@ export function UserAccountPopover({
                   <>
                     <ShieldCheck
                       aria-hidden="true"
-                      className="h-3.5 w-3.5 text-green-600"
+                      className="h-3.5 w-3.5 text-chart-3"
                     />
-                    <span className="font-semibold text-green-600 text-xs">
+                    <span className="font-semibold text-chart-3 text-xs">
                       Linked
                     </span>
                   </>
