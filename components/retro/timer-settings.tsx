@@ -16,9 +16,9 @@ import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
 
 interface TimerSettingsProps {
+  className?: string;
   duration: number;
   onDurationChange: (seconds: number) => void;
-  className?: string;
 }
 
 const PRESET_OPTIONS = [

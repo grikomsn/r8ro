@@ -5,13 +5,13 @@ import type { PokerParticipant, PokerVote } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface ParticipantsTableProps {
+  authorId: string;
+  currentUserId: string | null;
+  isAuthor: boolean;
   participants: PokerParticipant[];
+  scale: string[];
   votes: PokerVote[];
   votesRevealed: boolean;
-  isAuthor: boolean;
-  currentUserId: string | null;
-  authorId: string;
-  scale: string[];
 }
 
 export function ParticipantsTable({

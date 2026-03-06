@@ -6,18 +6,18 @@ import { cn } from "@/lib/utils";
 
 interface Participant {
   id: string;
+  is_observer?: boolean;
+  is_online: boolean;
   user_id: string;
   username: string;
-  is_online: boolean;
-  is_observer?: boolean;
 }
 
 interface ParticipantsPanelProps {
-  participants: Participant[];
   authorId: string;
-  onClose?: () => void;
-  showObservers?: boolean;
   className?: string;
+  onClose?: () => void;
+  participants: Participant[];
+  showObservers?: boolean;
 }
 
 export function ParticipantsPanel({

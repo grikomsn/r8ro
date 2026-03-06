@@ -11,11 +11,11 @@ import {
 import type { PokerSession } from "@/lib/types";
 
 interface SessionBottomNavProps {
-  session: PokerSession;
   isAuthor: boolean;
-  onToggleVoting: () => void;
-  onToggleReveal: () => void;
   onClearVotes: () => void;
+  onToggleReveal: () => void;
+  onToggleVoting: () => void;
+  session: PokerSession;
 }
 
 export function SessionBottomNav({

@@ -4,9 +4,9 @@ import { ParticipantsPanel } from "@/components/shared/participants-panel";
 import type { PokerParticipant } from "@/lib/types";
 
 interface ParticipantsListProps {
-  participants: PokerParticipant[];
   authorId: string;
   onClose?: () => void;
+  participants: PokerParticipant[];
 }
 
 export function ParticipantsList({

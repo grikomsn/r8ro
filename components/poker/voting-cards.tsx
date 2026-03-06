@@ -4,12 +4,12 @@ import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface VotingCardsProps {
+  isObserver: boolean;
+  isVotingActive: boolean;
+  onVote: (value: string) => void;
   scale: string[];
   selectedValue: string | null;
-  isVotingActive: boolean;
   votesRevealed: boolean;
-  onVote: (value: string) => void;
-  isObserver: boolean;
 }
 
 export function VotingCards({
