@@ -58,7 +58,7 @@ function Item({
   ...props
 }: React.ComponentProps<"div"> &
   VariantProps<typeof itemVariants> & { asChild?: boolean }) {
-  const Comp = asChild ? SlotPrimitive.Slot : "div";
+  const Comp: React.ElementType = asChild ? SlotPrimitive.Slot : "div";
   return (
     <Comp
       className={cn(itemVariants({ variant, size, className }))}
