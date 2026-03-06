@@ -99,6 +99,9 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
 
 # Optional: Supabase Service Role Key for server operations
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+
+# Optional: dedicated secret for link-cookie HMAC signing
+AUTH_LINK_COOKIE_SECRET=your_link_cookie_secret
 ```
 
 ### Database Setup

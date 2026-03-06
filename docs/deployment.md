@@ -32,6 +32,9 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 # For server-side operations
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 
+# Optional: dedicated secret for link-cookie HMAC signing
+AUTH_LINK_COOKIE_SECRET=your_link_cookie_secret
+
 # Custom domain (if not using platform default)
 NEXT_PUBLIC_APP_URL=https://your-custom-domain.com
 ```
