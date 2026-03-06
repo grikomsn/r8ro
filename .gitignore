@@ -10,5 +10,6 @@ next-env.d.ts
 node_modules/
 package-lock.json
 yarn.lock
+supabase/.temp/
 
 !.env.example
