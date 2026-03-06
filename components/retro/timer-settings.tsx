@@ -97,6 +97,10 @@ export function TimerSettings({
             </div>
             <Slider
               aria-labelledby="duration-label"
+              aria-valuemax={1800}
+              aria-valuemin={60}
+              aria-valuenow={localDuration}
+              aria-valuetext={formatTime(localDuration)}
               className="py-2"
               max={1800}
               min={60}

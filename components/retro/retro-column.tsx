@@ -2,6 +2,8 @@
 
 import {
   Check,
+  ChevronLeft,
+  ChevronRight,
   GripVertical,
   Lock,
   Pencil,
@@ -11,7 +13,7 @@ import {
   X,
 } from "lucide-react";
 import type React from "react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -24,7 +26,6 @@ import {
 import type { ColumnType, RetroCard } from "@/lib/types";
 
 interface RetroColumnProps {
-  bgColor: string;
   cards: RetroCard[];
   columnType: ColumnType;
   draggedCard: RetroCard | null;
@@ -40,9 +41,17 @@ interface RetroColumnProps {
 }
 
 const columnColorConfig: Record<ColumnType, { bg: string; text: string }> = {
-  went_well: { bg: "bg-green-600", text: "text-white" },
-  to_improve: { bg: "bg-red-600", text: "text-white" },
-  action_items: { bg: "bg-blue-600", text: "text-white" },
+  went_well: { bg: "bg-chart-4", text: "text-foreground" },
+  to_improve: { bg: "bg-destructive", text: "text-destructive-foreground" },
+  action_items: { bg: "bg-chart-2", text: "text-primary-foreground" },
+};
+
+const columnOrder: ColumnType[] = ["went_well", "to_improve", "action_items"];
+
+const columnLabels: Record<ColumnType, string> = {
+  went_well: "Went Well",
+  to_improve: "To Improve",
+  action_items: "Action Items",
 };
 
 export function RetroColumn({
@@ -64,6 +73,31 @@ export function RetroColumn({
   const [editingCardId, setEditingCardId] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
   const [isDragOver, setIsDragOver] = useState(false);
+  const [voteAnnouncement, setVoteAnnouncement] = useState("");
+  const voteAnnouncementInitialized = useRef(false);
+  const previousTotalVotes = useRef(0);
+
+  const columnIndex = columnOrder.indexOf(columnType);
+  const previousColumn = columnIndex > 0 ? columnOrder[columnIndex - 1] : null;
+  const nextColumn =
+    columnIndex < columnOrder.length - 1 ? columnOrder[columnIndex + 1] : null;
+
+  useEffect(() => {
+    const totalVotes = cards.reduce((sum, card) => sum + card.votes, 0);
+
+    if (!voteAnnouncementInitialized.current) {
+      voteAnnouncementInitialized.current = true;
+      previousTotalVotes.current = totalVotes;
+      return;
+    }
+
+    if (totalVotes !== previousTotalVotes.current) {
+      setVoteAnnouncement(
+        `${title} column now has ${totalVotes} total vote${totalVotes === 1 ? "" : "s"}.`
+      );
+      previousTotalVotes.current = totalVotes;
+    }
+  }, [cards, title]);
 
   // Handler functions
   const handleDragOver = (e: React.DragEvent) => {
@@ -248,6 +282,9 @@ export function RetroColumn({
         )}
 
         {/* Cards List */}
+        <p aria-live="polite" className="sr-only" role="status">
+          {voteAnnouncement}
+        </p>
         <div className="space-y-3" role="list">
           {sortedCards.map((card) => (
             <article
@@ -328,6 +365,58 @@ export function RetroColumn({
                   className="flex items-center gap-1"
                   role="group"
                 >
+                  {!isLocked && previousColumn && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            aria-label={`Move card to ${columnLabels[previousColumn]}`}
+                            className="h-8 w-8 rounded-lg p-0 opacity-0 transition-opacity focus-visible:opacity-100 group-focus-within:opacity-100 group-hover:opacity-100"
+                            disabled={pendingActions[`move-${card.id}`]}
+                            onClick={() => onMoveCard(card.id, previousColumn)}
+                            variant="ghost"
+                          >
+                            <ChevronLeft
+                              aria-hidden="true"
+                              className="h-4 w-4"
+                            />
+                            <span className="sr-only">
+                              Move to {columnLabels[previousColumn]}
+                            </span>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          Move to {columnLabels[previousColumn]}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
+                  {!isLocked && nextColumn && (
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            aria-label={`Move card to ${columnLabels[nextColumn]}`}
+                            className="h-8 w-8 rounded-lg p-0 opacity-0 transition-opacity focus-visible:opacity-100 group-focus-within:opacity-100 group-hover:opacity-100"
+                            disabled={pendingActions[`move-${card.id}`]}
+                            onClick={() => onMoveCard(card.id, nextColumn)}
+                            variant="ghost"
+                          >
+                            <ChevronRight
+                              aria-hidden="true"
+                              className="h-4 w-4"
+                            />
+                            <span className="sr-only">
+                              Move to {columnLabels[nextColumn]}
+                            </span>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          Move to {columnLabels[nextColumn]}
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  )}
                   {!isLocked && editingCardId !== card.id && (
                     <TooltipProvider>
                       <Tooltip>

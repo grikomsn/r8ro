@@ -1,6 +1,7 @@
 "use client";
 
 import { Crown, Eye } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import type { PokerParticipant, PokerVote } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -23,6 +24,23 @@ export function ParticipantsTable({
   authorId,
   scale: _scale,
 }: ParticipantsTableProps) {
+  const [liveAnnouncement, setLiveAnnouncement] = useState("");
+  const previousRevealState = useRef(votesRevealed);
+
+  useEffect(() => {
+    if (votesRevealed && !previousRevealState.current) {
+      setLiveAnnouncement(
+        `Votes revealed for ${participants.length} participants. ${votes.length} vote${votes.length === 1 ? "" : "s"} submitted.`
+      );
+    }
+
+    if (!votesRevealed && previousRevealState.current) {
+      setLiveAnnouncement("Votes are now hidden.");
+    }
+
+    previousRevealState.current = votesRevealed;
+  }, [participants.length, votes.length, votesRevealed]);
+
   // Calculate statistics if votes are revealed
   const calculateStats = () => {
     if (!votesRevealed || votes.length === 0) {
@@ -101,6 +119,9 @@ export function ParticipantsTable({
 
   return (
     <div className="space-y-4">
+      <p aria-live="polite" className="sr-only" role="status">
+        {liveAnnouncement}
+      </p>
       <h2 className="font-black text-xl uppercase">Participants & Votes</h2>
       <div className="overflow-hidden rounded-xl border-2 border-border bg-background">
         <table className="w-full">
@@ -154,7 +175,7 @@ export function ParticipantsTable({
                         />
                       )}
                       {participant.user_id === authorId && (
-                        <Crown className="h-4 w-4 fill-amber-500 text-amber-600" />
+                        <Crown className="h-4 w-4 fill-primary text-primary" />
                       )}
                     </div>
                   </td>
@@ -162,9 +183,9 @@ export function ParticipantsTable({
                     {showVoteValue && vote ? (
                       <span
                         className={cn(
-                          "inline-block rounded-lg px-3 py-1 font-bold font-mono text-lg",
+                          "fade-in zoom-in-95 inline-block animate-in rounded-lg px-3 py-1 font-bold font-mono text-lg duration-300",
                           outlier
-                            ? "border-2 border-amber-500 bg-amber-100 text-amber-900"
+                            ? "border-2 border-accent bg-accent/20 text-accent-foreground"
                             : "border-2 border-primary bg-primary/20 text-primary"
                         )}
                       >
@@ -195,7 +216,11 @@ export function ParticipantsTable({
       </div>
 
       {votesRevealed && stats && (
-        <div className="space-y-2 rounded-xl border-2 border-border bg-muted p-4">
+        <div
+          aria-live="polite"
+          className="fade-in slide-in-from-bottom-2 animate-in space-y-2 rounded-xl border-2 border-border bg-muted p-4 duration-300"
+          role="status"
+        >
           <h3 className="font-black text-lg uppercase">Statistics</h3>
           <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
             <div>
@@ -225,7 +250,7 @@ export function ParticipantsTable({
           </div>
           {stats.outliers.length > 0 && (
             <div className="mt-4 border-border border-t pt-4">
-              <p className="font-bold text-amber-600 text-sm">
+              <p className="font-bold text-accent text-sm">
                 {stats.outliers.length} outlier
                 {stats.outliers.length > 1 ? "s" : ""} detected
               </p>
