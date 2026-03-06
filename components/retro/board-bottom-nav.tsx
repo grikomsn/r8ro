@@ -1,7 +1,7 @@
 "use client";
 
 import { Clock, Pause, Play, RotateCcw, Settings } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -22,9 +22,9 @@ import type { RetroBoard } from "@/lib/types";
 interface BoardBottomNavProps {
   board: RetroBoard;
   isAuthor: boolean;
-  onTimerToggle: () => void;
-  onTimerReset: () => void;
   onSetTimer: (seconds: number) => void;
+  onTimerReset: () => void;
+  onTimerToggle: () => void;
 }
 
 export function BoardBottomNav({
@@ -34,81 +34,7 @@ export function BoardBottomNav({
   onTimerReset,
   onSetTimer,
 }: BoardBottomNavProps) {
-  const [_remainingTime, setRemainingTime] = useState(
-    board.timer_seconds || 300
-  );
   const [timerInput, setTimerInput] = useState("");
-  const hasPlayedAlarm = useRef(false);
-
-  useEffect(() => {
-    if (!board.timer_running) {
-      setRemainingTime(board.timer_seconds || 300);
-      hasPlayedAlarm.current = false;
-    }
-  }, [board.timer_seconds, board.timer_running]);
-
-  useEffect(() => {
-    const playAlarm = () => {
-      try {
-        const AudioContextClass =
-          window.AudioContext ||
-          ("webkitAudioContext" in window
-            ? (window as unknown as { webkitAudioContext: typeof AudioContext })
-                .webkitAudioContext
-            : undefined);
-        if (AudioContextClass) {
-          const audioContext = new AudioContextClass();
-
-          const playBeep = (time: number) => {
-            const oscillator = audioContext.createOscillator();
-            const gainNode = audioContext.createGain();
-
-            oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
-
-            oscillator.frequency.value = 800;
-            oscillator.type = "square";
-
-            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime + time);
-            gainNode.gain.exponentialRampToValueAtTime(
-              0.01,
-              audioContext.currentTime + time + 0.3
-            );
-
-            oscillator.start(audioContext.currentTime + time);
-            oscillator.stop(audioContext.currentTime + time + 0.3);
-          };
-
-          playBeep(0);
-          playBeep(0.4);
-          playBeep(0.8);
-        }
-      } catch (e) {
-        console.error("Audio playback failed:", e);
-      }
-    };
-
-    if (!(board.timer_running && board.timer_started_at)) {
-      return;
-    }
-
-    const startTime = new Date(board.timer_started_at).getTime();
-    const targetSeconds = board.timer_seconds || 300;
-
-    const interval = setInterval(() => {
-      const now = Date.now();
-      const elapsed = Math.floor((now - startTime) / 1000);
-      const remaining = Math.max(0, targetSeconds - elapsed);
-      setRemainingTime(remaining);
-
-      if (remaining === 0 && !hasPlayedAlarm.current) {
-        hasPlayedAlarm.current = true;
-        playAlarm();
-      }
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [board.timer_running, board.timer_started_at, board.timer_seconds]);
 
   const handleSetTimer = () => {
     const minutes = Number.parseInt(timerInput, 10);
@@ -119,7 +45,6 @@ export function BoardBottomNav({
   };
 
   const handleTimerReset = () => {
-    hasPlayedAlarm.current = false;
     onTimerReset();
   };
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { History, LogIn, Plus, X } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type React from "react";
 import { useEffect, useState } from "react";
@@ -61,9 +62,7 @@ export default function PokerClientPage() {
     setRecentSessions(getRecentPokerSessions());
   }, []);
 
-  const handleRemoveRecent = (slug: string, e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const handleRemoveRecent = (slug: string) => {
     removeRecentPokerSession(slug);
     setRecentSessions(getRecentPokerSessions());
   };
@@ -278,26 +277,28 @@ export default function PokerClientPage() {
                 <CardContent className="p-4">
                   <div className="grid gap-2">
                     {recentSessions.map((session) => (
-                      <a
+                      <div
                         className="group flex items-center justify-between rounded-xl border-2 border-border bg-background px-4 py-3 font-bold shadow-sm transition-all hover:border-primary hover:shadow-md"
-                        href={`/poker/${session.slug}`}
                         key={session.slug}
                       >
-                        <div className="flex min-w-0 flex-col gap-1">
+                        <Link
+                          className="flex min-w-0 flex-1 flex-col gap-1"
+                          href={`/poker/${session.slug}`}
+                        >
                           <span className="truncate">{session.title}</span>
                           <span className="font-mono text-muted-foreground text-xs">
                             {session.slug}
                           </span>
-                        </div>
+                        </Link>
                         <button
                           aria-label="Remove from recent"
                           className="ml-2 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
-                          onClick={(e) => handleRemoveRecent(session.slug, e)}
+                          onClick={() => handleRemoveRecent(session.slug)}
                           type="button"
                         >
                           <X className="h-4 w-4 text-muted-foreground hover:text-primary" />
                         </button>
-                      </a>
+                      </div>
                     ))}
                   </div>
                 </CardContent>

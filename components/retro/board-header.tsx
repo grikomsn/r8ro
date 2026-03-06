@@ -1,6 +1,5 @@
 "use client";
 
-import html2canvas from "html2canvas";
 import {
   Check,
   Clock,
@@ -52,18 +51,16 @@ import type { RetroBoard } from "@/lib/types";
 
 interface BoardHeaderProps {
   board: RetroBoard;
+  currentUserId?: string;
   isAuthor: boolean;
-  onToggleVisibility: () => void;
   onDeleteBoard: () => void;
-  onTimerToggle: () => void;
-  onTimerReset: () => void;
   onSetTimer: (seconds: number) => void;
   onTitleUpdate: (newTitle: string) => void;
   onToggleLock: () => void;
-  showSidebar?: boolean;
   onToggleSidebar?: () => void;
+  onToggleVisibility: () => void;
   participantCount?: number;
-  currentUserId?: string;
+  showSidebar?: boolean;
   timerDuration?: number;
 }
 
@@ -72,9 +69,7 @@ export function BoardHeader({
   isAuthor,
   onToggleVisibility,
   onDeleteBoard,
-  onTimerToggle: _onTimerToggle,
-  onTimerReset: _onTimerReset,
-  onSetTimer: _onSetTimer,
+  onSetTimer,
   onTitleUpdate,
   onToggleLock,
   showSidebar,
@@ -215,6 +210,8 @@ export function BoardHeader({
         return;
       }
 
+      const { default: html2canvas } = await import("html2canvas");
+
       const canvas = await html2canvas(boardElement, {
         backgroundColor: "#ffffff",
         scale: 2,
@@ -297,11 +294,7 @@ export function BoardHeader({
             {currentUserId && <UserAccountPopover variant="compact" />}
             <div className="hidden min-w-0 border-border border-l-2 pl-4 sm:block">
               {isEditingTitle ? (
-                <div
-                  aria-label="Edit board title"
-                  className="flex items-center gap-2"
-                  role="form"
-                >
+                <div className="flex items-center gap-2">
                   <Input
                     aria-label="Board title"
                     autoFocus
@@ -340,12 +333,17 @@ export function BoardHeader({
                 </div>
               ) : (
                 <div className="group flex items-center gap-2">
-                  <h1
-                    className={`font-bold text-lg ${isAuthor ? "cursor-pointer transition-colors hover:text-primary" : ""}`}
-                    onClick={() => isAuthor && setIsEditingTitle(true)}
-                  >
-                    {board.title}
-                  </h1>
+                  {isAuthor ? (
+                    <button
+                      className="cursor-pointer font-bold text-lg transition-colors hover:text-primary"
+                      onClick={() => setIsEditingTitle(true)}
+                      type="button"
+                    >
+                      {board.title}
+                    </button>
+                  ) : (
+                    <h2 className="font-bold text-lg">{board.title}</h2>
+                  )}
                   {isAuthor && (
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -395,7 +393,7 @@ export function BoardHeader({
             {isAuthor && timerDuration !== undefined && (
               <TimerSettings
                 duration={timerDuration}
-                onDurationChange={_onSetTimer}
+                onDurationChange={onSetTimer}
               />
             )}
             {onToggleSidebar && (

@@ -24,19 +24,19 @@ import {
 import type { ColumnType, RetroCard } from "@/lib/types";
 
 interface RetroColumnProps {
-  title: string;
-  columnType: ColumnType;
+  bgColor: string;
   cards: RetroCard[];
+  columnType: ColumnType;
+  draggedCard: RetroCard | null;
+  isLocked: boolean;
   onAddCard: (columnType: ColumnType, content: string) => void;
-  onVoteCard: (cardId: string) => void;
   onDeleteCard: (cardId: string) => void;
   onEditCard: (cardId: string, newContent: string) => void;
   onMoveCard: (cardId: string, newColumnType: ColumnType) => void;
-  bgColor: string;
-  draggedCard: RetroCard | null;
-  setDraggedCard: (card: RetroCard | null) => void;
-  isLocked: boolean;
+  onVoteCard: (cardId: string) => void;
   pendingActions?: Record<string, boolean>;
+  setDraggedCard: (card: RetroCard | null) => void;
+  title: string;
 }
 
 const columnColorConfig: Record<ColumnType, { bg: string; text: string }> = {
@@ -195,11 +195,7 @@ export function RetroColumn({
             Board is locked
           </div>
         ) : isAdding ? (
-          <div
-            aria-label="Add new card"
-            className="mb-3 rounded-lg border-2 border-border bg-muted p-3 shadow-sm"
-            role="form"
-          >
+          <div className="mb-3 rounded-lg border-2 border-border bg-muted p-3 shadow-sm">
             <Textarea
               aria-label="Card content"
               autoFocus
@@ -275,11 +271,7 @@ export function RetroColumn({
                 )}
                 <div className="flex-1">
                   {editingCardId === card.id && !isLocked ? (
-                    <div
-                      aria-label="Edit card"
-                      className="space-y-2"
-                      role="form"
-                    >
+                    <div className="space-y-2">
                       <Input
                         aria-label="Edit card content"
                         autoFocus

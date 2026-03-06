@@ -1,6 +1,7 @@
 "use client";
 
 import { History, LogIn, Plus, X } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type React from "react";
 import { useEffect, useState } from "react";
@@ -52,9 +53,7 @@ export default function RetroClientPage() {
     setRecentBoards(getRecentBoards());
   }, []);
 
-  const handleRemoveRecent = (slug: string, e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const handleRemoveRecent = (slug: string) => {
     removeRecentBoard(slug);
     setRecentBoards(getRecentBoards());
   };
@@ -263,26 +262,28 @@ export default function RetroClientPage() {
                 <CardContent className="p-4">
                   <div className="grid gap-2">
                     {recentBoards.map((board) => (
-                      <a
+                      <div
                         className="group flex items-center justify-between rounded-xl border-2 border-border bg-background px-4 py-3 font-bold shadow-sm transition-all hover:border-primary hover:shadow-md"
-                        href={`/retro/${board.slug}`}
                         key={board.slug}
                       >
-                        <div className="flex min-w-0 flex-col gap-1">
+                        <Link
+                          className="flex min-w-0 flex-1 flex-col gap-1"
+                          href={`/retro/${board.slug}`}
+                        >
                           <span className="truncate">{board.title}</span>
                           <span className="font-mono text-muted-foreground text-xs">
                             {board.slug}
                           </span>
-                        </div>
+                        </Link>
                         <button
                           aria-label="Remove from recent"
                           className="ml-2 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
-                          onClick={(e) => handleRemoveRecent(board.slug, e)}
+                          onClick={() => handleRemoveRecent(board.slug)}
                           type="button"
                         >
                           <X className="h-4 w-4 text-muted-foreground hover:text-primary" />
                         </button>
-                      </a>
+                      </div>
                     ))}
                   </div>
                 </CardContent>

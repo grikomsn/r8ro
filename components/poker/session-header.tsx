@@ -1,6 +1,5 @@
 "use client";
 
-import html2canvas from "html2canvas";
 import {
   Check,
   Copy,
@@ -51,17 +50,17 @@ import {
 import type { PokerSession } from "@/lib/types";
 
 interface SessionHeaderProps {
-  session: PokerSession;
-  isAuthor: boolean;
-  onToggleVisibility: () => void;
-  onDeleteSession: () => void;
-  onTitleUpdate: (newTitle: string) => void;
-  onStoryUpdate: (story: string) => void;
-  onUpdateScale: (scale: string[]) => void;
-  showSidebar?: boolean;
-  onToggleSidebar?: () => void;
-  participantCount?: number;
   currentUserId?: string;
+  isAuthor: boolean;
+  onDeleteSession: () => void;
+  onStoryUpdate: (story: string) => void;
+  onTitleUpdate: (newTitle: string) => void;
+  onToggleSidebar?: () => void;
+  onToggleVisibility: () => void;
+  onUpdateScale: (scale: string[]) => void;
+  participantCount?: number;
+  session: PokerSession;
+  showSidebar?: boolean;
 }
 
 export function SessionHeader({
@@ -78,7 +77,6 @@ export function SessionHeader({
   currentUserId,
 }: SessionHeaderProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [_copied, _setCopied] = useState(false);
   const [shareStatus, setShareStatus] = useState<string | null>(null);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleInput, setTitleInput] = useState(session.title);
@@ -124,11 +122,13 @@ export function SessionHeader({
     try {
       setShareStatus("capturing");
       const sessionElement = document.querySelector(
-        "[role='main']"
+        "[data-session-capture]"
       ) as HTMLElement;
       if (!sessionElement) {
         return;
       }
+
+      const { default: html2canvas } = await import("html2canvas");
 
       const canvas = await html2canvas(sessionElement, {
         backgroundColor: "#ffffff",
@@ -234,11 +234,7 @@ export function SessionHeader({
             {currentUserId && <UserAccountPopover variant="compact" />}
             <div className="hidden min-w-0 border-border border-l-2 pl-4 sm:block">
               {isEditingTitle ? (
-                <div
-                  aria-label="Edit session title"
-                  className="flex items-center gap-2"
-                  role="form"
-                >
+                <div className="flex items-center gap-2">
                   <Input
                     aria-label="Session title"
                     autoFocus
@@ -277,12 +273,17 @@ export function SessionHeader({
                 </div>
               ) : (
                 <div className="group flex items-center gap-2">
-                  <h1
-                    className={`font-bold text-lg ${isAuthor ? "cursor-pointer transition-colors hover:text-primary" : ""}`}
-                    onClick={() => isAuthor && setIsEditingTitle(true)}
-                  >
-                    {session.title}
-                  </h1>
+                  {isAuthor ? (
+                    <button
+                      className="cursor-pointer font-bold text-lg transition-colors hover:text-primary"
+                      onClick={() => setIsEditingTitle(true)}
+                      type="button"
+                    >
+                      {session.title}
+                    </button>
+                  ) : (
+                    <h2 className="font-bold text-lg">{session.title}</h2>
+                  )}
                   {isAuthor && (
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -351,12 +352,19 @@ export function SessionHeader({
               ) : (
                 <div className="group flex items-center gap-2">
                   {session.current_story ? (
-                    <h2
-                      className={`font-bold text-lg ${isAuthor ? "cursor-pointer transition-colors hover:text-primary" : ""}`}
-                      onClick={() => isAuthor && setIsEditingStory(true)}
-                    >
-                      {session.current_story}
-                    </h2>
+                    isAuthor ? (
+                      <button
+                        className="cursor-pointer font-bold text-lg transition-colors hover:text-primary"
+                        onClick={() => setIsEditingStory(true)}
+                        type="button"
+                      >
+                        {session.current_story}
+                      </button>
+                    ) : (
+                      <h2 className="font-bold text-lg">
+                        {session.current_story}
+                      </h2>
+                    )
                   ) : (
                     <button
                       className={`font-bold text-lg text-muted-foreground transition-colors hover:text-primary ${isAuthor ? "cursor-pointer" : "cursor-default"}`}
