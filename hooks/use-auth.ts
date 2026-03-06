@@ -43,6 +43,27 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+const GITHUB_LINK_PENDING_KEY = "r8ro-github-link-pending";
+const GITHUB_LINK_NEXT_PATH_KEY = "r8ro-github-link-next-path";
+
+function clearGitHubLinkPendingState() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  sessionStorage.removeItem(GITHUB_LINK_PENDING_KEY);
+  sessionStorage.removeItem(GITHUB_LINK_NEXT_PATH_KEY);
+}
+
+function markGitHubLinkPendingState(nextPath: string) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  sessionStorage.setItem(GITHUB_LINK_PENDING_KEY, "1");
+  sessionStorage.setItem(GITHUB_LINK_NEXT_PATH_KEY, nextPath);
+}
+
 function useAuthState(): AuthContextValue {
   const [state, setState] = useState<AuthState>({
     user: null,
@@ -122,6 +143,28 @@ function useAuthState(): AuthContextValue {
     async function initAuth() {
       const supabase = supabaseRef.current;
 
+      if (typeof window !== "undefined") {
+        const hashParams = new URLSearchParams(window.location.hash.slice(1));
+        const pendingGitHubLink =
+          sessionStorage.getItem(GITHUB_LINK_PENDING_KEY) === "1";
+        const hashErrorCode = hashParams.get("error_code");
+
+        if (pendingGitHubLink && hashErrorCode === "identity_already_exists") {
+          const nextPath =
+            sessionStorage.getItem(GITHUB_LINK_NEXT_PATH_KEY) ||
+            `${window.location.pathname}${window.location.search}`;
+          const callbackUrl = new URL("/auth/callback", window.location.origin);
+          callbackUrl.searchParams.set("link", "github");
+          callbackUrl.searchParams.set(
+            "next",
+            nextPath.startsWith("/") ? nextPath : "/"
+          );
+
+          window.location.replace(callbackUrl.toString());
+          return;
+        }
+      }
+
       try {
         const { data: userData, error: userError } =
           await supabase.auth.getUser();
@@ -144,6 +187,10 @@ function useAuthState(): AuthContextValue {
 
         const displayName = userData.user.user_metadata?.display_name || "";
         const isAnonymous = !!userData.user.is_anonymous;
+
+        if (!isAnonymous) {
+          clearGitHubLinkPendingState();
+        }
 
         if (mounted) {
           setState({
@@ -189,6 +236,11 @@ function useAuthState(): AuthContextValue {
           await signInAnonymously(supabaseRef.current, mounted);
         } else if (session?.user) {
           const isAnonymous = !!session.user.is_anonymous;
+
+          if (!isAnonymous) {
+            clearGitHubLinkPendingState();
+          }
+
           setState({
             user: session.user,
             userId: session.user.id,
@@ -242,6 +294,7 @@ function useAuthState(): AuthContextValue {
   const linkGitHubIdentity =
     useCallback(async (): Promise<LinkIdentityResult> => {
       if (!state.isAnonymous) {
+        clearGitHubLinkPendingState();
         console.error("User is not anonymous");
         return { success: false, error: "User is not anonymous" };
       }
@@ -252,6 +305,7 @@ function useAuthState(): AuthContextValue {
         });
 
         if (!prepareResponse.ok) {
+          clearGitHubLinkPendingState();
           let errorMessage = "Failed to prepare GitHub account linking";
 
           try {
@@ -279,14 +333,14 @@ function useAuthState(): AuthContextValue {
         const redirectUrl =
           typeof window !== "undefined"
             ? (() => {
+                const nextPath = `${window.location.pathname}${window.location.search}`;
+                markGitHubLinkPendingState(nextPath);
+
                 const callbackUrl = new URL(
                   "/auth/callback",
                   window.location.origin
                 );
-                callbackUrl.searchParams.set(
-                  "next",
-                  `${window.location.pathname}${window.location.search}`
-                );
+                callbackUrl.searchParams.set("next", nextPath);
                 callbackUrl.searchParams.set("link", "github");
                 return callbackUrl.toString();
               })()
@@ -300,12 +354,14 @@ function useAuthState(): AuthContextValue {
         });
 
         if (error) {
+          clearGitHubLinkPendingState();
           console.error("Failed to link GitHub identity:", error);
           return { success: false, error: error.message };
         }
 
         return { success: true };
       } catch (error: unknown) {
+        clearGitHubLinkPendingState();
         console.error("Failed to link GitHub identity:", error);
         return {
           success: false,
