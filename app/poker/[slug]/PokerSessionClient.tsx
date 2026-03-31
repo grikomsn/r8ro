@@ -676,7 +676,7 @@ export default function PokerSessionClient() {
         {/* Main content area */}
         <main
           aria-label="Poker session"
-          className={`flex flex-1 flex-col gap-6 overflow-y-auto p-4 transition-[padding] duration-300 ease-in-out md:p-6 ${showSidebar ? "xl:pr-0" : "xl:pr-6"}`}
+          className={`flex flex-1 flex-col gap-6 overflow-y-auto overscroll-y-none px-2 pt-4 transition-[padding] duration-300 ease-in-out md:px-3 md:pt-5 lg:px-4 ${showSidebar ? "xl:pr-2" : "xl:pr-4"}`}
           data-session-capture
         >
           <VotingCards

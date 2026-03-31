@@ -6,8 +6,8 @@ import {
   Eye,
   EyeOff,
   ImageIcon,
+  Menu,
   Pencil,
-  Settings,
   Share,
   Share2,
   Sparkles,
@@ -225,21 +225,21 @@ export function SessionHeader({
   return (
     <>
       <TooltipProvider>
-        <header className="grid grid-cols-1 gap-4 rounded-b-xl border-border border-b-2 bg-background px-3 py-3 shadow-sm md:px-4 lg:grid-cols-[1fr_auto]">
-          {/* LEFT SECTION: Branding and Title */}
-          <div className="flex min-w-0 items-center gap-3">
-            <h1 className="shrink-0 font-black font-mono text-2xl uppercase md:text-3xl">
+        <header className="flex flex-col gap-2 rounded-b-xl border-border border-b-2 bg-background px-3 py-2 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:gap-3 md:px-4 md:py-3 lg:gap-4">
+          {/* LEFT SECTION: Branding and Info */}
+          <div className="flex min-w-0 items-center gap-2 md:gap-3">
+            <h1 className="shrink-0 font-black font-mono text-xl uppercase md:text-2xl lg:text-3xl">
               r<span className="text-primary">8</span>ro
             </h1>
             {currentUserId && <UserAccountPopover variant="compact" />}
-            <div className="hidden min-w-0 border-border border-l-2 pl-4 sm:block">
+            <div className="min-w-0 border-border border-l-2 pl-3 md:pl-4">
               {isEditingTitle ? (
                 <div className="flex items-center gap-2">
                   <Input
                     aria-label="Session title"
                     autoComplete="off"
                     autoFocus
-                    className="h-8 w-48 rounded-lg border border-border font-bold"
+                    className="h-8 w-40 rounded-lg border border-border font-bold md:w-48"
                     name="sessionTitle"
                     onChange={(e) => setTitleInput(e.target.value)}
                     onKeyDown={handleTitleKeyDown}
@@ -277,14 +277,16 @@ export function SessionHeader({
                 <div className="group flex items-center gap-2">
                   {isAuthor ? (
                     <button
-                      className="cursor-pointer font-bold text-lg transition-colors hover:text-primary"
+                      className="cursor-pointer truncate font-bold text-base transition-colors hover:text-primary md:text-lg"
                       onClick={() => setIsEditingTitle(true)}
                       type="button"
                     >
                       {session.title}
                     </button>
                   ) : (
-                    <h2 className="font-bold text-lg">{session.title}</h2>
+                    <h2 className="truncate font-bold text-base md:text-lg">
+                      {session.title}
+                    </h2>
                   )}
                   {isAuthor && (
                     <Tooltip>
@@ -306,31 +308,34 @@ export function SessionHeader({
                   )}
                 </div>
               )}
-              <p className="text-muted-foreground text-sm">{session.slug}</p>
+              <p className="truncate text-muted-foreground text-xs md:text-sm">
+                {session.slug}
+              </p>
             </div>
           </div>
 
           {/* RIGHT SECTION: Current Story and Actions */}
-          <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
-            {/* Current Story */}
-            <div className="flex min-w-0 flex-shrink items-center gap-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-1.5 sm:gap-2 md:gap-3">
+            {/* Current Story - Prominent on all sizes */}
+            <div className="flex min-w-0 flex-1 items-center gap-2 sm:flex-initial">
               {isEditingStory ? (
-                <div className="flex items-center gap-2">
+                <div className="flex flex-1 items-center gap-2 sm:flex-initial">
                   <Input
                     aria-label="Current story"
                     autoComplete="off"
-                    className="h-10 w-64 rounded-lg border border-border font-bold"
+                    autoFocus
+                    className="h-8 min-w-0 flex-1 rounded-lg border border-border font-bold text-sm sm:w-48 sm:flex-initial md:h-9 md:w-64"
                     name="currentStory"
                     onChange={(e) => setStoryInput(e.target.value)}
                     onKeyDown={handleStoryKeyDown}
-                    placeholder="Enter story/task name"
+                    placeholder="Enter story…"
                     value={storyInput}
                   />
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button
                         aria-label="Save story"
-                        className="h-10 w-10 rounded-lg border border-border bg-foreground p-0 text-background"
+                        className="h-8 w-8 shrink-0 rounded-lg border border-border bg-foreground p-0 text-background"
                         onClick={saveStory}
                       >
                         <Check aria-hidden="true" className="h-4 w-4" />
@@ -342,7 +347,7 @@ export function SessionHeader({
                     <TooltipTrigger asChild>
                       <Button
                         aria-label="Cancel editing"
-                        className="h-10 w-10 rounded-lg border border-border bg-transparent p-0"
+                        className="h-8 w-8 shrink-0 rounded-lg border border-border bg-transparent p-0"
                         onClick={cancelStoryEdit}
                         variant="outline"
                       >
@@ -353,49 +358,52 @@ export function SessionHeader({
                   </Tooltip>
                 </div>
               ) : (
-                <div className="group flex items-center gap-2">
-                  {session.current_story ? (
-                    isAuthor ? (
-                      <button
-                        className="cursor-pointer font-bold text-lg transition-colors hover:text-primary"
-                        onClick={() => setIsEditingStory(true)}
-                        type="button"
-                      >
-                        {session.current_story}
-                      </button>
-                    ) : (
-                      <h2 className="font-bold text-lg">
-                        {session.current_story}
-                      </h2>
-                    )
-                  ) : (
-                    <button
-                      className={`font-bold text-lg text-muted-foreground transition-colors hover:text-primary ${isAuthor ? "cursor-pointer" : "cursor-default"}`}
-                      onClick={() => isAuthor && setIsEditingStory(true)}
-                      type="button"
-                    >
-                      {isAuthor ? "Click to add story…" : "No story set"}
-                    </button>
-                  )}
-                  {isAuthor && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="group flex min-w-0 flex-1 items-center gap-2 sm:flex-initial">
+                      {session.current_story ? (
+                        isAuthor ? (
+                          <button
+                            className="cursor-pointer truncate font-bold text-base transition-colors hover:text-primary md:text-lg"
+                            onClick={() => setIsEditingStory(true)}
+                            type="button"
+                          >
+                            {session.current_story}
+                          </button>
+                        ) : (
+                          <h2 className="truncate font-bold text-base md:text-lg">
+                            {session.current_story}
+                          </h2>
+                        )
+                      ) : (
+                        <button
+                          className={`truncate font-bold text-base text-muted-foreground transition-colors hover:text-primary md:text-lg ${isAuthor ? "cursor-pointer" : "cursor-default"}`}
+                          onClick={() => isAuthor && setIsEditingStory(true)}
+                          type="button"
+                        >
+                          {isAuthor ? "Add story…" : "No story"}
+                        </button>
+                      )}
+                      {isAuthor && (
                         <Button
                           aria-label="Edit story"
-                          className="h-6 w-6 rounded-lg p-0 opacity-0 transition-opacity focus-visible:opacity-100 group-focus-within:opacity-100 group-hover:opacity-100"
+                          className="h-6 w-6 shrink-0 rounded-lg p-0 opacity-0 transition-opacity focus-visible:opacity-100 group-focus-within:opacity-100 group-hover:opacity-100"
                           onClick={() => setIsEditingStory(true)}
                           variant="ghost"
                         >
                           <Pencil aria-hidden="true" className="h-3 w-3" />
                         </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Edit story</TooltipContent>
-                    </Tooltip>
-                  )}
-                </div>
+                      )}
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {session.current_story ||
+                      (isAuthor ? "Click to add story" : "No story set")}
+                  </TooltipContent>
+                </Tooltip>
               )}
               {participantCount > 0 && (
-                <div className="flex items-center gap-1 rounded-lg border border-border bg-muted px-2 py-1">
+                <div className="flex shrink-0 items-center gap-1 rounded-lg border border-border bg-muted px-2 py-1">
                   <Users className="h-4 w-4" />
                   <span className="font-bold text-sm">{participantCount}</span>
                 </div>
@@ -405,21 +413,22 @@ export function SessionHeader({
             {/* Actions */}
             <div
               aria-label="Session actions"
-              className="flex flex-wrap items-center gap-2"
+              className="flex flex-wrap items-center gap-1.5 sm:gap-2"
               role="group"
             >
+              {/* Participants Toggle */}
               {onToggleSidebar && (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
                       aria-expanded={showSidebar}
                       aria-label={`Participants (${participantCount})`}
-                      className="relative h-9 rounded-lg border-2 border-border bg-transparent font-bold shadow-sm md:h-10 xl:hidden"
+                      className="relative h-8 rounded-lg border-2 border-border bg-transparent p-0 font-bold shadow-sm sm:h-9 lg:h-10 lg:px-3 xl:hidden"
                       onClick={onToggleSidebar}
                       variant="outline"
                     >
-                      <Users aria-hidden="true" className="h-4 w-4 md:mr-2" />
-                      <span className="hidden md:inline">Participants</span>
+                      <Users aria-hidden="true" className="h-4 w-4 lg:mr-2" />
+                      <span className="hidden lg:inline">Participants</span>
                       {participantCount > 0 && (
                         <span
                           aria-hidden="true"
@@ -430,26 +439,26 @@ export function SessionHeader({
                       )}
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent className="md:hidden xl:hidden">
+                  <TooltipContent className="lg:hidden">
                     Participants ({participantCount})
                   </TooltipContent>
                 </Tooltip>
               )}
 
+              {/* Share Dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
                     aria-label="Share options"
-                    className="h-9 rounded-lg border-2 border-border bg-transparent font-bold shadow-sm md:h-10"
+                    className="h-8 rounded-lg border-2 border-border bg-transparent p-0 font-bold shadow-sm sm:h-9 lg:h-10 lg:px-3"
                     variant="outline"
                   >
                     {shareStatus ? (
-                      <Check aria-hidden="true" className="h-4 w-4 md:mr-2" />
+                      <Check aria-hidden="true" className="h-4 w-4 lg:mr-2" />
                     ) : (
-                      <Share2 aria-hidden="true" className="h-4 w-4 md:mr-2" />
+                      <Share2 aria-hidden="true" className="h-4 w-4 lg:mr-2" />
                     )}
-                    <span className="hidden md:inline">{getShareLabel()}</span>
-                    <span className="sr-only md:hidden">{getShareLabel()}</span>
+                    <span className="hidden lg:inline">{getShareLabel()}</span>
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
@@ -472,23 +481,18 @@ export function SessionHeader({
                 </DropdownMenuContent>
               </DropdownMenu>
 
+              {/* Author "More" Menu with Scale Changer */}
               {isAuthor && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
                       aria-haspopup="menu"
-                      aria-label="Session settings"
-                      className="h-9 rounded-lg border-2 border-border bg-transparent font-bold shadow-sm md:h-10"
+                      aria-label="More options"
+                      className="h-8 rounded-lg border-2 border-border bg-transparent p-0 font-bold shadow-sm sm:h-9 lg:h-10 lg:px-3"
                       variant="outline"
                     >
-                      <Settings
-                        aria-hidden="true"
-                        className="h-4 w-4 md:mr-2"
-                      />
-                      <span className="hidden md:inline">Settings</span>
-                      <span className="sr-only md:hidden">
-                        Session settings
-                      </span>
+                      <Menu aria-hidden="true" className="h-4 w-4 lg:mr-2" />
+                      <span className="hidden lg:inline">More</span>
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent
@@ -549,32 +553,37 @@ export function SessionHeader({
                 </DropdownMenu>
               )}
 
-              <Button
-                aria-label={
-                  session.is_public ? "Session is public" : "Session is private"
-                }
-                aria-pressed={!session.is_public}
-                className={`h-9 rounded-lg border-2 font-bold shadow-sm md:h-10 ${
-                  session.is_public
-                    ? "border-border bg-transparent"
-                    : "border-chart-4 bg-chart-4"
-                }`}
-                variant={session.is_public ? "outline" : "secondary"}
-              >
-                {session.is_public ? (
-                  <>
-                    <Eye aria-hidden="true" className="h-4 w-4 md:mr-2" />
-                    <span className="hidden md:inline">Public</span>
-                    <span className="sr-only md:hidden">Public session</span>
-                  </>
-                ) : (
-                  <>
-                    <EyeOff aria-hidden="true" className="h-4 w-4 md:mr-2" />
-                    <span className="hidden md:inline">Private</span>
-                    <span className="sr-only md:hidden">Private session</span>
-                  </>
-                )}
-              </Button>
+              {/* Visibility Indicator - Always Visible */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    aria-label={
+                      session.is_public
+                        ? "Session is public"
+                        : "Session is private"
+                    }
+                    aria-pressed={!session.is_public}
+                    className={`h-8 rounded-lg border-2 p-0 font-bold shadow-sm sm:h-9 lg:h-10 lg:px-3 ${
+                      session.is_public
+                        ? "border-border bg-transparent"
+                        : "border-chart-4 bg-chart-4"
+                    }`}
+                    variant={session.is_public ? "outline" : "secondary"}
+                  >
+                    {session.is_public ? (
+                      <Eye aria-hidden="true" className="h-4 w-4 lg:mr-2" />
+                    ) : (
+                      <EyeOff aria-hidden="true" className="h-4 w-4 lg:mr-2" />
+                    )}
+                    <span className="hidden lg:inline">
+                      {session.is_public ? "Public" : "Private"}
+                    </span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent className="lg:hidden">
+                  {session.is_public ? "Public session" : "Private session"}
+                </TooltipContent>
+              </Tooltip>
             </div>
           </div>
         </header>

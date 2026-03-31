@@ -80,7 +80,7 @@ export function VotingCards({
         {liveAnnouncement}
       </p>
       <h2 className="font-black text-xl uppercase">Select Your Vote</h2>
-      <div className="grid grid-cols-4 gap-4 md:grid-cols-7">
+      <div className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:gap-4 lg:grid-cols-7">
         {scale.map((value, index) => {
           const isSelected = selectedValue === value;
           const isDisabled = !isVotingActive || votesRevealed || isObserver;
@@ -91,7 +91,7 @@ export function VotingCards({
               aria-pressed={isSelected}
               className={cn(
                 "fade-in zoom-in-95 relative aspect-square animate-in rounded-xl border-2 shadow-md transition-[transform,border-color,box-shadow,background-color,color] duration-200",
-                "flex items-center justify-center font-black text-4xl md:text-5xl",
+                "flex items-center justify-center font-black text-2xl sm:text-3xl md:text-4xl lg:text-5xl",
                 isSelected && !isDisabled
                   ? "scale-105 border-primary bg-primary text-primary-foreground"
                   : isDisabled
