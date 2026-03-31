@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, Users } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+
 import { BoardBottomNav } from "@/components/retro/board-bottom-nav";
 import { BoardHeader } from "@/components/retro/board-header";
 import { RetroColumn } from "@/components/retro/retro-column";
@@ -894,10 +895,10 @@ export default function RetroPageClient() {
       <div className="relative flex flex-1 overflow-x-hidden">
         <main
           aria-label="Retro board columns"
-          className={`flex flex-1 gap-4 overflow-x-auto overflow-y-auto p-4 pb-20 transition-[padding] duration-300 ease-in-out md:gap-6 md:p-6 md:pb-24 ${showSidebar ? "xl:pr-0" : "xl:pr-6"}`}
+          className={`flex flex-1 gap-3 overflow-x-auto overscroll-x-none px-2 pt-3 pb-20 transition-all duration-300 ease-in-out md:gap-4 md:px-3 md:pt-4 md:pb-24 lg:gap-5 lg:px-4 lg:pt-5 ${showSidebar ? "xl:pr-2" : "xl:pr-4"}`}
           data-board-capture
         >
-          <div className="min-w-[280px] flex-1 md:min-w-0">
+          <div className="w-[300px] flex-shrink-0 md:w-[320px] lg:w-[340px] xl:w-1/3 xl:min-w-[300px]">
             <RetroColumn
               cards={cards.filter((c) => c.column_type === "went_well")}
               columnType="went_well"
@@ -913,7 +914,7 @@ export default function RetroPageClient() {
               title="Went Well"
             />
           </div>
-          <div className="min-w-[280px] flex-1 md:min-w-0">
+          <div className="w-[300px] flex-shrink-0 md:w-[320px] lg:w-[340px] xl:w-1/3 xl:min-w-[300px]">
             <RetroColumn
               cards={cards.filter((c) => c.column_type === "to_improve")}
               columnType="to_improve"
@@ -929,7 +930,7 @@ export default function RetroPageClient() {
               title="To Improve"
             />
           </div>
-          <div className="min-w-[280px] flex-1 md:min-w-0">
+          <div className="w-[300px] flex-shrink-0 md:w-[320px] lg:w-[340px] xl:w-1/3 xl:min-w-[300px]">
             <RetroColumn
               cards={cards.filter((c) => c.column_type === "action_items")}
               columnType="action_items"

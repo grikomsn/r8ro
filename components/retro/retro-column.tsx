@@ -186,11 +186,11 @@ export function RetroColumn({
     >
       {/* Column Header - Using design system colors */}
       <div
-        className={`border-2 border-border border-b-0 ${colors.bg} rounded-t-xl p-4 shadow-sm`}
+        className={`rounded-t-xl border-2 border-border border-b-0 ${colors.bg} p-3 shadow-sm md:p-4`}
       >
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           <h2
-            className={`font-black text-lg uppercase ${colors.text}`}
+            className={`font-black text-base uppercase ${colors.text} md:text-lg`}
             id={`column-${columnType}-heading`}
           >
             {title}
@@ -202,7 +202,7 @@ export function RetroColumn({
                 className={`h-4 w-4 ${colors.text} opacity-70`}
               />
             )}
-            <span className="rounded-md border border-border bg-background px-2 py-1 font-bold text-foreground text-sm">
+            <span className="rounded-md border border-border bg-background px-2 py-1 font-bold text-foreground text-xs md:text-sm">
               {cards.length}
             </span>
           </div>
@@ -212,7 +212,7 @@ export function RetroColumn({
       {/* Cards Container */}
       <div
         aria-labelledby={`column-${columnType}-heading`}
-        className={`flex-1 overflow-auto rounded-b-xl border-2 border-border border-t-0 bg-background p-4 shadow-sm transition-colors ${
+        className={`flex-1 overflow-auto overscroll-y-none rounded-b-xl border-2 border-border border-t-0 bg-background p-4 shadow-sm transition-colors ${
           isDragOver && !isLocked ? "bg-muted" : ""
         }`}
         onDragLeave={handleDragLeave}
@@ -289,7 +289,7 @@ export function RetroColumn({
           {sortedCards.map((card) => (
             <article
               aria-label={`Card by ${card.author_name}: ${card.content}`}
-              className={`group rounded-xl border-2 border-border bg-background p-3 shadow-sm transition-shadow hover:shadow-md ${
+              className={`group relative overflow-hidden rounded-xl border-2 border-border bg-background p-3 shadow-sm transition-shadow hover:shadow-md ${
                 isLocked
                   ? "cursor-default"
                   : "cursor-grab active:cursor-grabbing"
@@ -307,7 +307,7 @@ export function RetroColumn({
                     className="mt-0.5 h-5 w-5 flex-shrink-0 text-muted-foreground"
                   />
                 )}
-                <div className="flex-1">
+                <div className="min-w-0 flex-1">
                   {editingCardId === card.id && !isLocked ? (
                     <div className="space-y-2">
                       <Input
@@ -347,7 +347,7 @@ export function RetroColumn({
                     </div>
                   ) : (
                     <p
-                      className={`whitespace-pre-wrap text-sm ${isLocked ? "pl-0" : ""}`}
+                      className={`break-words text-sm ${isLocked ? "pl-0" : ""}`}
                     >
                       {card.content}
                     </p>
@@ -355,115 +355,128 @@ export function RetroColumn({
                 </div>
               </div>
               <div
-                className={`flex items-center justify-between ${isLocked ? "pl-0" : "pl-7"}`}
+                className={`flex flex-col gap-2 ${isLocked ? "pl-0" : "pl-7"}`}
               >
+                {/* Author line */}
                 <span className="text-muted-foreground text-xs">
                   by {card.author_name}
                 </span>
+                {/* Action buttons row */}
                 <div
                   aria-label="Card actions"
-                  className="flex items-center gap-1"
+                  className="flex items-center justify-end gap-1"
                   role="group"
                 >
-                  {!isLocked && previousColumn && (
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            aria-label={`Move card to ${columnLabels[previousColumn]}`}
-                            className="h-8 w-8 rounded-lg p-0 opacity-0 transition-opacity focus-visible:opacity-100 group-focus-within:opacity-100 group-hover:opacity-100"
-                            disabled={pendingActions[`move-${card.id}`]}
-                            onClick={() => onMoveCard(card.id, previousColumn)}
-                            variant="ghost"
-                          >
-                            <ChevronLeft
-                              aria-hidden="true"
-                              className="h-4 w-4"
-                            />
-                            <span className="sr-only">
-                              Move to {columnLabels[previousColumn]}
-                            </span>
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          Move to {columnLabels[previousColumn]}
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  )}
-                  {!isLocked && nextColumn && (
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            aria-label={`Move card to ${columnLabels[nextColumn]}`}
-                            className="h-8 w-8 rounded-lg p-0 opacity-0 transition-opacity focus-visible:opacity-100 group-focus-within:opacity-100 group-hover:opacity-100"
-                            disabled={pendingActions[`move-${card.id}`]}
-                            onClick={() => onMoveCard(card.id, nextColumn)}
-                            variant="ghost"
-                          >
-                            <ChevronRight
-                              aria-hidden="true"
-                              className="h-4 w-4"
-                            />
-                            <span className="sr-only">
-                              Move to {columnLabels[nextColumn]}
-                            </span>
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          Move to {columnLabels[nextColumn]}
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  )}
-                  {!isLocked && editingCardId !== card.id && (
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            aria-label="Edit card"
-                            className="h-8 w-8 rounded-lg p-0 opacity-0 transition-opacity focus-visible:opacity-100 group-focus-within:opacity-100 group-hover:opacity-100"
-                            disabled={pendingActions[`edit-${card.id}`]}
-                            onClick={() => startEditing(card)}
-                            variant="ghost"
-                          >
-                            <Pencil aria-hidden="true" className="h-4 w-4" />
-                            <span className="sr-only">Edit card</span>
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Edit</TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  )}
                   {!isLocked && (
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            aria-label="Delete card"
-                            className="h-8 w-8 rounded-lg p-0 opacity-0 transition-opacity focus-visible:opacity-100 group-focus-within:opacity-100 group-hover:opacity-100"
-                            disabled={pendingActions[`delete-${card.id}`]}
-                            onClick={() => onDeleteCard(card.id)}
-                            variant="ghost"
-                          >
-                            <Trash2
-                              aria-hidden="true"
-                              className="h-4 w-4 text-primary"
-                            />
-                            <span className="sr-only">Delete card</span>
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>Delete</TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
+                    <>
+                      {/* Move buttons - always visible on mobile */}
+                      {previousColumn && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                aria-label={`Move card to ${columnLabels[previousColumn]}`}
+                                className="h-7 w-7 rounded-lg p-0 md:h-8 md:w-8 md:opacity-0 md:transition-opacity md:group-hover:opacity-100 md:focus-visible:opacity-100"
+                                disabled={pendingActions[`move-${card.id}`]}
+                                onClick={() =>
+                                  onMoveCard(card.id, previousColumn)
+                                }
+                                variant="ghost"
+                              >
+                                <ChevronLeft
+                                  aria-hidden="true"
+                                  className="h-3.5 w-3.5 md:h-4 md:w-4"
+                                />
+                                <span className="sr-only">
+                                  Move to {columnLabels[previousColumn]}
+                                </span>
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              Move to {columnLabels[previousColumn]}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
+                      {nextColumn && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                aria-label={`Move card to ${columnLabels[nextColumn]}`}
+                                className="h-7 w-7 rounded-lg p-0 md:h-8 md:w-8 md:opacity-0 md:transition-opacity md:group-hover:opacity-100 md:focus-visible:opacity-100"
+                                disabled={pendingActions[`move-${card.id}`]}
+                                onClick={() => onMoveCard(card.id, nextColumn)}
+                                variant="ghost"
+                              >
+                                <ChevronRight
+                                  aria-hidden="true"
+                                  className="h-3.5 w-3.5 md:h-4 md:w-4"
+                                />
+                                <span className="sr-only">
+                                  Move to {columnLabels[nextColumn]}
+                                </span>
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              Move to {columnLabels[nextColumn]}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
+                      {/* Edit button - always visible on mobile */}
+                      {editingCardId !== card.id && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                aria-label="Edit card"
+                                className="h-7 w-7 rounded-lg p-0 md:h-8 md:w-8 md:opacity-0 md:transition-opacity md:group-hover:opacity-100 md:focus-visible:opacity-100"
+                                disabled={pendingActions[`edit-${card.id}`]}
+                                onClick={() => startEditing(card)}
+                                variant="ghost"
+                              >
+                                <Pencil
+                                  aria-hidden="true"
+                                  className="h-3.5 w-3.5 md:h-4 md:w-4"
+                                />
+                                <span className="sr-only">Edit card</span>
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Edit</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      )}
+                      {/* Delete button - always visible on mobile */}
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              aria-label="Delete card"
+                              className="h-7 w-7 rounded-lg p-0 md:h-8 md:w-8 md:opacity-0 md:transition-opacity md:group-hover:opacity-100 md:focus-visible:opacity-100"
+                              disabled={pendingActions[`delete-${card.id}`]}
+                              onClick={() => onDeleteCard(card.id)}
+                              variant="ghost"
+                            >
+                              <Trash2
+                                aria-hidden="true"
+                                className="h-3.5 w-3.5 text-primary md:h-4 md:w-4"
+                              />
+                              <span className="sr-only">Delete card</span>
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Delete</TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </>
                   )}
+                  {/* Vote button - always visible on all screen sizes */}
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
                           aria-label={`Vote for this card. Current votes: ${card.votes}`}
-                          className="h-8 rounded-lg border border-border px-2 font-bold shadow-sm transition-[background-color,box-shadow] hover:bg-secondary"
+                          className="ml-1 h-7 flex-shrink-0 rounded-lg border border-border px-2 font-bold text-sm shadow-sm transition-[background-color,box-shadow] hover:bg-secondary md:h-8"
                           disabled={
                             isLocked || pendingActions[`vote-${card.id}`]
                           }
