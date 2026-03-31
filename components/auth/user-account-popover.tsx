@@ -1,6 +1,6 @@
 "use client";
 
-import { Github, ShieldCheck, User, UserCircle } from "lucide-react";
+import { Code, ShieldCheck, User, UserCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -67,7 +67,7 @@ export function UserAccountPopover({
                   className={`${toneClasses.icon} ${isCompact ? "h-4 w-4" : "h-5 w-5"}`}
                 />
               ) : (
-                <Github
+                <Code
                   className={`${toneClasses.icon} ${isCompact ? "h-3.5 w-3.5" : "h-4 w-4"}`}
                 />
               )}
@@ -162,7 +162,7 @@ export function UserAccountPopover({
                   onClick={handleLinkGitHub}
                   size="lg"
                 >
-                  <Github aria-hidden="true" className="mr-2 h-4 w-4" />
+                  <Code aria-hidden="true" className="mr-2 h-4 w-4" />
                   Link GitHub Account
                 </Button>
                 <p className="text-center text-[10px] text-muted-foreground">

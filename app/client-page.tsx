@@ -1,6 +1,6 @@
 "use client";
 
-import { History, LogIn, Plus, X } from "lucide-react";
+import { History, LogIn, Plus, UserRound, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type React from "react";
@@ -26,6 +26,57 @@ import { generateSlug } from "@/lib/utils/slug";
 const USERNAME_MAX_LENGTH = 30;
 const USERNAME_REGEX = /^[a-zA-Z0-9_-]+$/;
 
+type RetroBoardListItem = Pick<RecentBoard, "slug" | "title">;
+
+interface RetroBoardListProps {
+  boards: RetroBoardListItem[];
+  emptyMessage: string;
+  onRemove?: (slug: string) => void;
+}
+
+function RetroBoardList({
+  boards,
+  emptyMessage,
+  onRemove,
+}: RetroBoardListProps) {
+  if (boards.length === 0) {
+    return (
+      <p className="px-2 py-3 text-muted-foreground text-sm">{emptyMessage}</p>
+    );
+  }
+
+  return (
+    <div className="grid gap-2">
+      {boards.map((board) => (
+        <div
+          className="group flex items-center justify-between rounded-xl border-2 border-border bg-background px-4 py-3 font-bold shadow-sm transition-[border-color,box-shadow] hover:border-primary hover:shadow-md"
+          key={board.slug}
+        >
+          <Link
+            className="flex min-w-0 flex-1 flex-col gap-1"
+            href={`/retro/${board.slug}`}
+          >
+            <span className="truncate">{board.title}</span>
+            <span className="font-mono text-muted-foreground text-xs">
+              {board.slug}
+            </span>
+          </Link>
+          {onRemove ? (
+            <button
+              aria-label="Remove from recent"
+              className="ml-2 shrink-0 opacity-100 transition-opacity focus-visible:opacity-100 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100"
+              onClick={() => onRemove(board.slug)}
+              type="button"
+            >
+              <X className="h-4 w-4 text-muted-foreground hover:text-primary" />
+            </button>
+          ) : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function RetroClientPage() {
   const router = useRouter();
   const {
@@ -42,6 +93,9 @@ export default function RetroClientPage() {
   const [joinForm, setJoinForm] = useState({ slug: "" });
   const [error, setError] = useState("");
   const [recentBoards, setRecentBoards] = useState<RecentBoard[]>([]);
+  const [myBoards, setMyBoards] = useState<RetroBoardListItem[]>([]);
+  const [isMyBoardsLoading, setIsMyBoardsLoading] = useState(false);
+  const [myBoardsError, setMyBoardsError] = useState("");
 
   useEffect(() => {
     if (isInitialized && displayName) {
@@ -52,6 +106,57 @@ export default function RetroClientPage() {
   useEffect(() => {
     setRecentBoards(getRecentBoards());
   }, []);
+
+  useEffect(() => {
+    if (!userId) {
+      setMyBoards([]);
+      setMyBoardsError("");
+      setIsMyBoardsLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+
+    const loadMyBoards = async () => {
+      setIsMyBoardsLoading(true);
+      setMyBoardsError("");
+
+      try {
+        const supabase = createClient();
+        const { data, error: fetchError } = await supabase
+          .from("retro_boards")
+          .select("slug, title")
+          .eq("author_id", userId)
+          .order("updated_at", { ascending: false })
+          .limit(10);
+
+        if (fetchError) {
+          throw new Error(fetchError.message || "Failed to load your retros");
+        }
+
+        if (isMounted) {
+          setMyBoards(data ?? []);
+        }
+      } catch (err) {
+        console.error("Failed to load user-created retros:", err);
+
+        if (isMounted) {
+          setMyBoards([]);
+          setMyBoardsError("Could not load your created retros right now.");
+        }
+      } finally {
+        if (isMounted) {
+          setIsMyBoardsLoading(false);
+        }
+      }
+    };
+
+    loadMyBoards();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [userId]);
 
   const handleRemoveRecent = (slug: string) => {
     removeRecentBoard(slug);
@@ -204,6 +309,13 @@ export default function RetroClientPage() {
     );
   }
 
+  const shouldShowRetrosSection =
+    !!userId ||
+    recentBoards.length > 0 ||
+    myBoards.length > 0 ||
+    isMyBoardsLoading ||
+    !!myBoardsError;
+
   return (
     <>
       <script
@@ -253,39 +365,60 @@ export default function RetroClientPage() {
         <div className="flex flex-1 flex-col items-center justify-center p-4 md:p-8">
           <div className="w-full max-w-2xl space-y-6">
             {/* Recent boards section */}
-            {recentBoards.length > 0 && (
+            {shouldShowRetrosSection && (
               <Card className="gap-0 overflow-hidden rounded-2xl border-2 border-border p-0 shadow-md">
-                <div className="flex items-center gap-2 border-border border-b-2 bg-muted px-6 py-4">
-                  <History className="h-5 w-5" />
-                  <h2 className="font-bold text-base uppercase">Recent</h2>
-                </div>
-                <CardContent className="p-4">
-                  <div className="grid gap-2">
-                    {recentBoards.map((board) => (
-                      <div
-                        className="group flex items-center justify-between rounded-xl border-2 border-border bg-background px-4 py-3 font-bold shadow-sm transition-[border-color,box-shadow] hover:border-primary hover:shadow-md"
-                        key={board.slug}
+                <CardContent className="p-0">
+                  <Tabs
+                    className="w-full"
+                    defaultValue={userId ? "mine" : "recent"}
+                  >
+                    <TabsList className="grid h-auto w-full grid-cols-2 rounded-none border-border border-b-2 bg-muted p-0">
+                      <TabsTrigger
+                        className="gap-2 rounded-none border-transparent border-b-4 py-4 font-bold text-base uppercase data-[state=active]:border-primary data-[state=active]:bg-background data-[state=active]:text-foreground"
+                        value="mine"
                       >
-                        <Link
-                          className="flex min-w-0 flex-1 flex-col gap-1"
-                          href={`/retro/${board.slug}`}
-                        >
-                          <span className="truncate">{board.title}</span>
-                          <span className="font-mono text-muted-foreground text-xs">
-                            {board.slug}
-                          </span>
-                        </Link>
-                        <button
-                          aria-label="Remove from recent"
-                          className="ml-2 shrink-0 opacity-100 transition-opacity focus-visible:opacity-100 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100"
-                          onClick={() => handleRemoveRecent(board.slug)}
-                          type="button"
-                        >
-                          <X className="h-4 w-4 text-muted-foreground hover:text-primary" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
+                        <UserRound className="h-5 w-5" />
+                        My Retros
+                      </TabsTrigger>
+                      <TabsTrigger
+                        className="gap-2 rounded-none border-transparent border-b-4 py-4 font-bold text-base uppercase data-[state=active]:border-accent data-[state=active]:bg-background data-[state=active]:text-foreground"
+                        value="recent"
+                      >
+                        <History className="h-5 w-5" />
+                        Recent
+                      </TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent className="mt-0 p-4" value="mine">
+                      {isMyBoardsLoading ? (
+                        <p className="px-2 py-3 text-muted-foreground text-sm">
+                          Loading your retros…
+                        </p>
+                      ) : myBoardsError ? (
+                        <div className="rounded-xl border-2 border-primary/20 bg-primary/10 px-4 py-3">
+                          <p
+                            aria-live="polite"
+                            className="font-bold text-primary text-sm"
+                          >
+                            {myBoardsError}
+                          </p>
+                        </div>
+                      ) : (
+                        <RetroBoardList
+                          boards={myBoards}
+                          emptyMessage="No created retros yet. Start one from the Create tab below."
+                        />
+                      )}
+                    </TabsContent>
+
+                    <TabsContent className="mt-0 p-4" value="recent">
+                      <RetroBoardList
+                        boards={recentBoards}
+                        emptyMessage="No recent retros yet. Join or create a session to see it here."
+                        onRemove={handleRemoveRecent}
+                      />
+                    </TabsContent>
+                  </Tabs>
                 </CardContent>
               </Card>
             )}

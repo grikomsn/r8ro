@@ -86,9 +86,9 @@ function useAuthState(): AuthContextValue {
       isMounted: boolean
     ) {
       const legacyName =
-        typeof window !== "undefined"
-          ? localStorage.getItem("retro_username") || ""
-          : "";
+        typeof window === "undefined"
+          ? ""
+          : localStorage.getItem("retro_username") || "";
 
       const { data, error } = await client.auth.signInAnonymously({
         options: {
@@ -331,8 +331,9 @@ function useAuthState(): AuthContextValue {
         }
 
         const redirectUrl =
-          typeof window !== "undefined"
-            ? (() => {
+          typeof window === "undefined"
+            ? "/auth/callback"
+            : (() => {
                 const nextPath = `${window.location.pathname}${window.location.search}`;
                 markGitHubLinkPendingState(nextPath);
 
@@ -343,8 +344,7 @@ function useAuthState(): AuthContextValue {
                 callbackUrl.searchParams.set("next", nextPath);
                 callbackUrl.searchParams.set("link", "github");
                 return callbackUrl.toString();
-              })()
-            : "/auth/callback";
+              })();
 
         const { error } = await supabaseRef.current.auth.linkIdentity({
           provider: "github",
