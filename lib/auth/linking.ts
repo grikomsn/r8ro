@@ -3,6 +3,17 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 export const LINK_SOURCE_USER_COOKIE = "r8ro-link-source-user-id";
 export const LINK_SOURCE_USER_COOKIE_MAX_AGE_SECONDS = 60 * 10;
 
+export type LinkFlowStage = "link" | "signin-fallback";
+
+export interface LinkSourceState {
+  next: string;
+  sourceUserId: string;
+  stage: LinkFlowStage;
+}
+
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+
 function getLinkCookieSecret() {
   const secret =
     process.env.AUTH_LINK_COOKIE_SECRET ??
@@ -17,20 +28,35 @@ function getLinkCookieSecret() {
   return secret;
 }
 
-function signLinkSourceUserId(sourceUserId: string) {
+function signLinkState(encodedState: string) {
   return createHmac("sha256", getLinkCookieSecret())
-    .update(sourceUserId)
+    .update(encodedState)
     .digest("hex");
 }
 
-export function createSignedLinkSourceCookieValue(sourceUserId: string) {
-  const signature = signLinkSourceUserId(sourceUserId);
-  return `${sourceUserId}.${signature}`;
+export function getSafeLinkNextPath(value: unknown) {
+  if (
+    typeof value !== "string" ||
+    !value.startsWith("/") ||
+    value.startsWith("//")
+  ) {
+    return "/";
+  }
+
+  return value;
 }
 
-export function verifyAndExtractLinkSourceUserId(
+export function createSignedLinkSourceCookieValue(state: LinkSourceState) {
+  const encodedState = Buffer.from(JSON.stringify(state), "utf8").toString(
+    "base64url"
+  );
+  const signature = signLinkState(encodedState);
+  return `${encodedState}.${signature}`;
+}
+
+export function verifyAndExtractLinkSourceState(
   cookieValue: string | undefined
-) {
+): LinkSourceState | null {
   if (!cookieValue) {
     return null;
   }
@@ -40,9 +66,9 @@ export function verifyAndExtractLinkSourceUserId(
     return null;
   }
 
-  const sourceUserId = cookieValue.slice(0, separatorIndex);
+  const encodedState = cookieValue.slice(0, separatorIndex);
   const providedSignature = cookieValue.slice(separatorIndex + 1);
-  const expectedSignature = signLinkSourceUserId(sourceUserId);
+  const expectedSignature = signLinkState(encodedState);
 
   const providedBuffer = Buffer.from(providedSignature, "utf8");
   const expectedBuffer = Buffer.from(expectedSignature, "utf8");
@@ -55,5 +81,35 @@ export function verifyAndExtractLinkSourceUserId(
     return null;
   }
 
-  return sourceUserId;
+  try {
+    const parsed: unknown = JSON.parse(
+      Buffer.from(encodedState, "base64url").toString("utf8")
+    );
+
+    if (
+      typeof parsed !== "object" ||
+      parsed === null ||
+      !("sourceUserId" in parsed) ||
+      typeof parsed.sourceUserId !== "string" ||
+      parsed.sourceUserId.length === 0 ||
+      !("stage" in parsed) ||
+      (parsed.stage !== "link" && parsed.stage !== "signin-fallback")
+    ) {
+      return null;
+    }
+
+    return {
+      next: "next" in parsed ? getSafeLinkNextPath(parsed.next) : "/",
+      sourceUserId: parsed.sourceUserId,
+      stage: parsed.stage,
+    };
+  } catch {
+    return UUID_PATTERN.test(encodedState)
+      ? {
+          next: "/",
+          sourceUserId: encodedState,
+          stage: "link",
+        }
+      : null;
+  }
 }

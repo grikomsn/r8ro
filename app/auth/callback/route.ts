@@ -1,19 +1,15 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import {
+  createSignedLinkSourceCookieValue,
+  getSafeLinkNextPath,
   LINK_SOURCE_USER_COOKIE,
-  verifyAndExtractLinkSourceUserId,
+  LINK_SOURCE_USER_COOKIE_MAX_AGE_SECONDS,
+  type LinkSourceState,
+  verifyAndExtractLinkSourceState,
 } from "@/lib/auth/linking";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createServerClient } from "@/lib/supabase/server";
-
-function getSafeNextPath(nextParam: string | null) {
-  if (!nextParam?.startsWith("/")) {
-    return "/";
-  }
-
-  return nextParam;
-}
 
 function clearPendingLinkCookie(response: NextResponse) {
   response.cookies.set({
@@ -29,15 +25,26 @@ function clearPendingLinkCookie(response: NextResponse) {
   return response;
 }
 
+function setPendingLinkCookie(response: NextResponse, state: LinkSourceState) {
+  response.cookies.set({
+    name: LINK_SOURCE_USER_COOKIE,
+    value: createSignedLinkSourceCookieValue(state),
+    httpOnly: true,
+    maxAge: LINK_SOURCE_USER_COOKIE_MAX_AGE_SECONDS,
+    path: "/",
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+  });
+
+  return response;
+}
+
 async function redirectToGitHubSignInFallback(
   supabase: Awaited<ReturnType<typeof createServerClient>>,
   origin: string,
-  next: string
+  linkState: LinkSourceState | null
 ) {
   const fallbackRedirect = new URL("/auth/callback", origin);
-  fallbackRedirect.searchParams.set("mode", "signin-fallback");
-  fallbackRedirect.searchParams.set("next", next);
-  fallbackRedirect.searchParams.set("link", "github");
 
   const { data: oauthData, error: oauthError } =
     await supabase.auth.signInWithOAuth({
@@ -49,7 +56,14 @@ async function redirectToGitHubSignInFallback(
     });
 
   if (!oauthError && oauthData.url) {
-    return NextResponse.redirect(oauthData.url);
+    const response = NextResponse.redirect(oauthData.url);
+
+    return linkState
+      ? setPendingLinkCookie(response, {
+          ...linkState,
+          stage: "signin-fallback",
+        })
+      : response;
   }
 
   console.error("Failed to fallback to GitHub sign-in:", oauthError);
@@ -59,16 +73,18 @@ async function redirectToGitHubSignInFallback(
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = getSafeNextPath(searchParams.get("next"));
+  const legacyNext = getSafeLinkNextPath(searchParams.get("next"));
   const isGitHubLinkFlow = searchParams.get("link") === "github";
-  const attemptedFallbackSignIn =
-    searchParams.get("mode") === "signin-fallback";
   const pendingSourceCookie = request.cookies.get(
     LINK_SOURCE_USER_COOKIE
   )?.value;
-  const pendingSourceUserId =
-    verifyAndExtractLinkSourceUserId(pendingSourceCookie);
+  const pendingLinkState = verifyAndExtractLinkSourceState(pendingSourceCookie);
+  const pendingSourceUserId = pendingLinkState?.sourceUserId;
   const hasPendingSourceCookie = !!pendingSourceCookie;
+  const next = pendingLinkState?.next ?? legacyNext;
+  const attemptedFallbackSignIn =
+    pendingLinkState?.stage === "signin-fallback" ||
+    searchParams.get("mode") === "signin-fallback";
 
   if (hasPendingSourceCookie && !pendingSourceUserId) {
     console.error("Invalid account-link source cookie signature");
@@ -77,14 +93,11 @@ export async function GET(request: NextRequest) {
   const supabase = await createServerClient();
 
   if (!code) {
-    if (
-      (isGitHubLinkFlow || hasPendingSourceCookie) &&
-      !attemptedFallbackSignIn
-    ) {
+    if ((isGitHubLinkFlow || pendingLinkState) && !attemptedFallbackSignIn) {
       const fallbackResponse = await redirectToGitHubSignInFallback(
         supabase,
         origin,
-        next
+        pendingLinkState
       );
       if (fallbackResponse) {
         return fallbackResponse;
@@ -164,7 +177,7 @@ export async function GET(request: NextRequest) {
     const fallbackResponse = await redirectToGitHubSignInFallback(
       supabase,
       origin,
-      next
+      pendingLinkState
     );
     if (fallbackResponse) {
       return fallbackResponse;

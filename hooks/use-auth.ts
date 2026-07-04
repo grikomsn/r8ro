@@ -44,7 +44,6 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 const GITHUB_LINK_PENDING_KEY = "r8ro-github-link-pending";
-const GITHUB_LINK_NEXT_PATH_KEY = "r8ro-github-link-next-path";
 
 function clearGitHubLinkPendingState() {
   if (typeof window === "undefined") {
@@ -52,16 +51,14 @@ function clearGitHubLinkPendingState() {
   }
 
   sessionStorage.removeItem(GITHUB_LINK_PENDING_KEY);
-  sessionStorage.removeItem(GITHUB_LINK_NEXT_PATH_KEY);
 }
 
-function markGitHubLinkPendingState(nextPath: string) {
+function markGitHubLinkPendingState() {
   if (typeof window === "undefined") {
     return;
   }
 
   sessionStorage.setItem(GITHUB_LINK_PENDING_KEY, "1");
-  sessionStorage.setItem(GITHUB_LINK_NEXT_PATH_KEY, nextPath);
 }
 
 function useAuthState(): AuthContextValue {
@@ -150,15 +147,7 @@ function useAuthState(): AuthContextValue {
         const hashErrorCode = hashParams.get("error_code");
 
         if (pendingGitHubLink && hashErrorCode === "identity_already_exists") {
-          const nextPath =
-            sessionStorage.getItem(GITHUB_LINK_NEXT_PATH_KEY) ||
-            `${window.location.pathname}${window.location.search}`;
           const callbackUrl = new URL("/auth/callback", window.location.origin);
-          callbackUrl.searchParams.set("link", "github");
-          callbackUrl.searchParams.set(
-            "next",
-            nextPath.startsWith("/") ? nextPath : "/"
-          );
 
           window.location.replace(callbackUrl.toString());
           return;
@@ -300,7 +289,15 @@ function useAuthState(): AuthContextValue {
       }
 
       try {
+        const nextPath =
+          typeof window === "undefined"
+            ? "/"
+            : `${window.location.pathname}${window.location.search}`;
         const prepareResponse = await fetch("/auth/link/start", {
+          body: JSON.stringify({ next: nextPath }),
+          headers: {
+            "Content-Type": "application/json",
+          },
           method: "POST",
         });
 
@@ -334,16 +331,12 @@ function useAuthState(): AuthContextValue {
           typeof window === "undefined"
             ? "/auth/callback"
             : (() => {
-                const nextPath = `${window.location.pathname}${window.location.search}`;
-                markGitHubLinkPendingState(nextPath);
+                markGitHubLinkPendingState();
 
-                const callbackUrl = new URL(
+                return new URL(
                   "/auth/callback",
                   window.location.origin
-                );
-                callbackUrl.searchParams.set("next", nextPath);
-                callbackUrl.searchParams.set("link", "github");
-                return callbackUrl.toString();
+                ).toString();
               })();
 
         const { error } = await supabaseRef.current.auth.linkIdentity({

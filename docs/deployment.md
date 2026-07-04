@@ -52,13 +52,13 @@ AUTH_LINK_COOKIE_SECRET=your_link_cookie_secret
 
      ```text
      https://your-custom-domain.com/auth/callback
-     http://localhost:3000/**
+     http://localhost:3000/auth/callback
      ```
 
      Add the exact local origin for non-default ports too, such as
-     `http://localhost:12812/**`. If a callback origin is missing, Supabase
-     falls back to the Site URL and guest-to-GitHub linking cannot complete
-     locally.
+     `http://localhost:12812/auth/callback`. If a callback URL is missing,
+     Supabase falls back to the Site URL and guest-to-GitHub linking cannot
+     complete locally.
 5. **Enable Realtime**: Go to Settings → API → enable Realtime for:
    - `retro_boards`
    - `retro_cards`

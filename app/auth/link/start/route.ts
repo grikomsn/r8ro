@@ -1,13 +1,26 @@
+import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import {
   createSignedLinkSourceCookieValue,
+  getSafeLinkNextPath,
   LINK_SOURCE_USER_COOKIE,
   LINK_SOURCE_USER_COOKIE_MAX_AGE_SECONDS,
 } from "@/lib/auth/linking";
 import { createServerClient } from "@/lib/supabase/server";
 
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
+    let next = "/";
+
+    try {
+      const body: unknown = await request.json();
+      if (typeof body === "object" && body !== null && "next" in body) {
+        next = getSafeLinkNextPath(body.next);
+      }
+    } catch {
+      // Keep the default path when the optional JSON body is absent or invalid.
+    }
+
     const supabase = await createServerClient();
     const {
       data: { user },
@@ -28,7 +41,11 @@ export async function POST() {
     const response = NextResponse.json({ success: true });
     response.cookies.set({
       name: LINK_SOURCE_USER_COOKIE,
-      value: createSignedLinkSourceCookieValue(user.id),
+      value: createSignedLinkSourceCookieValue({
+        next,
+        sourceUserId: user.id,
+        stage: "link",
+      }),
       httpOnly: true,
       maxAge: LINK_SOURCE_USER_COOKIE_MAX_AGE_SECONDS,
       path: "/",
