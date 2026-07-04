@@ -34,33 +34,17 @@ const lato = Lato({
 
 export const metadata: Metadata = {
   title: {
-    default: "r8ro - Real-time Collaborative Retrospectives",
+    default: "r8ro — Realtime retrospectives and planning poker",
     template: "%s | r8ro",
   },
   description:
-    "Create and run effective retrospective sessions with your team. Real-time collaboration, voting, timer controls, and privacy features. Perfect for agile teams and sprint retrospectives.",
-  generator: "v0.app",
+    "Realtime retrospective boards and planning poker with voting, presence, and timers.",
   applicationName: "r8ro",
-  keywords: [
-    "retrospective",
-    "agile retrospective",
-    "sprint retro",
-    "scrum retrospective",
-    "team collaboration",
-    "brainstorming",
-    "sprint planning",
-    "agile tools",
-    "real-time collaboration",
-    "remote team tools",
-  ],
-  authors: [{ name: "r8ro", url: "https://r8ro.app" }],
-  creator: "r8ro",
-  publisher: "r8ro",
   metadataBase: new URL("https://r8ro.app"),
   openGraph: {
-    title: "r8ro - Real-time Collaborative Retrospectives",
+    title: "r8ro — Realtime retrospectives and planning poker",
     description:
-      "Create and run effective retrospective sessions with your team. Real-time collaboration, voting, timer controls, and privacy features.",
+      "Realtime retrospective boards and planning poker with voting, presence, and timers.",
     type: "website",
     locale: "en_US",
     url: "https://r8ro.app",
@@ -70,17 +54,16 @@ export const metadata: Metadata = {
         url: "/opengraph.png",
         width: 1200,
         height: 630,
-        alt: "r8ro - Real-time Collaborative Retrospectives",
+        alt: "r8ro",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "r8ro - Real-time Collaborative Retrospectives",
+    title: "r8ro — Realtime retrospectives and planning poker",
     description:
-      "Create and run effective retrospective sessions with your team. Real-time collaboration, voting, and timer controls.",
+      "Realtime retrospective boards and planning poker with voting, presence, and timers.",
     images: ["/opengraph.png"],
-    creator: "@r8ro",
   },
   robots: {
     index: true,

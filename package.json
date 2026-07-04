@@ -1,6 +1,6 @@
 {
   "name": "r8ro",
-  "version": "0.1.0",
+  "version": "0.0.0",
   "description": "Realtime collaborative retrospective boards with anonymous-first auth and scrum poker",
   "homepage": "https://r8ro.app",
   "repository": {
@@ -9,11 +9,6 @@
   },
   "bugs": {
     "url": "https://github.com/grikomsn/r8ro/issues"
-  },
-  "author": {
-    "name": "Griko Nibras",
-    "email": "griko@nibras.co",
-    "url": "https://nibras.co"
   },
   "keywords": [
     "retrospective",

@@ -2,13 +2,13 @@ import type { Metadata } from "next";
 import RetroClientPage from "./client-page";
 
 export const metadata: Metadata = {
-  title: "r8ro - Real-time Collaborative Retrospectives",
+  title: "Realtime retrospective boards",
   description:
-    "Create and run effective retrospective sessions with your team. Real-time collaboration, voting, timer controls, and privacy features. Perfect for agile teams and sprint retrospectives.",
+    "Create retrospective boards with realtime cards, voting, presence, and a shared timer.",
   openGraph: {
-    title: "r8ro - Real-time Collaborative Retrospectives",
+    title: "r8ro retrospective boards",
     description:
-      "Create and run effective retrospective sessions with your team. Real-time collaboration, voting, timer controls, and privacy features.",
+      "Realtime retrospective boards with cards, voting, presence, and a shared timer.",
     type: "website",
     url: "https://r8ro.app",
     images: [
@@ -16,7 +16,7 @@ export const metadata: Metadata = {
         url: "/opengraph.png",
         width: 1200,
         height: 630,
-        alt: "r8ro - Real-time Collaborative Retrospectives",
+        alt: "r8ro retrospective board",
       },
     ],
   },

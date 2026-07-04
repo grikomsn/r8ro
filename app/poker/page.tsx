@@ -2,13 +2,13 @@ import type { Metadata } from "next";
 import PokerClientPage from "./client-page";
 
 export const metadata: Metadata = {
-  title: "Scrum Poker - r8ro",
+  title: "Planning poker",
   description:
-    "Create and run planning poker sessions with your team. Real-time collaboration, voting, and estimation. Perfect for agile teams and sprint planning.",
+    "Create planning poker sessions with realtime voting, presence, and vote reveal.",
   openGraph: {
-    title: "Scrum Poker - r8ro",
+    title: "r8ro planning poker",
     description:
-      "Create and run planning poker sessions with your team. Real-time collaboration and voting.",
+      "Realtime planning poker with configurable scales and vote reveal.",
     type: "website",
     url: "https://r8ro.app/poker",
     images: [
@@ -16,7 +16,7 @@ export const metadata: Metadata = {
         url: "/opengraph.png",
         width: 1200,
         height: 630,
-        alt: "r8ro - Real-time Collaborative Planning Poker",
+        alt: "r8ro planning poker",
       },
     ],
   },
