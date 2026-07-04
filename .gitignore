@@ -1,15 +1,29 @@
 .DS_Store
-.env*.local
+
+# Environment and local credentials
+.env
+.env.*
+!.env.example
+
+# Dependencies and build output
+node_modules/
 .next
 .turbo
+.pnpm-store/
+coverage/
+
+# Local tooling
 .vercel
 .vscode/
-*.env*
-*.tsbuildinfo
-next-env.d.ts
-node_modules/
-package-lock.json
-yarn.lock
 supabase/.temp/
 
-!.env.example
+# Generated files and logs
+*.log
+*.tsbuildinfo
+next-env.d.ts
+
+# This repository uses pnpm exclusively
+bun.lock
+bun.lockb
+package-lock.json
+yarn.lock

@@ -77,7 +77,7 @@ No Jest/Vitest/Playwright configured. Validation chain: `pnpm check-types` → `
 - `AUTH_LINK_COOKIE_SECRET` is optional; falls back to `SUPABASE_SERVICE_ROLE_KEY` if unset
 - Tailwind v4 is configured in `app/globals.css` — there is no `tailwind.config.js`
 - `.cursor/hooks.json` runs a full-project `pnpm dlx ultracite fix` after every file edit
-- `README.md` incorrectly lists `pnpm lint` — that script does not exist; use `pnpm fix`
+- The repository uses pnpm exclusively; do not add npm, Yarn, or Bun lockfiles
 
 ## Handoff Checklist
 
