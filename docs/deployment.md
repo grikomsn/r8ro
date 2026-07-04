@@ -34,9 +34,6 @@ SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 
 # Optional: dedicated secret for link-cookie HMAC signing
 AUTH_LINK_COOKIE_SECRET=your_link_cookie_secret
-
-# Custom domain (if not using platform default)
-NEXT_PUBLIC_APP_URL=https://your-custom-domain.com
 ```
 
 ## Database Setup
@@ -49,6 +46,19 @@ NEXT_PUBLIC_APP_URL=https://your-custom-domain.com
 4. **Configure Auth**:
    - Enable Anonymous auth (default)
    - Optionally add GitHub as a provider
+   - In **Authentication → URL Configuration**, set the Site URL to the
+     production origin and add every OAuth callback origin to **Redirect
+     URLs**:
+
+     ```text
+     https://your-custom-domain.com/auth/callback
+     http://localhost:3000/**
+     ```
+
+     Add the exact local origin for non-default ports too, such as
+     `http://localhost:12812/**`. If a callback origin is missing, Supabase
+     falls back to the Site URL and guest-to-GitHub linking cannot complete
+     locally.
 5. **Enable Realtime**: Go to Settings → API → enable Realtime for:
    - `retro_boards`
    - `retro_cards`
