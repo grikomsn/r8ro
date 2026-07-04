@@ -1,15 +1,18 @@
 # Supabase Schema and RLS Policies
 
-This directory contains the complete database schema and Row Level Security (RLS) policies for the r8ro retro app.
+This directory contains the fresh-project retro baseline, subsequent
+migrations, and Row Level Security (RLS) documentation for r8ro.
 
 ## Files
 
-- `schema.sql` - Complete database schema including:
+- `schema.sql` - Retro baseline including:
   - Helper functions (`can_access_board`)
   - Table definitions with all columns, types, and defaults
   - Foreign key constraints
   - Indexes for performance
-  - Row Level Security policies for all tables
+- `migrations/` - Poker tables, Realtime configuration, later policy changes,
+  and account-linking support
+- `RLS_POLICIES.md` - Current policy reference
 
 ## Schema Overview
 
@@ -33,6 +36,12 @@ This directory contains the complete database schema and Row Level Security (RLS
    - Unique constraint ensures one vote per user per card
    - Enables vote/unvote functionality
 
+5. **poker_sessions** - Scrum poker session configuration and voting state
+
+6. **poker_participants** - Poker participants, observers, and presence
+
+7. **poker_votes** - One estimate per participant and session
+
 ### RLS Policies
 
 All tables have Row Level Security enabled with policies enforcing:
@@ -51,16 +60,13 @@ All tables have Row Level Security enabled with policies enforcing:
 
 To apply this schema to a fresh Supabase database:
 
-```bash
-psql -h <your-db-host> -U postgres -d postgres -f schema.sql
-```
+1. Apply `schema.sql`.
+2. Apply every SQL file in `migrations/` in filename order.
+3. Enable anonymous authentication and configure OAuth redirect URLs.
 
-Or use Supabase CLI:
-
-```bash
-supabase db reset
-# Then apply schema.sql through Supabase dashboard or CLI
-```
+Use the Supabase SQL Editor for a hosted project or the connection information
+from `supabase status` for a local CLI stack. Never commit connection strings,
+service-role keys, or a production project reference.
 
 ## Migration History
 

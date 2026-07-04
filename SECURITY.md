@@ -14,7 +14,9 @@ If you discover a security vulnerability, please report it responsibly.
 
 **Do not** open a public issue.
 
-Instead, send an email to: <griko@nibras.com>
+Use
+[GitHub's private vulnerability reporting](https://github.com/grikomsn/r8ro/security/advisories/new).
+If private reporting is unavailable, email <griko@nibras.co>.
 
 Please include:
 
@@ -22,9 +24,8 @@ Please include:
 - Steps to reproduce the issue
 - Any potential impact assessment
 
-## Response
-
-Security reports will be acknowledged within 48 hours, and you'll receive a response regarding the next steps within 7 days.
+You can expect an acknowledgement within seven days. Please allow time to
+investigate and coordinate a fix before public disclosure.
 
 ## Security Best Practices
 
@@ -32,7 +33,7 @@ r8ro is designed with security in mind:
 
 - All database tables protected by Row Level Security (RLS)
 - Anonymous-first authentication with optional GitHub binding
-- No sensitive data stored in client-side code
-- Environment variables for all configuration secrets
+- Server credentials are read only from environment variables
+- Automated Gitleaks checks reject newly committed credentials
 
 For detailed security architecture, see the [Security section in README.md](README.md#security).

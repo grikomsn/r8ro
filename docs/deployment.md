@@ -1,352 +1,100 @@
 # Deployment Guide
 
-This guide covers various deployment options for r8ro, from simple Vercel hosting to self-managed infrastructure.
-
-## Quick Start (Vercel)
-
-The fastest way to deploy r8ro is using Vercel:
-
-1. **Fork and push to GitHub**
-2. **Connect to Vercel**: Import your GitHub repository
-3. **Configure environment variables** in Vercel dashboard:
-
-   ```bash
-   NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
-   ```
-
-4. **Deploy**: Automatic deployment on push to `main`
+The maintained production path is Supabase Cloud plus Vercel. Other Node.js
+hosts can run the application, but they are not covered by repository
+automation.
 
 ## Environment Variables
 
-### Required
+Configure these values in the hosting platform. Do not commit them.
+
+| Variable | Required | Exposure | Purpose |
+| --- | --- | --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | Yes | Browser | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Browser | Supabase publishable/anon key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Yes for GitHub linking fallback | Server only | Secure guest-account merge |
+| `AUTH_LINK_COOKIE_SECRET` | No | Server only | Dedicated HMAC secret; falls back to the service-role key |
+
+Values prefixed with `NEXT_PUBLIC_` are included in the browser bundle. Never
+put a service-role key or other privileged credential in a public variable.
+
+## Prepare Supabase
+
+For a fresh Supabase project:
+
+1. Run `supabase/schema.sql` in the SQL Editor.
+2. Run every file in `supabase/migrations/` in filename order.
+3. Enable anonymous sign-ins under **Authentication → Sign In / Providers**.
+4. Configure Realtime for the tables listed in
+   `20260106120000_enable_realtime_replication.sql`.
+5. Review the policies documented in `supabase/RLS_POLICIES.md`.
+
+The schema file establishes the retro baseline. The migrations add poker,
+Realtime configuration, policy changes, and account-linking support.
+
+## Configure Authentication
+
+In **Authentication → URL Configuration**:
+
+- Set **Site URL** to the production origin, for example
+  `https://example.com`.
+- Add the production callback:
+  `https://example.com/auth/callback`.
+- Add each development callback exactly, for example
+  `http://localhost:3000/auth/callback`.
+
+If development uses another port, that exact origin must be allow-listed.
+
+To enable GitHub:
+
+1. Create a GitHub OAuth app.
+2. Use the Supabase provider callback shown in the Supabase dashboard as the
+   OAuth app authorization callback.
+3. Add the GitHub client ID and secret to the Supabase GitHub provider.
+
+GitHub credentials belong in Supabase, not in this application's environment
+files.
+
+## Deploy to Vercel
+
+1. Import the GitHub repository in Vercel.
+2. Add the environment variables above for Production and Preview as needed.
+3. Deploy the `main` branch.
+4. Add the final production domain to the Supabase Site URL and redirect
+   allow-list.
+
+The repository pins Node and pnpm in `package.json`; `vercel.json` enforces the
+pnpm install command.
+
+Before deploying a change locally, run:
 
 ```bash
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-```
-
-### Optional
-
-```bash
-# For server-side operations
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-
-# Optional: dedicated secret for link-cookie HMAC signing
-AUTH_LINK_COOKIE_SECRET=your_link_cookie_secret
-```
-
-## Database Setup
-
-### Supabase Cloud (Recommended)
-
-1. **Create Project**: Sign up at [supabase.com](https://supabase.com)
-2. **Apply Schema**: Copy contents of `supabase/schema.sql` to SQL Editor
-3. **Enable RLS**: Row Level Security should be enabled by default
-4. **Configure Auth**:
-   - Enable Anonymous auth (default)
-   - Optionally add GitHub as a provider
-   - In **Authentication → URL Configuration**, set the Site URL to the
-     production origin and add every OAuth callback origin to **Redirect
-     URLs**:
-
-     ```text
-     https://your-custom-domain.com/auth/callback
-     http://localhost:3000/auth/callback
-     ```
-
-     Add the exact local origin for non-default ports too, such as
-     `http://localhost:12812/auth/callback`. If a callback URL is missing,
-     Supabase falls back to the Site URL and guest-to-GitHub linking cannot
-     complete locally.
-5. **Enable Realtime**: Go to Settings → API → enable Realtime for:
-   - `retro_boards`
-   - `retro_cards`
-   - `retro_participants`
-   - `retro_card_votes`
-   - `poker_sessions`
-   - `poker_participants`
-   - `poker_votes`
-
-### Local Supabase
-
-For development or complete self-hosting:
-
-```bash
-# Install CLI
-brew install supabase/tap/supabase
-
-# Initialize
-supabase init
-supabase start
-
-# Apply migrations
-supabase db reset
-```
-
-## Deployment Platforms
-
-### Vercel
-
-**Pros**: Zero config, automatic SSL, git integration
-**Cons**: Vendor lock-in, less control
-
-```bash
-# Install Vercel CLI
-npm i -g vercel
-
-# Deploy
-vercel --prod
-```
-
-### Netlify
-
-```bash
-# Build command
+pnpm install --frozen-lockfile
+pnpm fix
+pnpm check-types
 pnpm build
-
-# Publish directory
-out
-
-# Environment variables in Netlify dashboard
 ```
 
-### Docker
+## Run on Another Node.js Host
 
-Create `Dockerfile`:
-
-```dockerfile
-FROM node:18-alpine AS base
-WORKDIR /app
-
-FROM base AS deps
-COPY package.json pnpm-lock.yaml ./
-RUN npm install -g pnpm && pnpm install --frozen-lockfile
-
-FROM base AS builder
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
-RUN pnpm build
-
-FROM base AS runner
-WORKDIR /app
-ENV NODE_ENV production
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
-EXPOSE 3000
-ENV PORT 3000
-CMD ["node", "server.js"]
-```
+Use Node.js 24 and provide the same environment variables:
 
 ```bash
-# Build and run
-docker build -t r8ro .
-docker run -p 3000:3000 --env-file .env.local r8ro
-```
-
-### Self-Hosted VPS
-
-```bash
-# Server setup
-sudo apt update
-sudo apt install -y nodejs npm git nginx
-
-# Install pnpm
-npm install -g pnpm
-
-# Clone and build
-git clone https://github.com/your-username/r8ro.git
-cd r8ro
-pnpm install
+pnpm install --frozen-lockfile
 pnpm build
-
-# Process management with PM2
-npm install -g pm2
-pm2 start npm --name "r8ro" -- start
-
-# Nginx reverse proxy
-sudo nano /etc/nginx/sites-available/r8ro
+pnpm start
 ```
 
-Nginx configuration:
-
-```nginx
-server {
-    listen 80;
-    server_name your-domain.com;
-
-    location / {
-        proxy_pass http://localhost:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
-    }
-}
-```
-
-```bash
-# Enable site
-sudo ln -s /etc/nginx/sites-available/r8ro /etc/nginx/sites-enabled/
-sudo nginx -t
-sudo systemctl reload nginx
-
-# SSL with Certbot
-sudo apt install certbot python3-certbot-nginx
-sudo certbot --nginx -d your-domain.com
-```
+Place a TLS-terminating reverse proxy in front of the app and forward WebSocket
+connections if the platform requires explicit configuration.
 
 ## Production Checklist
 
-### Security
-
-- [ ] HTTPS enabled (SSL certificate)
-- [ ] Supabase RLS policies reviewed
-- [ ] No secrets in client-side code
-- [ ] Environment variables secured
-- [ ] CORS properly configured
-
-### Performance
-
-- [ ] Database backups configured
-- [ ] CDN for static assets (if using custom domain)
-- [ ] Monitoring and alerting setup
-- [ ] Error tracking (Sentry, etc.)
-
-### Reliability
-
-- [ ] Health checks configured
-- [ ] Automated testing in CI/CD
-- [ ] Database connection pooling
-- [ ] Graceful error handling
-
-### Monitoring
-
-Set up these monitors:
-
-1. **Application Health**: `/api/health` endpoint
-2. **Database**: Supabase dashboard metrics
-3. **Error Rates**: Via logging service
-4. **Performance**: Page load times, API response times
-
-## Scaling Considerations
-
-### Database Scaling
-
-- **Read Replicas**: For high read traffic
-- **Connection Pooling**: PgBouncer or Supabase's built-in pooling
-- **Optimized Queries**: Review slow queries in Supabase dashboard
-
-### Application Scaling
-
-- **Horizontal Scaling**: Multiple app instances behind load balancer
-- **CDN**: Cloudflare or similar for static assets
-- **Caching**: Redis for session data if needed
-
-### Cost Optimization
-
-- **Supabase Tier**: Start with free tier, upgrade as needed
-- **Compute Rightsizing**: Monitor CPU/memory usage
-- **Bandwidth**: Optimize images and assets
-
-## Migration Guide
-
-### From Another Platform
-
-1. **Export Data**: From existing retro/poker tools
-2. **Transform**: Convert to r8ro's schema format
-3. **Import**: Use Supabase SQL Editor or CLI
-4. **Test**: Verify all data migrated correctly
-
-### Database Migrations
-
-When updating r8ro versions:
-
-```bash
-# Backup current database
-supabase db dump > backup.sql
-
-# Apply new migrations
-supabase db up
-
-# Verify data integrity
-pnpm run db:verify  # if available
-```
-
-## Troubleshooting
-
-### Common Issues
-
-**Build Failures**
-
-```bash
-# Clear Next.js cache
-rm -rf .next
-pnpm build
-```
-
-**Database Connection**
-
-- Verify Supabase URL and keys
-- Check network/firewall settings
-- Ensure RLS policies allow access
-
-**Realtime Issues**
-
-- Confirm Realtime enabled for tables
-- Check browser console for WebSocket errors
-- Verify subscription patterns (`retro-*`, `poker-*`)
-
-**Authentication Problems**
-
-- Check Supabase Auth configuration
-- Verify redirect URLs in Supabase dashboard
-- Ensure anonymous auth is enabled
-
-### Debug Mode
-
-Enable debug logging:
-
-```bash
-# Environment variables
-DEBUG=*
-NEXT_PUBLIC_DEBUG=true
-```
-
-### Support Resources
-
-- [r8ro GitHub Issues](https://github.com/your-org/r8ro/issues)
-- [Supabase Documentation](https://supabase.com/docs)
-- [Next.js Deployment Guide](https://nextjs.org/docs/deployment)
-
-## Maintenance
-
-### Regular Tasks
-
-1. **Update Dependencies**: `pnpm update`
-2. **Security Patches**: Monitor `npm audit`
-3. **Database Maintenance**: Supabase handles most automatically
-4. **Backup Verification**: Test restore procedures
-
-### Version Updates
-
-When updating r8ro:
-
-1. **Review Changelog**: Check for breaking changes
-2. **Test Staging**: Deploy to staging environment first
-3. **Backup Database**: Before major updates
-4. **Monitor**: Watch for issues after deployment
-
-### End-of-Life
-
-If decommissioning:
-
-1. **Export Data**: Download all user data
-2. **Notify Users**: Advance notice of shutdown
-3. **Delete Resources**: Remove from hosting platforms
-4. **Documentation**: Archive for reference
+- HTTPS is enabled.
+- Production and preview callback URLs are allow-listed in Supabase.
+- Server-only credentials are not exposed through `NEXT_PUBLIC_` variables.
+- All tables have the intended RLS policies.
+- Realtime replication is enabled for retro and poker tables.
+- `pnpm check-types` and `pnpm build` pass.
+- A guest sign-in and a GitHub identity-link flow both complete.
+- A two-browser realtime retro and poker smoke test passes.

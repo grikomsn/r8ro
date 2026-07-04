@@ -52,7 +52,9 @@ Migration `20260106120000_enable_realtime_replication.sql` sets `REPLICA IDENTIT
 
 ## Regenerating the Schema Dump
 
-1. **Connect to Supabase MCP** (preferred): `supabase_execute_sql` queries run against project `dpdrtbkckcnedtbuwtiu`. Use it to confirm table signatures or policy text before editing docs.
+1. **Connect to Supabase MCP** (optional): configure a local project reference
+   and use read-only queries to confirm table signatures or policy text before
+   editing docs. Never commit a production project reference or credential.
 2. **CLI Pull** (fallback):
    ```bash
    supabase db pull --debug

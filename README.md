@@ -2,6 +2,8 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![r8ro.app](https://img.shields.io/badge/🌐-r8ro.app-blue)](https://r8ro.app)
+[![CI](https://github.com/grikomsn/r8ro/actions/workflows/ci.yml/badge.svg)](https://github.com/grikomsn/r8ro/actions/workflows/ci.yml)
+[![Secret scan](https://github.com/grikomsn/r8ro/actions/workflows/secret-scan.yml/badge.svg)](https://github.com/grikomsn/r8ro/actions/workflows/secret-scan.yml)
 
 Realtime collaborative retrospective boards. Anonymous-first with GitHub auth binding.
 
@@ -239,15 +241,21 @@ r8ro/
 
 ## Development
 
+### Requirements
+
+- Node.js 24
+- pnpm 11 (declared in `package.json`)
+- A Supabase project or local Supabase stack
+
 ### Setup
 
 ```bash
 # Install dependencies
-pnpm install
+pnpm install --frozen-lockfile
 
 # Set up environment variables
 cp .env.example .env.local
-# Add your Supabase URL and anon key
+# Add your Supabase configuration
 
 # Run dev server
 pnpm dev
@@ -258,25 +266,28 @@ pnpm dev
 ```bash
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+AUTH_LINK_COOKIE_SECRET=your_random_hmac_secret
 ```
+
+The service-role key is required by the guest-to-GitHub account merge fallback
+and must remain server-side. `AUTH_LINK_COOKIE_SECRET` is optional and falls
+back to the service-role key when omitted. Never commit `.env.local`.
 
 ### Database Setup
 
-Apply schema from `supabase/schema.sql`:
-
-```bash
-# Using Supabase CLI
-supabase db reset
-
-# Or apply manually via Supabase Dashboard
-# Copy contents of supabase/schema.sql to SQL Editor
-```
+For a fresh project, apply `supabase/schema.sql`, then apply every file in
+`supabase/migrations/` in filename order. Configure anonymous authentication,
+Realtime, and OAuth callback URLs as described in
+[the deployment guide](docs/deployment.md).
 
 ### Commands
 
 - `pnpm dev` — Start dev server
-- `pnpm build` — Production build
-- `pnpm lint` — Run ESLint
+- `pnpm fix` — Format and lint with Ultracite/Biome
+- `pnpm check-types` — Run the required standalone TypeScript check
+- `pnpm build` — Create a production build
+- `pnpm start` — Serve a production build
 
 ## Contributing
 
@@ -299,17 +310,13 @@ Contributions are welcome! Please read our [Contributing Guidelines](CONTRIBUTIN
 5. **Make changes** and follow the code style in `AGENTS.md`
 6. **Submit** a pull request with clear description
 
-See [docs/operations.md](docs/operations.md) for detailed development setup.
+See [docs/operations.md](docs/operations.md) for detailed development setup
+and [SUPPORT.md](SUPPORT.md) for help.
 
 ## Deployment
 
-r8ro can be deployed on various platforms. See [docs/deployment.md](docs/deployment.md) for comprehensive deployment guides including:
-
-- **Vercel** (recommended for simplicity)
-- **Netlify**
-- **Docker containers**
-- **Self-hosted VPS**
-- **Cloud providers** (AWS, Google Cloud, etc.)
+r8ro is deployed on Vercel. See [docs/deployment.md](docs/deployment.md) for
+the verified deployment and Supabase configuration steps.
 
 ## Author
 
@@ -323,3 +330,5 @@ Created by **[Griko Nibras](https://grikomsn.com)** - a full-stack developer foc
 - Anonymous users get full Supabase Auth UUIDs (can be upgraded to GitHub)
 
 See [`supabase/RLS_POLICIES.md`](supabase/RLS_POLICIES.md) for detailed policy documentation.
+
+Report vulnerabilities privately according to [SECURITY.md](SECURITY.md).
