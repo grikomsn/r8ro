@@ -87,9 +87,8 @@ export function ParticipantsTable({
   const stats = calculateStats();
 
   // Get vote for each participant
-  const getParticipantVote = (participant: PokerParticipant) => {
-    return votes.find((v) => v.user_id === participant.user_id);
-  };
+  const getParticipantVote = (participant: PokerParticipant) =>
+    votes.find((v) => v.user_id === participant.user_id);
 
   // Check if vote is outlier
   const isOutlier = (vote: PokerVote | undefined) => {
