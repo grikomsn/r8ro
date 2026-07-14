@@ -3,5 +3,6 @@ allowBuilds:
 minimumReleaseAgeExclude:
   - react-resizable-panels@4.12.2
   - recharts@3.9.2
+  - ultracite@7.9.4
 overrides:
   postcss: 8.5.19
