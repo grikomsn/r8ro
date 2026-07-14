@@ -4,5 +4,12 @@ minimumReleaseAgeExclude:
   - react-resizable-panels@4.12.2
   - recharts@3.9.2
   - ultracite@7.9.4
+  - '@supabase/auth-js@2.110.5'
+  - '@supabase/functions-js@2.110.5'
+  - '@supabase/postgrest-js@2.110.5'
+  - '@supabase/realtime-js@2.110.5'
+  - '@supabase/ssr@0.12.2'
+  - '@supabase/storage-js@2.110.5'
+  - '@supabase/supabase-js@2.110.5'
 overrides:
   postcss: 8.5.19
