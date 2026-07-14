@@ -31,8 +31,8 @@
   },
   "dependencies": {
     "@hookform/resolvers": "5.4.0",
-    "@supabase/ssr": "0.12.1",
-    "@supabase/supabase-js": "2.110.3",
+    "@supabase/ssr": "0.12.2",
+    "@supabase/supabase-js": "2.110.5",
     "@vercel/analytics": "2.0.1",
     "autoprefixer": "10.5.2",
     "class-variance-authority": "0.7.1",
