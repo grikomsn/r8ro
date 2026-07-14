@@ -14,6 +14,10 @@ The repository is configured for Vercel and Supabase.
 `AUTH_LINK_COOKIE_SECRET` falls back to the service-role key. Never place a
 privileged key in a `NEXT_PUBLIC_` variable.
 
+The guest-account merge RPC is restricted to `service_role` at the database
+level. Keep the merge flow in server-only routes that use
+`lib/supabase/admin.ts`.
+
 ## Supabase
 
 For a new project:

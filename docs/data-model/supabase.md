@@ -26,7 +26,8 @@ SQL files are authoritative when this document differs.
 - `can_access_poker_session(uuid)` applies the same rule to poker sessions.
 - `merge_guest_account_into_current_user(source_user_id, target_user_id)`
   migrates retro and poker ownership, participation, and votes during the
-  GitHub-link fallback.
+  GitHub-link fallback. It is executable only by `service_role`; browser API
+  roles cannot invoke it directly.
 
 ## Current RLS Summary
 
@@ -47,6 +48,11 @@ See `supabase/RLS_POLICIES.md` for policy names and source files.
 
 `20260106120000_enable_realtime_replication.sql` sets `REPLICA IDENTITY FULL`
 and adds all seven application tables to the `supabase_realtime` publication.
+
+`20260714150754_harden_security_definer_functions.sql` pins helper search
+paths, enforces service-role-only execution for account merging, and removes
+duplicate participant uniqueness constraints without changing the remaining
+`(board_id, user_id)` guarantee.
 
 ## Schema Changes
 

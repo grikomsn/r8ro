@@ -10,6 +10,7 @@ CREATE OR REPLACE FUNCTION public.can_access_board(board_uuid uuid)
 RETURNS boolean
 LANGUAGE sql
 STABLE SECURITY DEFINER
+SET search_path = pg_catalog, public
 AS $$
   SELECT EXISTS (
     SELECT 1 FROM retro_boards

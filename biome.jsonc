@@ -5,6 +5,13 @@
     "ultracite/biome/react",
     "ultracite/biome/next"
   ],
+  "assist": {
+    "actions": {
+      "source": {
+        "useSortedKeys": "off"
+      }
+    }
+  },
   "linter": {
     "rules": {
       "a11y": {
@@ -24,6 +31,9 @@
         }
       },
       "performance": {
+        "noJsxPropsBind": {
+          "level": "off"
+        },
         "noNamespaceImport": {
           "level": "off"
         }
@@ -42,10 +52,22 @@
         },
         "useFilenamingConvention": {
           "level": "off"
+        },
+        "useDestructuring": {
+          "level": "off"
         }
       },
       "suspicious": {
         "noArrayIndexKey": {
+          "level": "off"
+        },
+        "noLeakedRender": {
+          "level": "off"
+        },
+        "noShadow": {
+          "level": "off"
+        },
+        "noUnnecessaryConditions": {
           "level": "off"
         }
       }
@@ -53,6 +75,9 @@
   },
   "overrides": [
     {
+      "assist": {
+        "enabled": false
+      },
       "includes": ["components/ui/**/*.{ts,tsx}"],
       "linter": {
         "enabled": false
