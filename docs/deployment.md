@@ -22,11 +22,11 @@ level. Keep the merge flow in server-only routes that use
 
 For a new project:
 
-1. Apply `supabase/schema.sql`.
-2. Apply `supabase/migrations/*.sql` in filename order.
-3. Enable anonymous authentication.
-4. Enable the GitHub provider if GitHub linking is required.
-5. Verify that the Realtime migration added all application tables.
+1. Apply `supabase/migrations/*.sql` in filename order. The retro baseline is
+   the first migration in that directory.
+2. Enable anonymous authentication.
+3. Enable the GitHub provider if GitHub linking is required.
+4. Verify that the Realtime migration added all application tables.
 
 In **Authentication → URL Configuration**, set the production Site URL and add
 exact callback URLs:

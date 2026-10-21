@@ -18,19 +18,25 @@ Supabase. The deployed app is [r8ro.app](https://r8ro.app).
 - Shared timer and recent-board history.
 - Author controls for title, visibility, lock state, and deletion.
 - Unlocked boards let participants add, edit, move, delete, and vote on cards.
-- Locked boards leave those mutations to the board author.
+- Locked boards are frozen for everyone, including the author.
 
 ### Planning Poker
 
 - Fibonacci, T-shirt, and linear voting scales.
 - Realtime participants, votes, and presence.
-- Author controls for title, story, visibility, voting state, vote reveal, and
-  scale.
-- Numeric vote statistics after reveal.
+- Author controls for title, story, visibility, voting state, vote reveal, vote
+  clearing, and scale.
+- Vote statistics after reveal: minimum, maximum, average, mode and outliers
+  for a numeric scale, and a distribution for a non-numeric one.
+- Votes stay hidden until the session is revealed, enforced by the database.
 
 Every visitor signs in through Supabase anonymous authentication. An anonymous
-account can optionally be linked to GitHub. The current UI restricts private
-boards and poker sessions to their author.
+account can optionally be linked to GitHub. A private board or session stays
+visible to the people already on it, and everybody else is treated as if it did
+not exist.
+
+Every user can download a JSON archive of the boards and sessions they created
+or joined, from the account menu.
 
 ## Stack
 
@@ -46,7 +52,22 @@ Requirements:
 
 - Node.js 24
 - pnpm 11
-- A Supabase project or local Supabase stack
+- Docker, for the local Supabase stack
+- The Supabase CLI, for the local stack
+
+With the local Supabase stack:
+
+```bash
+pnpm install --frozen-lockfile
+supabase start
+pnpm dev
+```
+
+`supabase start` applies every file in `supabase/migrations/` and prints the
+local API URL and keys. Point `NEXT_PUBLIC_SUPABASE_URL` at
+`http://127.0.0.1:54321` and copy the printed keys into `.env.local`.
+
+With a hosted Supabase project:
 
 ```bash
 pnpm install --frozen-lockfile
@@ -65,9 +86,9 @@ Set these values in `.env.local`:
 
 Never expose a service-role key through a `NEXT_PUBLIC_` variable.
 
-For a new database, apply `supabase/schema.sql`, then every file in
-`supabase/migrations/` in filename order. Enable anonymous authentication and
-configure the callback URLs described in
+For a new database, apply every file in `supabase/migrations/` in filename
+order. The retro baseline is the first migration in that directory. Enable
+anonymous authentication and configure the callback URLs described in
 [docs/deployment.md](docs/deployment.md).
 
 ## Validation

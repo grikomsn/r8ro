@@ -1,8 +1,11 @@
 # Row Level Security Reference
 
 SQL is authoritative. This file summarizes the policies created by
-`schema.sql`, `20250101000000_create_poker_tables.sql`, and
-`20260106123000_update_retro_policies.sql`.
+`20241231000000_create_retro_tables.sql`, `20250101000000_create_poker_tables.sql`,
+`20260106123000_update_retro_policies.sql`, and
+`20261021090600_enforce_poker_vote_rules.sql`.
+
+`supabase/schema.sql` is a reference dump and is not applied.
 
 ## Retro
 
@@ -32,7 +35,9 @@ The 2026 policy migration replaces the baseline mutation policies:
 - `retro_cards_delete_unlocked_participants`: the same access rule for delete.
 
 The update and delete policies do not compare `retro_cards.author_id` with the
-current user.
+current user. The identity columns of a card are protected by the
+`prevent_card_identity_change` trigger instead, which rejects a change to
+`id`, `board_id`, `author_id`, `author_name`, or to the `votes` counter.
 
 ### `retro_card_votes`
 
@@ -41,6 +46,9 @@ current user.
   board that passes the lock rule.
 - `retro_votes_delete_unlocked_participants`: self-owned vote with the same
   board access and lock checks.
+
+The vote count shown on a card is `retro_cards.votes`, which the
+`sync_retro_card_vote_count` trigger keeps in step with these rows.
 
 ## Poker
 
@@ -58,12 +66,16 @@ current user.
 
 ### `poker_votes`
 
-- Select: anyone who can access the session.
-- Insert: self only while voting is active and the user is not an observer.
-- Update: self only while voting is active.
-- Delete: self only.
+- `poker_votes_select_policy`: a participant sees their own vote, and sees
+  everybody's vote once the session is revealed.
+- `poker_votes_insert_policy`: self only while voting is active, the user is
+  not an observer, and the value is on the session's voting scale.
+- `poker_votes_update_policy`: the same conditions for a vote change.
+- `poker_votes_delete_policy`: self only.
 
-The author has no separate bulk-delete policy for other users' votes.
+The author clears every vote in their session with
+`public.clear_poker_votes(session_id)`, which checks the session authorship
+itself.
 
 ## Realtime
 

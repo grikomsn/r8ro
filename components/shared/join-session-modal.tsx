@@ -9,6 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/use-auth";
+import {
+  USERNAME_MAX_LENGTH,
+  validateUsername,
+} from "@/lib/constants/username";
 
 interface JoinSessionModalProps {
   onJoin: (username: string) => void;
@@ -24,6 +28,7 @@ export function JoinSessionModal({
   const { displayName, updateDisplayName, isInitialized } = useAuth();
   const [username, setUsername] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (isInitialized && displayName) {
@@ -33,17 +38,28 @@ export function JoinSessionModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username.trim()) {
+
+    const validationError = validateUsername(username);
+    if (validationError) {
+      setError(validationError);
       return;
     }
 
+    setError("");
     setIsSubmitting(true);
 
-    if (username.trim() !== displayName) {
-      await updateDisplayName(username.trim());
+    const trimmed = username.trim();
+
+    if (trimmed !== displayName) {
+      const updated = await updateDisplayName(trimmed);
+      if (!updated) {
+        setIsSubmitting(false);
+        setError("Could not save your name. Please try again.");
+        return;
+      }
     }
 
-    onJoin(username.trim());
+    onJoin(trimmed);
     setIsSubmitting(false);
   };
 
@@ -86,12 +102,23 @@ export function JoinSessionModal({
                 autoComplete="name"
                 className="h-12 rounded-xl border-2 border-border text-base shadow-sm"
                 id="username"
+                maxLength={USERNAME_MAX_LENGTH}
                 name="username"
-                onChange={(e) => setUsername(e.target.value)}
+                onChange={(e) => {
+                  setUsername(e.target.value);
+                  if (error) {
+                    setError("");
+                  }
+                }}
                 placeholder="Enter your name"
                 required
                 value={username}
               />
+              {error && (
+                <p className="text-destructive text-sm" role="alert">
+                  {error}
+                </p>
+              )}
             </div>
             <Button
               className="w-full rounded-xl border-2 border-border bg-primary py-6 font-bold text-base uppercase shadow-md transition-shadow hover:shadow-lg"

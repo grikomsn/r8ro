@@ -1,6 +1,12 @@
 -- Supabase Schema and RLS Policies Dump
 -- Generated for r8ro retro app
 -- This file contains the complete database schema including tables, constraints, indexes, functions, and RLS policies
+--
+-- REFERENCE ONLY. The authoritative definition is
+-- supabase/migrations/20241231000000_create_retro_tables.sql plus the
+-- migrations that follow it. Do not apply this file on top of the migration
+-- history: the helper function below is created before its tables, which
+-- PostgreSQL rejects.
 
 -- ============================================================================
 -- HELPER FUNCTIONS

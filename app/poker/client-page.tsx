@@ -1,6 +1,6 @@
 "use client";
 
-import { History, LogIn, Plus, X } from "lucide-react";
+import { History, ListChecks, LogIn, Plus, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type React from "react";
@@ -14,10 +14,12 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/use-auth";
 import { ERROR_MESSAGES } from "@/lib/constants/error-messages";
+import { FIELD_LIMITS } from "@/lib/constants/field-limits";
 import {
   VOTING_SCALES,
   type VotingScaleType,
 } from "@/lib/constants/poker-scales";
+import { validateUsername } from "@/lib/constants/username";
 import { createClient } from "@/lib/supabase/client";
 import {
   addRecentPokerSession,
@@ -25,14 +27,17 @@ import {
   type RecentPokerSession,
   removeRecentPokerSession,
 } from "@/lib/utils/recent-poker-sessions";
-import { generateSlug } from "@/lib/utils/slug";
+import { withSlugRetry } from "@/lib/utils/slug";
 
-const USERNAME_MAX_LENGTH = 30;
-const USERNAME_REGEX = /^[a-zA-Z0-9_-]+$/;
+interface PokerSessionListItem {
+  slug: string;
+  title: string;
+}
 
 export default function PokerClientPage() {
   const router = useRouter();
   const {
+    authError,
     userId,
     displayName,
     updateDisplayName,
@@ -51,6 +56,9 @@ export default function PokerClientPage() {
   const [recentSessions, setRecentSessions] = useState<RecentPokerSession[]>(
     []
   );
+  const [mySessions, setMySessions] = useState<PokerSessionListItem[]>([]);
+  const [mySessionsError, setMySessionsError] = useState("");
+  const [isMySessionsLoading, setIsMySessionsLoading] = useState(false);
 
   useEffect(() => {
     if (isInitialized && displayName) {
@@ -62,6 +70,61 @@ export default function PokerClientPage() {
     setRecentSessions(getRecentPokerSessions());
   }, []);
 
+  // Sessions the user created, read from the database rather than the recent
+  // cookie, so they stay reachable when the cookie expires or is cleared.
+  useEffect(() => {
+    if (!userId) {
+      setMySessions([]);
+      setMySessionsError("");
+      setIsMySessionsLoading(false);
+      return;
+    }
+
+    let isMounted = true;
+
+    const loadMySessions = async () => {
+      setIsMySessionsLoading(true);
+      setMySessionsError("");
+
+      try {
+        const supabase = createClient();
+        const { data, error: fetchError } = await supabase
+          .from("poker_sessions")
+          .select("slug, title")
+          .eq("author_id", userId)
+          .order("updated_at", { ascending: false })
+          .limit(50);
+
+        if (fetchError) {
+          throw new Error(
+            fetchError.message || "Failed to load your poker sessions"
+          );
+        }
+
+        if (isMounted) {
+          setMySessions(data ?? []);
+        }
+      } catch (err) {
+        console.error("Failed to load user-created poker sessions:", err);
+
+        if (isMounted) {
+          setMySessions([]);
+          setMySessionsError("Could not load your created sessions right now.");
+        }
+      } finally {
+        if (isMounted) {
+          setIsMySessionsLoading(false);
+        }
+      }
+    };
+
+    loadMySessions();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [userId]);
+
   const handleRemoveRecent = (slug: string) => {
     removeRecentPokerSession(slug);
     setRecentSessions(getRecentPokerSessions());
@@ -69,20 +132,13 @@ export default function PokerClientPage() {
 
   const handleCreateSession = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username.trim()) {
-      setError(ERROR_MESSAGES.USERNAME_REQUIRED);
+
+    const usernameError = validateUsername(username);
+    if (usernameError) {
+      setError(usernameError);
       return;
     }
-    if (username.length > USERNAME_MAX_LENGTH) {
-      setError(`Name must be ${USERNAME_MAX_LENGTH} characters or less`);
-      return;
-    }
-    if (!USERNAME_REGEX.test(username)) {
-      setError(
-        "Name can only contain letters, numbers, underscores, and hyphens"
-      );
-      return;
-    }
+
     if (!userId) {
       setError(ERROR_MESSAGES.AUTH_NOT_READY);
       return;
@@ -93,7 +149,6 @@ export default function PokerClientPage() {
 
     try {
       const supabase = createClient();
-      const slug = generateSlug();
 
       if (username.trim() !== displayName) {
         const success = await updateDisplayName(username.trim());
@@ -106,39 +161,39 @@ export default function PokerClientPage() {
 
       const votingScale = VOTING_SCALES[createForm.scale];
 
-      const sessionData = {
-        slug,
-        title: createForm.title.trim() || "Untitled Poker Session",
-        author_id: userId,
-        author_name: username.trim(),
-        voting_scale: votingScale,
-        is_public: true,
-        votes_revealed: false,
-        is_voting_active: true,
-      };
+      // The slug space is finite, so a collision is retried with a new slug
+      // rather than reported as a raw database error.
+      const { data: inserted, error: insertError } = await withSlugRetry(
+        async (slug) => {
+          const { data, error } = await supabase
+            .from("poker_sessions")
+            .insert({
+              slug,
+              title: createForm.title.trim() || "Untitled Poker Session",
+              author_id: userId,
+              author_name: username.trim(),
+              voting_scale: votingScale,
+              is_public: true,
+              votes_revealed: false,
+              is_voting_active: true,
+            })
+            .select("id, slug")
+            .single();
 
-      const { error: insertError } = await supabase
-        .from("poker_sessions")
-        .insert(sessionData);
+          return { data, error };
+        }
+      );
 
-      if (insertError) {
-        throw new Error(insertError.message || ERROR_MESSAGES.CREATE_FAILED);
+      if (insertError || !inserted) {
+        throw new Error(insertError?.message || ERROR_MESSAGES.CREATE_FAILED);
       }
 
-      const { data: sessionDataResult, error: sessionError } = await supabase
-        .from("poker_sessions")
-        .select("id")
-        .eq("slug", slug)
-        .single();
-
-      if (sessionError || !sessionDataResult) {
-        throw new Error(sessionError?.message || ERROR_MESSAGES.CREATE_FAILED);
-      }
+      const slug = inserted.slug;
 
       const { error: participantError } = await supabase
         .from("poker_participants")
         .insert({
-          session_id: sessionDataResult.id,
+          session_id: inserted.id,
           user_id: userId,
           username: username.trim(),
           is_online: true,
@@ -220,6 +275,27 @@ export default function PokerClientPage() {
     );
   }
 
+  if (authError) {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center bg-secondary p-4 md:p-8">
+        <div
+          className="max-w-md rounded-2xl border-2 border-border bg-background p-8 shadow-md"
+          role="alert"
+        >
+          <p className="font-bold text-primary text-xl">Session unavailable</p>
+          <p className="mt-2 text-muted-foreground text-sm">{authError}</p>
+          <button
+            className="mt-6 rounded-lg bg-primary px-4 py-2 font-medium text-primary-foreground text-sm"
+            onClick={() => window.location.reload()}
+            type="button"
+          >
+            Retry
+          </button>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <>
       <script
@@ -260,6 +336,44 @@ export default function PokerClientPage() {
         {/* Main content area */}
         <div className="flex flex-1 flex-col items-center justify-center p-4 md:p-8">
           <div className="w-full max-w-2xl space-y-6">
+            {/* Sessions the user created, read from the database */}
+            {(mySessions.length > 0 ||
+              isMySessionsLoading ||
+              mySessionsError) && (
+              <Card className="gap-0 overflow-hidden rounded-2xl border-2 border-border p-0 shadow-md">
+                <div className="flex items-center gap-2 border-border border-b-2 bg-muted px-6 py-4">
+                  <ListChecks className="h-5 w-5" />
+                  <h2 className="font-bold text-base uppercase">My Sessions</h2>
+                </div>
+                <CardContent className="p-4">
+                  {isMySessionsLoading ? (
+                    <p className="text-muted-foreground text-sm">
+                      Loading your sessions…
+                    </p>
+                  ) : mySessionsError ? (
+                    <p className="text-destructive text-sm">
+                      {mySessionsError}
+                    </p>
+                  ) : (
+                    <div className="grid gap-2">
+                      {mySessions.map((session) => (
+                        <Link
+                          className="flex min-w-0 flex-col gap-1 rounded-xl border-2 border-border bg-background px-4 py-3 font-bold shadow-sm transition-[border-color,box-shadow] hover:border-primary hover:shadow-md"
+                          href={`/poker/${session.slug}`}
+                          key={session.slug}
+                        >
+                          <span className="truncate">{session.title}</span>
+                          <span className="font-mono text-muted-foreground text-xs">
+                            {session.slug}
+                          </span>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
             {/* Recent sessions section */}
             {recentSessions.length > 0 && (
               <Card className="gap-0 overflow-hidden rounded-2xl border-2 border-border p-0 shadow-md">
@@ -351,6 +465,7 @@ export default function PokerClientPage() {
                           autoComplete="off"
                           className="h-12 rounded-xl border-2 border-border bg-background px-4 text-base shadow-sm"
                           id="create-title"
+                          maxLength={FIELD_LIMITS.sessionTitle}
                           name="sessionTitle"
                           onChange={(e) =>
                             setCreateForm({

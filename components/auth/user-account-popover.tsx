@@ -1,6 +1,7 @@
 "use client";
 
-import { Code, ShieldCheck, User, UserCircle } from "lucide-react";
+import { Code, Download, ShieldCheck, User, UserCircle } from "lucide-react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -8,6 +9,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { useAuth } from "@/hooks/use-auth";
+import { exportMyData } from "@/lib/utils/export-my-data";
 
 interface UserAccountPopoverProps {
   variant?: "default" | "compact";
@@ -18,11 +20,26 @@ export function UserAccountPopover({
 }: UserAccountPopoverProps) {
   const { userId, displayName, isAnonymous, linkGitHubIdentity, isLoading } =
     useAuth();
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportError, setExportError] = useState("");
 
   const handleLinkGitHub = async () => {
     const result = await linkGitHubIdentity();
     if (!result.success) {
       console.error(`Failed to link GitHub: ${result.error}`);
+    }
+  };
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    setExportError("");
+    try {
+      await exportMyData();
+    } catch (error) {
+      console.error("Failed to export data:", error);
+      setExportError("Export failed. Please try again.");
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -143,6 +160,33 @@ export function UserAccountPopover({
             </div>
           </div>
 
+          {/* Export Section */}
+          <div className="h-px bg-border" />
+          <div className="space-y-3">
+            <div className="rounded-xl bg-muted p-3">
+              <p className="font-medium text-muted-foreground text-xs">
+                <strong className="text-foreground">Download your data</strong>{" "}
+                to keep a copy of every board, card and vote you created or
+                joined.
+              </p>
+            </div>
+            <Button
+              className="w-full rounded-xl"
+              disabled={isExporting}
+              onClick={handleExport}
+              size="lg"
+              variant="outline"
+            >
+              <Download aria-hidden="true" className="mr-2 h-4 w-4" />
+              {isExporting ? "Preparing…" : "Export my data"}
+            </Button>
+            {exportError && (
+              <p className="text-center text-[10px] text-destructive">
+                {exportError}
+              </p>
+            )}
+          </div>
+
           {/* Upgrade Section */}
           {isAnonymous && (
             <>
@@ -166,8 +210,8 @@ export function UserAccountPopover({
                   Link GitHub Account
                 </Button>
                 <p className="text-center text-[10px] text-muted-foreground">
-                  Your current user ID and all data will be preserved after
-                  linking.
+                  Linking transfers your current boards and votes to your GitHub
+                  account. Export a copy first if you want a backup.
                 </p>
               </div>
             </>

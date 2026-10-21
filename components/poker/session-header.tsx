@@ -43,6 +43,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { FIELD_LIMITS } from "@/lib/constants/field-limits";
 import {
   VOTING_SCALES,
   type VotingScaleType,
@@ -240,6 +241,7 @@ export function SessionHeader({
                     autoComplete="off"
                     autoFocus
                     className="h-8 w-40 rounded-lg border border-border font-bold md:w-48"
+                    maxLength={FIELD_LIMITS.sessionTitle}
                     name="sessionTitle"
                     onChange={(e) => setTitleInput(e.target.value)}
                     onKeyDown={handleTitleKeyDown}
@@ -325,6 +327,7 @@ export function SessionHeader({
                     autoComplete="off"
                     autoFocus
                     className="h-8 min-w-0 flex-1 rounded-lg border border-border font-bold text-sm sm:w-48 sm:flex-initial md:h-9 md:w-64"
+                    maxLength={FIELD_LIMITS.story}
                     name="currentStory"
                     onChange={(e) => setStoryInput(e.target.value)}
                     onKeyDown={handleStoryKeyDown}

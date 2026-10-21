@@ -54,8 +54,27 @@ export function ParticipantsTable({
       })
       .filter((v): v is number => v !== null);
 
+    // A non-numeric scale such as T-shirt sizes has no minimum, maximum or
+    // average, so the distribution is reported instead of the numeric
+    // summary. Without this the whole statistics panel stayed hidden for
+    // every T-shirt session.
     if (numericVotes.length === 0) {
-      return null;
+      const distribution = new Map<string, number>();
+      for (const vote of votes) {
+        distribution.set(
+          vote.vote_value,
+          (distribution.get(vote.vote_value) ?? 0) + 1
+        );
+      }
+
+      return {
+        distribution: [...distribution.entries()].sort((a, b) => b[1] - a[1]),
+        min: null,
+        max: null,
+        avg: null,
+        mode: null,
+        outliers: [],
+      };
     }
 
     const min = Math.min(...numericVotes);
@@ -81,7 +100,14 @@ export function ParticipantsTable({
       return Math.abs(num - avg) > avg * 1.5;
     });
 
-    return { min, max, avg, mode: Number.parseFloat(mode), outliers };
+    return {
+      distribution: [],
+      min,
+      max,
+      avg,
+      mode: Number.parseFloat(mode),
+      outliers,
+    };
   };
 
   const stats = calculateStats();
@@ -221,32 +247,53 @@ export function ParticipantsTable({
           role="status"
         >
           <h3 className="font-black text-lg uppercase">Statistics</h3>
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-            <div>
-              <p className="font-bold text-muted-foreground text-xs uppercase">
-                Min
-              </p>
-              <p className="font-black text-2xl">{stats.min}</p>
+          {stats.avg === null ? (
+            <div className="space-y-2">
+              <p className="text-muted-foreground text-sm">Vote distribution</p>
+              <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                {stats.distribution.map(([value, count]) => (
+                  <div key={value}>
+                    <p className="font-bold text-muted-foreground text-xs uppercase">
+                      {value}
+                    </p>
+                    <p className="font-black text-2xl">
+                      {count}
+                      <span className="ml-1 font-medium text-muted-foreground text-xs">
+                        vote{count > 1 ? "s" : ""}
+                      </span>
+                    </p>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div>
-              <p className="font-bold text-muted-foreground text-xs uppercase">
-                Max
-              </p>
-              <p className="font-black text-2xl">{stats.max}</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+              <div>
+                <p className="font-bold text-muted-foreground text-xs uppercase">
+                  Min
+                </p>
+                <p className="font-black text-2xl">{stats.min}</p>
+              </div>
+              <div>
+                <p className="font-bold text-muted-foreground text-xs uppercase">
+                  Max
+                </p>
+                <p className="font-black text-2xl">{stats.max}</p>
+              </div>
+              <div>
+                <p className="font-bold text-muted-foreground text-xs uppercase">
+                  Average
+                </p>
+                <p className="font-black text-2xl">{stats.avg.toFixed(1)}</p>
+              </div>
+              <div>
+                <p className="font-bold text-muted-foreground text-xs uppercase">
+                  Mode
+                </p>
+                <p className="font-black text-2xl">{stats.mode}</p>
+              </div>
             </div>
-            <div>
-              <p className="font-bold text-muted-foreground text-xs uppercase">
-                Average
-              </p>
-              <p className="font-black text-2xl">{stats.avg.toFixed(1)}</p>
-            </div>
-            <div>
-              <p className="font-bold text-muted-foreground text-xs uppercase">
-                Mode
-              </p>
-              <p className="font-black text-2xl">{stats.mode}</p>
-            </div>
-          </div>
+          )}
           {stats.outliers.length > 0 && (
             <div className="mt-4 border-border border-t pt-4">
               <p className="font-bold text-accent text-sm">

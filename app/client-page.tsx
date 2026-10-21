@@ -14,6 +14,8 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/use-auth";
 import { ERROR_MESSAGES } from "@/lib/constants/error-messages";
+import { FIELD_LIMITS } from "@/lib/constants/field-limits";
+import { validateUsername } from "@/lib/constants/username";
 import { createClient } from "@/lib/supabase/client";
 import {
   addRecentBoard,
@@ -21,10 +23,7 @@ import {
   type RecentBoard,
   removeRecentBoard,
 } from "@/lib/utils/recent-boards";
-import { generateSlug } from "@/lib/utils/slug";
-
-const USERNAME_MAX_LENGTH = 30;
-const USERNAME_REGEX = /^[a-zA-Z0-9_-]+$/;
+import { withSlugRetry } from "@/lib/utils/slug";
 
 type RetroBoardListItem = Pick<RecentBoard, "slug" | "title">;
 
@@ -80,6 +79,7 @@ function RetroBoardList({
 export default function RetroClientPage() {
   const router = useRouter();
   const {
+    authError,
     userId,
     displayName,
     updateDisplayName,
@@ -165,20 +165,13 @@ export default function RetroClientPage() {
 
   const handleCreateSession = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username.trim()) {
-      setError(ERROR_MESSAGES.USERNAME_REQUIRED);
+
+    const usernameError = validateUsername(username);
+    if (usernameError) {
+      setError(usernameError);
       return;
     }
-    if (username.length > USERNAME_MAX_LENGTH) {
-      setError(`Name must be ${USERNAME_MAX_LENGTH} characters or less`);
-      return;
-    }
-    if (!USERNAME_REGEX.test(username)) {
-      setError(
-        "Name can only contain letters, numbers, underscores, and hyphens"
-      );
-      return;
-    }
+
     if (!userId) {
       setError(ERROR_MESSAGES.AUTH_NOT_READY);
       return;
@@ -189,7 +182,6 @@ export default function RetroClientPage() {
 
     try {
       const supabase = createClient();
-      const slug = generateSlug();
 
       if (username.trim() !== displayName) {
         const success = await updateDisplayName(username.trim());
@@ -200,38 +192,39 @@ export default function RetroClientPage() {
         }
       }
 
-      const boardData = {
-        slug,
-        title: createForm.title.trim() || "Untitled Retro",
-        author_id: userId,
-        author_name: username.trim(),
-        is_public: true,
-        timer_running: false,
-        timer_seconds: 0,
-      };
+      // The slug space is finite, so a collision is retried with a new slug
+      // rather than reported as a raw database error.
+      const { data: inserted, error: insertError } = await withSlugRetry(
+        async (slug) => {
+          const { data, error } = await supabase
+            .from("retro_boards")
+            .insert({
+              slug,
+              title: createForm.title.trim() || "Untitled Retro",
+              author_id: userId,
+              author_name: username.trim(),
+              is_public: true,
+              timer_running: false,
+              timer_seconds: 300,
+            })
+            .select("id, slug")
+            .single();
 
-      const { error: insertError } = await supabase
-        .from("retro_boards")
-        .insert(boardData);
+          return { data, error };
+        }
+      );
 
-      if (insertError) {
-        throw new Error(insertError.message || ERROR_MESSAGES.CREATE_FAILED);
+      if (insertError || !inserted) {
+        throw new Error(insertError?.message || ERROR_MESSAGES.CREATE_FAILED);
       }
 
-      const { data: boardDataResult, error: boardError } = await supabase
-        .from("retro_boards")
-        .select("id")
-        .eq("slug", slug)
-        .single();
-
-      if (boardError || !boardDataResult) {
-        throw new Error(boardError?.message || ERROR_MESSAGES.CREATE_FAILED);
-      }
+      const slug = inserted.slug;
+      const boardId = inserted.id;
 
       const { error: participantError } = await supabase
         .from("retro_participants")
         .insert({
-          board_id: boardDataResult.id,
+          board_id: boardId,
           user_id: userId,
           username: username.trim(),
           is_online: true,
@@ -304,6 +297,27 @@ export default function RetroClientPage() {
         <div className="flex flex-col items-center gap-4">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
           <p className="font-medium text-foreground/60 text-sm">Loading…</p>
+        </div>
+      </main>
+    );
+  }
+
+  if (authError) {
+    return (
+      <main className="flex min-h-screen flex-col items-center justify-center bg-secondary p-4 md:p-8">
+        <div
+          className="max-w-md rounded-2xl border-2 border-border bg-background p-8 shadow-md"
+          role="alert"
+        >
+          <p className="font-bold text-primary text-xl">Session unavailable</p>
+          <p className="mt-2 text-muted-foreground text-sm">{authError}</p>
+          <button
+            className="mt-6 rounded-lg bg-primary px-4 py-2 font-medium text-primary-foreground text-sm"
+            onClick={() => window.location.reload()}
+            type="button"
+          >
+            Retry
+          </button>
         </div>
       </main>
     );
@@ -469,6 +483,7 @@ export default function RetroClientPage() {
                           autoComplete="off"
                           className="h-12 rounded-xl border-2 border-border bg-background px-4 text-base shadow-sm"
                           id="create-title"
+                          maxLength={FIELD_LIMITS.sessionTitle}
                           name="sessionTitle"
                           onChange={(e) =>
                             setCreateForm({

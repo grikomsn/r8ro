@@ -17,6 +17,7 @@ import {
 } from "@/lib/supabase/client";
 
 interface AuthState {
+  authError: string | null;
   displayName: string;
   isAnonymous: boolean;
   isInitialized: boolean;
@@ -31,6 +32,7 @@ interface LinkIdentityResult {
 }
 
 interface AuthContextValue {
+  authError: string | null;
   displayName: string;
   isAnonymous: boolean;
   isInitialized: boolean;
@@ -61,8 +63,49 @@ function markGitHubLinkPendingState() {
   sessionStorage.setItem(GITHUB_LINK_PENDING_KEY, "1");
 }
 
+// Remembers the identity that last worked for this browser. It is a
+// diagnostic breadcrumb only: it is never treated as proof of ownership, and
+// it never re-authorises a request. Its purpose is to tell a genuine new
+// visitor apart from one whose session failed to load, so that a transient
+// failure does not mint a replacement account and orphan the boards that the
+// original account owns.
+const KNOWN_IDENTITY_KEY = "r8ro:last-user";
+
+function rememberIdentity(user: User) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    localStorage.setItem(
+      KNOWN_IDENTITY_KEY,
+      JSON.stringify({
+        userId: user.id,
+        displayName: user.user_metadata?.display_name ?? "",
+      })
+    );
+  } catch {
+    // A diagnostic checkpoint must never break a working session.
+  }
+}
+
+function hasKnownIdentity() {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  try {
+    return localStorage.getItem(KNOWN_IDENTITY_KEY) !== null;
+  } catch {
+    // If storage cannot be read, assume an identity exists so that a failure
+    // never authorises replacing it.
+    return true;
+  }
+}
+
 function useAuthState(): AuthContextValue {
   const [state, setState] = useState<AuthState>({
+    authError: null,
     user: null,
     userId: null,
     displayName: "",
@@ -77,6 +120,24 @@ function useAuthState(): AuthContextValue {
 
   useEffect(() => {
     let mounted = true;
+
+    // Reports that the session could not be verified, without discarding the
+    // identity. The UI shows this instead of loading forever.
+    function stopForAuthFailure(error: unknown) {
+      console.error("Auth verification failed:", error);
+
+      if (mounted) {
+        setState((previous) => ({
+          ...previous,
+          authError:
+            "We could not verify your session. Please retry, and avoid clearing browser data.",
+          user: null,
+          userId: null,
+          isLoading: false,
+          isInitialized: true,
+        }));
+      }
+    }
 
     async function signInAnonymously(
       client: ReturnType<typeof createClient>,
@@ -100,6 +161,8 @@ function useAuthState(): AuthContextValue {
         if (isMounted) {
           setState((prev) => ({
             ...prev,
+            authError:
+              "We could not start a session. The service may be unavailable.",
             isLoading: false,
             isInitialized: true,
           }));
@@ -108,19 +171,25 @@ function useAuthState(): AuthContextValue {
       }
 
       if (data.user && isMounted) {
+        const signedInUser = data.user;
+
         if (typeof window !== "undefined") {
           localStorage.removeItem("retro_username");
           localStorage.removeItem("retro_user_id");
         }
 
-        setState({
-          user: data.user,
-          userId: data.user.id,
+        setState((previous) => ({
+          ...previous,
+          authError: null,
+          user: signedInUser,
+          userId: signedInUser.id,
           displayName: legacyName,
           isLoading: false,
           isInitialized: true,
           isAnonymous: true,
-        });
+        }));
+
+        rememberIdentity(data.user);
       }
     }
 
@@ -155,6 +224,17 @@ function useAuthState(): AuthContextValue {
       }
 
       try {
+        // Read the session first. A visitor with no session at all is a new
+        // visitor and may be given an anonymous account. A visitor whose
+        // session could not be verified is not: minting a new account would
+        // silently detach them from the boards they own.
+        const { data: sessionData, error: sessionError } =
+          await supabase.auth.getSession();
+
+        if (sessionError) {
+          throw sessionError;
+        }
+
         const { data: userData, error: userError } =
           await supabase.auth.getUser();
 
@@ -170,7 +250,15 @@ function useAuthState(): AuthContextValue {
         }
 
         if (!userData?.user) {
-          await signInAnonymously(supabase, mounted);
+          if (!sessionData.session) {
+            // Genuinely new visitor: no session and no stored identity.
+            await signInAnonymously(supabase, mounted);
+            return;
+          }
+
+          // There is a session but the user could not be resolved. Report it
+          // instead of replacing the identity.
+          stopForAuthFailure(userError ?? new Error("User unavailable"));
           return;
         }
 
@@ -181,15 +269,19 @@ function useAuthState(): AuthContextValue {
           clearGitHubLinkPendingState();
         }
 
+        rememberIdentity(userData.user);
+
         if (mounted) {
-          setState({
+          setState((previous) => ({
+            ...previous,
+            authError: null,
             user: userData.user,
             userId: userData.user.id,
             displayName,
             isLoading: false,
             isInitialized: true,
             isAnonymous,
-          });
+          }));
         }
       } catch (error: unknown) {
         const errorMessage =
@@ -203,7 +295,7 @@ function useAuthState(): AuthContextValue {
         }
 
         console.error("Auth initialization error:", error);
-        await recoverFromCorruptedSession();
+        stopForAuthFailure(error);
       }
     }
 
@@ -222,6 +314,14 @@ function useAuthState(): AuthContextValue {
 
       updateTimeoutRef.current = setTimeout(async () => {
         if (event === "SIGNED_OUT") {
+          // A sign out for a browser that already had an identity is a
+          // failure, not a fresh visit. Minting a replacement account here
+          // would strand the boards the previous account owned.
+          if (hasKnownIdentity()) {
+            stopForAuthFailure(new Error("Session ended unexpectedly"));
+            return;
+          }
+
           await signInAnonymously(supabaseRef.current, mounted);
         } else if (session?.user) {
           const isAnonymous = !!session.user.is_anonymous;
@@ -230,14 +330,18 @@ function useAuthState(): AuthContextValue {
             clearGitHubLinkPendingState();
           }
 
-          setState({
+          rememberIdentity(session.user);
+
+          setState((previous) => ({
+            ...previous,
+            authError: null,
             user: session.user,
             userId: session.user.id,
             displayName: session.user.user_metadata?.display_name || "",
             isLoading: false,
             isInitialized: true,
             isAnonymous,
-          });
+          }));
         }
       }, 100);
     });
@@ -370,6 +474,7 @@ function useAuthState(): AuthContextValue {
     user: state.user,
     userId: state.userId,
     displayName: state.displayName,
+    authError: state.authError,
     isLoading: state.isLoading,
     isInitialized: state.isInitialized,
     isAnonymous: state.isAnonymous,
