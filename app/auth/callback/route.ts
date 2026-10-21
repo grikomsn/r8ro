@@ -1,7 +1,10 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import {
-  createSignedLinkSourceCookieValue,
+  clearPendingLinkCookie,
+  setPendingLinkCookie,
+} from "@/lib/auth/link-cookie";
+import {
   getSafeLinkNextPath,
   LINK_SOURCE_USER_COOKIE,
   LINK_SOURCE_USER_COOKIE_MAX_AGE_SECONDS,
@@ -10,34 +13,6 @@ import {
 } from "@/lib/auth/linking";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createServerClient } from "@/lib/supabase/server";
-
-function clearPendingLinkCookie(response: NextResponse) {
-  response.cookies.set({
-    name: LINK_SOURCE_USER_COOKIE,
-    value: "",
-    httpOnly: true,
-    maxAge: 0,
-    path: "/",
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-  });
-
-  return response;
-}
-
-function setPendingLinkCookie(response: NextResponse, state: LinkSourceState) {
-  response.cookies.set({
-    name: LINK_SOURCE_USER_COOKIE,
-    value: createSignedLinkSourceCookieValue(state),
-    httpOnly: true,
-    maxAge: LINK_SOURCE_USER_COOKIE_MAX_AGE_SECONDS,
-    path: "/",
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-  });
-
-  return response;
-}
 
 async function redirectToGitHubSignInFallback(
   supabase: Awaited<ReturnType<typeof createServerClient>>,
@@ -141,8 +116,20 @@ export async function GET(request: NextRequest) {
               "Failed to merge guest account after OAuth:",
               mergeError
             );
-            return clearPendingLinkCookie(
-              NextResponse.redirect(`${origin}/auth/auth-code-error`)
+            // The signed source cookie is the only proof of which guest
+            // account the data belongs to, so it is kept and the user is
+            // offered a retry rather than losing the transfer.
+            return setPendingLinkCookie(
+              NextResponse.redirect(
+                `${origin}/auth/auth-code-error?reason=merge_pending`
+              ),
+              pendingLinkState ?? {
+                expiresAt:
+                  Date.now() + LINK_SOURCE_USER_COOKIE_MAX_AGE_SECONDS * 1000,
+                next,
+                sourceUserId: pendingSourceUserId,
+                stage: "link",
+              }
             );
           }
         } catch (mergeError) {
@@ -150,8 +137,17 @@ export async function GET(request: NextRequest) {
             "Failed to merge guest account after OAuth:",
             mergeError
           );
-          return clearPendingLinkCookie(
-            NextResponse.redirect(`${origin}/auth/auth-code-error`)
+          return setPendingLinkCookie(
+            NextResponse.redirect(
+              `${origin}/auth/auth-code-error?reason=merge_pending`
+            ),
+            pendingLinkState ?? {
+              expiresAt:
+                Date.now() + LINK_SOURCE_USER_COOKIE_MAX_AGE_SECONDS * 1000,
+              next,
+              sourceUserId: pendingSourceUserId,
+              stage: "link",
+            }
           );
         }
       }
