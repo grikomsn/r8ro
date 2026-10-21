@@ -216,6 +216,11 @@ export default function PokerSessionClient() {
     const supabase = createClient();
     const channel = supabase.channel(`poker-${slug}`, {
       config: {
+        // A private channel is authorised by the realtime.messages policies
+        // added in 20261021090900_restrict_presence_channels.sql. Without it
+        // any client could read the presence of a session that was made
+        // private, because the topic is derived from the slug.
+        private: true,
         presence: {
           key: userId,
         },

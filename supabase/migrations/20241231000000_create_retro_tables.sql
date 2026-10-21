@@ -331,3 +331,31 @@ CREATE POLICY "votes_insert_policy" ON public.retro_card_votes FOR INSERT
 DROP POLICY IF EXISTS votes_delete_policy ON public.retro_card_votes;
 CREATE POLICY "votes_delete_policy" ON public.retro_card_votes FOR DELETE
   USING ((SELECT auth.uid()) = user_id);
+
+-- ============================================================================
+-- CLEAN UP SUPERSEDED POLICIES
+-- ============================================================================
+--
+-- 20260106123000_update_retro_policies.sql replaces the card and vote mutation
+-- policies above with policies that also let a participant act on a card they
+-- did not author. Those replacement policies have different names, so the
+-- baseline policy names are not removed by that migration.
+--
+-- This file can be applied to a database that has already run the later
+-- migrations, for example when the retro tables were created outside the
+-- migration system and the baseline is pushed afterwards. In that case the
+-- baseline policies above would be re-created alongside the replacements.
+--
+-- Dropping them here keeps a single, current set of policies in every
+-- environment. The baseline policies are strictly weaker than the
+-- replacements, so removing them does not change what anyone can do; it only
+-- removes the redundant copy.
+--
+-- The trigger is left as created above, because 20261021090100 replaces the
+-- function and the trigger registration afterwards.
+
+DROP POLICY IF EXISTS cards_insert_policy ON public.retro_cards;
+DROP POLICY IF EXISTS cards_update_policy ON public.retro_cards;
+DROP POLICY IF EXISTS cards_delete_policy ON public.retro_cards;
+DROP POLICY IF EXISTS votes_insert_policy ON public.retro_card_votes;
+DROP POLICY IF EXISTS votes_delete_policy ON public.retro_card_votes;
