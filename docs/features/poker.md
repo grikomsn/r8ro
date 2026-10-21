@@ -14,19 +14,20 @@
 ## Session Behavior
 
 - The author can edit the title and current story, change the scale, toggle
-  public/private state, start or stop voting, reveal or hide votes, and delete
-  the session.
-- Participants can create or update their own vote while voting is active.
-- Vote values remain hidden until reveal, except that the current author can
-  see their own vote.
+  public/private state, start or stop voting, reveal or hide votes, clear all
+  votes, and delete the session.
+- Participants can create or update their own vote while voting is active. A
+  vote value must be on the session's voting scale.
+- Vote values remain hidden until reveal. This is enforced by the database, so
+  the values cannot be read through the API before the reveal either.
 - Revealed numeric values produce minimum, maximum, average, mode, and outlier
-  indicators.
-- The current client renders a private overlay for every non-author when
-  `is_public` is false.
+  indicators. A non-numeric scale such as T-shirt sizes produces a vote
+  distribution instead, because it has no minimum, maximum, or average.
+- A private session stays visible to the people already on it. Only the author
+  and existing participants keep access.
 
-The UI includes a bulk clear-votes action, but the current
-`poker_votes_delete_policy` permits users to delete only their own vote. Do not
-describe multi-user clearing as supported until the policy and UI are aligned.
+The bulk clear-votes action calls `clear_poker_votes(session_id)`, which
+removes every vote in the session and is restricted to the session author.
 
 ## Realtime
 

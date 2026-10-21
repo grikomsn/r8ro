@@ -20,8 +20,8 @@ r8ro has two Next.js App Router experiences:
 - Recent-session lists are stored in browser cookies by
   `lib/utils/recent-boards.ts` and
   `lib/utils/recent-poker-sessions.ts`.
-- Database authorization is defined by `supabase/schema.sql` plus ordered
-  migrations in `supabase/migrations/`.
+- Database authorization is defined by ordered migrations in
+  `supabase/migrations/`.
 
 See the feature documents for behavior and
 [data-model/supabase.md](data-model/supabase.md) for database details.

@@ -14,6 +14,16 @@ import {
 } from "lucide-react";
 import type React from "react";
 import { useEffect, useRef, useState } from "react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,6 +33,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { FIELD_LIMITS } from "@/lib/constants/field-limits";
 import type { ColumnType, RetroCard } from "@/lib/types";
 
 interface RetroColumnProps {
@@ -74,6 +85,11 @@ export function RetroColumn({
   const [editContent, setEditContent] = useState("");
   const [isDragOver, setIsDragOver] = useState(false);
   const [voteAnnouncement, setVoteAnnouncement] = useState("");
+  // Deleting a card removes it and its votes for every participant, so it is
+  // confirmed before it happens.
+  const [cardPendingDelete, setCardPendingDelete] = useState<string | null>(
+    null
+  );
   const voteAnnouncementInitialized = useRef(false);
   const previousTotalVotes = useRef(0);
 
@@ -233,6 +249,7 @@ export function RetroColumn({
             <Textarea
               aria-label="Card content"
               className="mb-2 min-h-[80px] rounded-lg border border-border shadow-sm"
+              maxLength={FIELD_LIMITS.cardContent}
               name="cardContent"
               onChange={(e) => setNewCardContent(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -314,6 +331,7 @@ export function RetroColumn({
                         aria-label="Edit card content"
                         autoComplete="off"
                         className="rounded-lg border border-border"
+                        maxLength={FIELD_LIMITS.cardContent}
                         name="editCardContent"
                         onChange={(e) => setEditContent(e.target.value)}
                         onKeyDown={handleEditKeyDown}
@@ -455,7 +473,7 @@ export function RetroColumn({
                               aria-label="Delete card"
                               className="h-7 w-7 rounded-lg p-0 md:h-8 md:w-8 md:opacity-0 md:transition-opacity md:group-hover:opacity-100 md:focus-visible:opacity-100"
                               disabled={pendingActions[`delete-${card.id}`]}
-                              onClick={() => onDeleteCard(card.id)}
+                              onClick={() => setCardPendingDelete(card.id)}
                               variant="ghost"
                             >
                               <Trash2
@@ -499,6 +517,44 @@ export function RetroColumn({
           ))}
         </div>
       </div>
+
+      <AlertDialog
+        onOpenChange={(open) => {
+          if (!open) {
+            setCardPendingDelete(null);
+          }
+        }}
+        open={cardPendingDelete !== null}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this card?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The card and its votes are removed for everyone on this board.
+              This cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => setCardPendingDelete(null)}
+              type="button"
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (cardPendingDelete) {
+                  onDeleteCard(cardPendingDelete);
+                }
+                setCardPendingDelete(null);
+              }}
+              type="button"
+            >
+              Delete card
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

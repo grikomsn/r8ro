@@ -42,6 +42,7 @@ export async function POST(request: NextRequest) {
     response.cookies.set({
       name: LINK_SOURCE_USER_COOKIE,
       value: createSignedLinkSourceCookieValue({
+        expiresAt: Date.now() + LINK_SOURCE_USER_COOKIE_MAX_AGE_SECONDS * 1000,
         next,
         sourceUserId: user.id,
         stage: "link",

@@ -46,6 +46,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { FIELD_LIMITS } from "@/lib/constants/field-limits";
 import type { RetroBoard } from "@/lib/types";
 
 interface BoardHeaderProps {
@@ -299,6 +300,7 @@ export function BoardHeader({
                     autoComplete="off"
                     autoFocus
                     className="h-8 w-40 rounded-lg border border-border font-bold md:w-48"
+                    maxLength={FIELD_LIMITS.sessionTitle}
                     name="boardTitle"
                     onChange={(e) => setTitleInput(e.target.value)}
                     onKeyDown={handleTitleKeyDown}

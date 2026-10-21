@@ -6,6 +6,7 @@ export const LINK_SOURCE_USER_COOKIE_MAX_AGE_SECONDS = 60 * 10;
 export type LinkFlowStage = "link" | "signin-fallback";
 
 export interface LinkSourceState {
+  expiresAt: number;
   next: string;
   sourceUserId: string;
   stage: LinkFlowStage;
@@ -93,12 +94,18 @@ export function verifyAndExtractLinkSourceState(
       typeof parsed.sourceUserId !== "string" ||
       parsed.sourceUserId.length === 0 ||
       !("stage" in parsed) ||
-      (parsed.stage !== "link" && parsed.stage !== "signin-fallback")
+      (parsed.stage !== "link" && parsed.stage !== "signin-fallback") ||
+      !("expiresAt" in parsed) ||
+      typeof parsed.expiresAt !== "number" ||
+      // The browser cookie lifetime is not a cryptographic expiry, so the
+      // signed payload carries its own and is checked here.
+      parsed.expiresAt <= Date.now()
     ) {
       return null;
     }
 
     return {
+      expiresAt: parsed.expiresAt,
       next: "next" in parsed ? getSafeLinkNextPath(parsed.next) : "/",
       sourceUserId: parsed.sourceUserId,
       stage: parsed.stage,
@@ -106,6 +113,8 @@ export function verifyAndExtractLinkSourceState(
   } catch {
     return UUID_PATTERN.test(encodedState)
       ? {
+          expiresAt:
+            Date.now() + LINK_SOURCE_USER_COOKIE_MAX_AGE_SECONDS * 1000,
           next: "/",
           sourceUserId: encodedState,
           stage: "link",

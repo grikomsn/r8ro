@@ -17,12 +17,18 @@
 - Participants on an unlocked accessible board can add, edit, move, delete,
   and vote on cards. Neither the UI nor the latest retro card policies limit
   edit/delete operations to the card author.
-- `retro_card_votes` stores at most one vote per user and card.
+- `retro_card_votes` stores at most one vote per user and card. The count
+  shown on a card comes from `retro_cards.votes`, which the database
+  maintains, so it stays correct across clients and reconnects.
+- Deleting a card is confirmed before it happens, because it removes the card
+  and its votes for every participant.
 - The author can change the title, visibility, lock state, timer, and delete
   the board.
-- The current client renders a private overlay for every non-author when
-  `is_public` is false. The database access helper still recognizes existing
-  participants, so UI and RLS are intentionally documented separately.
+- A locked board is frozen: nobody can add, edit, move, delete, vote, or
+  unvote a card on it. The board author cannot bypass the lock either.
+- A private board stays visible to the people already on it. Only the author
+  and existing participants keep access; everybody else is treated as if the
+  board did not exist.
 
 ## Realtime
 
@@ -42,5 +48,5 @@ handlers track or untrack the current user.
 
 The current SQL rules are summarized in
 [../data-model/supabase.md](../data-model/supabase.md) and defined in
-`supabase/schema.sql` plus
+`supabase/migrations/20241231000000_create_retro_tables.sql` plus
 `supabase/migrations/20260106123000_update_retro_policies.sql`.

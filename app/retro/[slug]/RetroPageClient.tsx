@@ -8,6 +8,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { BoardBottomNav } from "@/components/retro/board-bottom-nav";
 import { BoardHeader } from "@/components/retro/board-header";
 import { RetroColumn } from "@/components/retro/retro-column";
+import { AuthErrorNotice } from "@/components/shared/auth-error-notice";
 import { JoinSessionModal } from "@/components/shared/join-session-modal";
 import { ParticipantsPanel } from "@/components/shared/participants-panel";
 import { PrivateAccessOverlay } from "@/components/shared/private-access-overlay";
@@ -57,7 +58,12 @@ export default function RetroPageClient() {
   const router = useRouter();
   const slug = params.slug as string;
 
-  const { userId, displayName, isInitialized: authInitialized } = useAuth();
+  const {
+    authError,
+    userId,
+    displayName,
+    isInitialized: authInitialized,
+  } = useAuth();
 
   const [board, setBoard] = useState<RetroBoard | null>(null);
   const [cards, setCards] = useState<RetroCard[]>([]);
@@ -75,6 +81,7 @@ export default function RetroPageClient() {
 
   const boardRef = useRef(board);
   const cardsRef = useRef(cards);
+  const hasSubscribedRef = useRef(false);
   boardRef.current = board;
   cardsRef.current = cards;
 
@@ -85,13 +92,61 @@ export default function RetroPageClient() {
       return;
     }
 
+    if (authError) {
+      // The session could not be verified, so the board can never load.
+      setLoading(false);
+      return;
+    }
+
     if (displayName) {
       setUserName(displayName);
     } else if (userId) {
       setShowJoinModal(true);
       setLoading(false);
     }
-  }, [authInitialized, displayName, userId]);
+  }, [authError, authInitialized, displayName, userId]);
+
+  // Re-reads the board contents. Used on the initial load and again whenever
+  // the realtime socket reconnects, because Postgres changes are not replayed
+  // for a reconnect and anything missed while offline would be lost.
+  const refetchBoard = useCallback(async () => {
+    const supabase = createClient();
+
+    const { data: boardData, error: boardError } = await supabase
+      .from("retro_boards")
+      .select("*")
+      .eq("slug", slug)
+      .maybeSingle();
+
+    throwIfSupabaseError(boardError, "Failed to load board");
+
+    if (!boardData) {
+      return null;
+    }
+
+    const [cardsRes, participantsRes] = await Promise.all([
+      supabase
+        .from("retro_cards")
+        .select("*")
+        .eq("board_id", boardData.id)
+        .order("created_at", { ascending: true }),
+      supabase
+        .from("retro_participants")
+        .select("*")
+        .eq("board_id", boardData.id),
+    ]);
+
+    throwIfSupabaseError(cardsRes.error, "Failed to load cards");
+    throwIfSupabaseError(participantsRes.error, "Failed to load participants");
+
+    // The vote count is maintained in the database by
+    // public.sync_retro_card_vote_count, so the card row is authoritative
+    // and no separate vote query is needed.
+    setCards(cardsRes.data || []);
+    setParticipants(participantsRes.data || []);
+
+    return { board: boardData, participants: participantsRes.data ?? [] };
+  }, [slug]);
 
   useEffect(() => {
     if (!(userId && userName)) {
@@ -103,84 +158,39 @@ export default function RetroPageClient() {
 
     async function load() {
       try {
-        const { data: boardData, error: boardError } = await supabase
-          .from("retro_boards")
-          .select("*")
-          .eq("slug", slug)
-          .maybeSingle();
+        const loaded = await refetchBoard();
 
         if (cancelled) {
           return;
         }
 
-        throwIfSupabaseError(boardError, "Failed to load board");
-
-        if (!boardData) {
+        if (!loaded) {
           setError("Board not found");
           setLoading(false);
           return;
         }
 
+        const { board: boardData, participants: loadedParticipants } = loaded;
+
         setBoard(boardData);
         addRecentBoard(boardData.slug, boardData.title);
 
-        const cardsRes = await supabase
-          .from("retro_cards")
-          .select("*")
-          .eq("board_id", boardData.id)
-          .order("created_at", { ascending: true });
-
-        throwIfSupabaseError(cardsRes.error, "Failed to load cards");
-
-        const cardIds = (cardsRes.data || []).map((c) => c.id);
-        const [votesRes, participantsRes] = await Promise.all([
-          cardIds.length > 0
-            ? supabase
-                .from("retro_card_votes")
-                .select("card_id")
-                .in("card_id", cardIds)
-            : Promise.resolve({ data: [], error: null }),
-          supabase
-            .from("retro_participants")
-            .select("*")
-            .eq("board_id", boardData.id),
-        ]);
-
-        if (cancelled) {
-          return;
-        }
-
-        throwIfSupabaseError(votesRes.error, "Failed to load votes");
-        throwIfSupabaseError(
-          participantsRes.error,
-          "Failed to load participants"
-        );
-
-        const voteCounts = new Map<string, number>();
-        for (const vote of votesRes.data || []) {
-          voteCounts.set(vote.card_id, (voteCounts.get(vote.card_id) || 0) + 1);
-        }
-
-        const cardsWithVotes = (cardsRes.data || []).map((card) => ({
-          ...card,
-          votes: voteCounts.get(card.id) || 0,
-        }));
-
-        setCards(cardsWithVotes);
-        setParticipants(participantsRes.data || []);
-
-        const existing = participantsRes.data?.find(
-          (p) => p.user_id === userId
-        );
+        const existing = loadedParticipants.find((p) => p.user_id === userId);
         if (!existing) {
           const { error: upsertError } = await supabase
             .from("retro_participants")
-            .upsert({
-              board_id: boardData.id,
-              user_id: userId,
-              username: userName,
-              is_online: true,
-            });
+            .upsert(
+              {
+                board_id: boardData.id,
+                user_id: userId,
+                username: userName,
+                is_online: true,
+              },
+              {
+                onConflict: "board_id,user_id",
+                ignoreDuplicates: true,
+              }
+            );
           throwIfSupabaseError(upsertError, "Failed to join board");
         }
 
@@ -200,7 +210,7 @@ export default function RetroPageClient() {
     return () => {
       cancelled = true;
     };
-  }, [slug, userId, userName]);
+  }, [userId, userName, refetchBoard]);
 
   useEffect(() => {
     const boardId = board?.id;
@@ -211,6 +221,11 @@ export default function RetroPageClient() {
     const supabase = createClient();
     const channel = supabase.channel(`retro-${slug}`, {
       config: {
+        // A private channel is authorised by the realtime.messages policies
+        // added in 20261021090900_restrict_presence_channels.sql. Without it
+        // any client could read the presence of a board that was made
+        // private, because the topic is derived from the slug.
+        private: true,
         presence: {
           key: userId,
         },
@@ -249,59 +264,24 @@ export default function RetroPageClient() {
               const existingIndex = prev.findIndex((c) => c.id === newCard.id);
               if (existingIndex !== -1) {
                 const updated = [...prev];
-                const preservedVotes = prev[existingIndex]?.votes ?? 0;
-                updated[existingIndex] = { ...newCard, votes: preservedVotes };
+                updated[existingIndex] = newCard;
                 return updated;
               }
-              return [...prev, { ...newCard, votes: 0 }];
+              return [...prev, newCard];
             });
           } else if (payload.eventType === "UPDATE" && payload.new) {
+            // The database maintains the vote count, so the incoming card row
+            // is authoritative and must not have its count overwritten.
+            const updatedCard = payload.new as RetroCard;
             setCards((prev) =>
-              prev.map((c) =>
-                c.id === payload.new.id
-                  ? { ...(payload.new as RetroCard), votes: c.votes }
-                  : c
-              )
+              prev.some((card) => card.id === updatedCard.id)
+                ? prev.map((card) =>
+                    card.id === updatedCard.id ? updatedCard : card
+                  )
+                : [...prev, updatedCard]
             );
           } else if (payload.eventType === "DELETE") {
             setCards((prev) => prev.filter((c) => c.id !== payload.old.id));
-          }
-        }
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "retro_card_votes",
-        },
-        (payload) => {
-          const payloadNew = payload.new as { card_id?: string } | null;
-          const payloadOld = payload.old as { card_id?: string } | null;
-          const cardId = payloadNew?.card_id || payloadOld?.card_id;
-          if (!cardId) {
-            return;
-          }
-
-          const isCardInCurrentBoard = cardsRef.current.some(
-            (card) => card.id === cardId
-          );
-          if (!isCardInCurrentBoard) {
-            return;
-          }
-
-          if (payload.eventType === "INSERT") {
-            setCards((prev) =>
-              prev.map((c) =>
-                c.id === cardId ? { ...c, votes: c.votes + 1 } : c
-              )
-            );
-          } else if (payload.eventType === "DELETE") {
-            setCards((prev) =>
-              prev.map((c) =>
-                c.id === cardId ? { ...c, votes: Math.max(0, c.votes - 1) } : c
-              )
-            );
           }
         }
       )
@@ -370,6 +350,23 @@ export default function RetroPageClient() {
             username: userName,
             online_at: Date.now(),
           });
+
+          // Postgres changes are not replayed for a reconnect, so anything
+          // that happened while the socket was down is missing. Re-read the
+          // board to reconcile. The first subscription is skipped because the
+          // load effect has just run.
+          if (hasSubscribedRef.current) {
+            refetchBoard()
+              .then((loaded) => {
+                if (loaded) {
+                  setBoard(loaded.board);
+                }
+              })
+              .catch((error) => {
+                console.error("Failed to refresh board:", error);
+              });
+          }
+          hasSubscribedRef.current = true;
         }
       });
 
@@ -424,7 +421,7 @@ export default function RetroPageClient() {
       });
       channel.unsubscribe();
     };
-  }, [board?.id, slug, userId, userName, router]);
+  }, [board?.id, slug, userId, userName, router, refetchBoard]);
 
   const handleJoin = useCallback(
     (username: string) => {
@@ -834,6 +831,10 @@ export default function RetroPageClient() {
     );
   }
 
+  if (authError) {
+    return <AuthErrorNotice message={authError} />;
+  }
+
   if (showJoinModal) {
     return <JoinSessionModal onJoin={handleJoin} submitLabel="Join Retro" />;
   }
@@ -866,7 +867,12 @@ export default function RetroPageClient() {
     );
   }
 
-  if (!(board.is_public || isAuthor)) {
+  // Existing participants keep access to a board the author made private.
+  // The database allows this (the select policy includes participants), so
+  // the client gate has to match it.
+  const isParticipant = participants.some((p) => p.user_id === userId);
+
+  if (!(board.is_public || isAuthor || isParticipant)) {
     return (
       <PrivateAccessOverlay
         description="This retro board is currently set to private. Only the session author can view and access it."

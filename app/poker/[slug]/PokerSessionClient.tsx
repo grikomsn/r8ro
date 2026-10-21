@@ -8,6 +8,7 @@ import { ParticipantsTable } from "@/components/poker/participants-table";
 import { SessionBottomNav } from "@/components/poker/session-bottom-nav";
 import { SessionHeader } from "@/components/poker/session-header";
 import { VotingCards } from "@/components/poker/voting-cards";
+import { AuthErrorNotice } from "@/components/shared/auth-error-notice";
 import { JoinSessionModal } from "@/components/shared/join-session-modal";
 import { ParticipantsPanel } from "@/components/shared/participants-panel";
 import { PrivateAccessOverlay } from "@/components/shared/private-access-overlay";
@@ -44,7 +45,12 @@ export default function PokerSessionClient() {
   const router = useRouter();
   const slug = params.slug as string;
 
-  const { userId, displayName, isInitialized: authInitialized } = useAuth();
+  const {
+    authError,
+    userId,
+    displayName,
+    isInitialized: authInitialized,
+  } = useAuth();
 
   const [session, setSession] = useState<PokerSession | null>(null);
   const [participants, setParticipants] = useState<PokerParticipant[]>([]);
@@ -60,13 +66,38 @@ export default function PokerSessionClient() {
 
   const sessionRef = useRef(session);
   const votesRef = useRef(votes);
+  const hasSubscribedRef = useRef(false);
   sessionRef.current = session;
   votesRef.current = votes;
 
   const isAuthor = session && userId === session.author_id;
 
+  // Votes are hidden until the session is revealed, so the list has to be
+  // re-read whenever the reveal state changes or the socket reconnects.
+  const refetchVotes = useCallback(async () => {
+    const current = sessionRef.current;
+    if (!current) {
+      return;
+    }
+    const { data, error } = await createClient()
+      .from("poker_votes")
+      .select("*")
+      .eq("session_id", current.id);
+    if (error) {
+      console.error("Failed to refresh votes:", error);
+      return;
+    }
+    setVotes(data || []);
+  }, []);
+
   useEffect(() => {
     if (!authInitialized) {
+      return;
+    }
+
+    if (authError) {
+      // The session could not be verified, so the session can never load.
+      setLoading(false);
       return;
     }
 
@@ -78,7 +109,7 @@ export default function PokerSessionClient() {
       setShowJoinModal(true);
       setLoading(false);
     }
-  }, [authInitialized, displayName, userId]);
+  }, [authError, authInitialized, displayName, userId]);
 
   useEffect(() => {
     if (!(userId && userName)) {
@@ -141,13 +172,19 @@ export default function PokerSessionClient() {
         if (!existing) {
           const { error: upsertError } = await supabase
             .from("poker_participants")
-            .upsert({
-              session_id: sessionData.id,
-              user_id: userId,
-              username: userName,
-              is_online: true,
-              is_observer: false,
-            });
+            .upsert(
+              {
+                session_id: sessionData.id,
+                user_id: userId,
+                username: userName,
+                is_online: true,
+                is_observer: false,
+              },
+              {
+                onConflict: "session_id,user_id",
+                ignoreDuplicates: true,
+              }
+            );
           throwIfSupabaseError(upsertError, "Failed to join session");
         }
 
@@ -179,6 +216,11 @@ export default function PokerSessionClient() {
     const supabase = createClient();
     const channel = supabase.channel(`poker-${slug}`, {
       config: {
+        // A private channel is authorised by the realtime.messages policies
+        // added in 20261021090900_restrict_presence_channels.sql. Without it
+        // any client could read the presence of a session that was made
+        // private, because the topic is derived from the slug.
+        private: true,
         presence: {
           key: userId,
         },
@@ -196,7 +238,17 @@ export default function PokerSessionClient() {
         },
         (payload) => {
           if (payload.eventType === "UPDATE" && payload.new) {
-            setSession(payload.new as PokerSession);
+            const updated = payload.new as PokerSession;
+            const wasRevealed = sessionRef.current?.votes_revealed ?? false;
+            setSession(updated);
+
+            // Votes stay hidden until the session is revealed, so the list has
+            // to be re-read when the reveal state changes.
+            if (wasRevealed !== updated.votes_revealed) {
+              refetchVotes().catch((error) => {
+                console.error("Failed to refresh votes:", error);
+              });
+            }
           } else if (payload.eventType === "DELETE") {
             router.push("/poker");
           }
@@ -302,6 +354,15 @@ export default function PokerSessionClient() {
             username: userName,
             online_at: Date.now(),
           });
+
+          // Postgres changes are not replayed for a reconnect, so votes that
+          // changed while the socket was down would be missed.
+          if (hasSubscribedRef.current) {
+            refetchVotes().catch((error) => {
+              console.error("Failed to refresh votes:", error);
+            });
+          }
+          hasSubscribedRef.current = true;
         }
       });
 
@@ -356,7 +417,7 @@ export default function PokerSessionClient() {
       });
       channel.unsubscribe();
     };
-  }, [session?.id, slug, userId, userName, router]);
+  }, [session?.id, slug, userId, userName, router, refetchVotes]);
 
   const handleJoin = useCallback(
     (username: string) => {
@@ -447,10 +508,12 @@ export default function PokerSessionClient() {
     const previousVotes = votesRef.current;
     setVotes([]);
     try {
-      const { error } = await createClient()
-        .from("poker_votes")
-        .delete()
-        .eq("session_id", s.id);
+      // A direct delete can only remove the caller's own vote, because the
+      // delete policy is scoped to the caller's user id. The RPC performs an
+      // author scoped delete instead.
+      const { error } = await createClient().rpc("clear_poker_votes", {
+        p_session_id: s.id,
+      });
       throwIfSupabaseError(error, "Failed to clear votes");
     } catch (error) {
       console.error("Failed to clear votes:", error);
@@ -610,6 +673,10 @@ export default function PokerSessionClient() {
     );
   }
 
+  if (authError) {
+    return <AuthErrorNotice message={authError} />;
+  }
+
   if (showJoinModal) {
     return (
       <JoinSessionModal onJoin={handleJoin} submitLabel="Join Poker Session" />
@@ -644,7 +711,11 @@ export default function PokerSessionClient() {
     );
   }
 
-  if (!(session.is_public || isAuthor)) {
+  // Existing participants keep access to a session the author made private.
+  // The database allows this, so the client gate has to match it.
+  const isParticipant = participants.some((p) => p.user_id === userId);
+
+  if (!(session.is_public || isAuthor || isParticipant)) {
     return (
       <PrivateAccessOverlay
         description="This poker session is currently set to private. Only the session author can view and access it."

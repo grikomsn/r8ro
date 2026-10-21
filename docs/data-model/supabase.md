@@ -2,10 +2,26 @@
 
 The database definition is split across:
 
-1. `supabase/schema.sql`, the retro baseline.
+1. `supabase/migrations/20241231000000_create_retro_tables.sql`, the retro
+   baseline.
 2. `supabase/migrations/*.sql`, applied in filename order.
 
+`supabase/schema.sql` is a static reference dump of the retro schema, not a
+migration. Do not apply it on top of the migration history.
+
 SQL files are authoritative when this document differs.
+
+## Grants
+
+Every migration that creates a table states its grants explicitly. The
+`20261021090000_grant_table_privileges.sql` migration gives the
+`authenticated` role full DML on the seven application tables, `service_role`
+the same, and the `anon` role `SELECT` on the parent tables only, because the
+server-rendered metadata queries run without a session.
+
+Supabase stops automatically granting Data API access to new tables in the
+`public` schema on 2026-10-30, so a new table needs its own grants in the same
+migration that creates it.
 
 ## Tables
 
@@ -39,8 +55,15 @@ SQL files are authoritative when this document differs.
   card. Card ownership is not checked by the latest migration.
 - Retro vote insert/delete requires access, an unlocked board (or board
   authorship), and `user_id = auth.uid()`.
-- Poker vote insert/update requires active voting and ownership of the vote.
-  Observers cannot insert. Poker vote deletion is self-only.
+- Poker vote insert/update requires active voting, ownership of the vote, and a
+  value that is on the session's voting scale. Observers cannot insert or
+  update. Poker vote deletion is self-only.
+- Poker votes are only readable by other participants once the session is
+  revealed. A participant always sees their own vote.
+- `clear_poker_votes(session_id)` removes every vote in a session. It is
+  restricted to the session author.
+- `retro_cards.votes` is maintained by the database and is the authoritative
+  count. A participant cannot write it directly.
 
 See `supabase/RLS_POLICIES.md` for policy names and source files.
 
@@ -58,6 +81,6 @@ duplicate participant uniqueness constraints without changing the remaining
 
 - Add a timestamped migration; do not edit an applied migration.
 - Update `supabase/schema.sql` only when intentionally refreshing the retro
-  baseline.
+  reference dump, and keep it in sync with the retro baseline migration.
 - Update this document and the affected feature document.
 - Add new realtime tables to the publication in a new migration.
