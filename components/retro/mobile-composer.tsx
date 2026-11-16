@@ -81,7 +81,7 @@ export function MobileComposer({ columnType, onAddCard }: MobileComposerProps) {
       </label>
       <Button
         aria-label="Add card"
-        className="h-11 w-11 shrink-0 rounded-xl p-0"
+        className="h-11 w-11 shrink-0 rounded-xl p-0 disabled:bg-muted disabled:text-muted-foreground disabled:opacity-100"
         disabled={!content.trim()}
         type="submit"
       >

@@ -2,11 +2,17 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 interface AppLogoProps {
+  /** Colour of the "8"; override it on an amber background. */
+  accentClassName?: string;
   className?: string;
   href?: string;
 }
 
-export function AppLogo({ className, href = "/" }: AppLogoProps) {
+export function AppLogo({
+  accentClassName = "text-primary",
+  className,
+  href = "/",
+}: AppLogoProps) {
   return (
     <Link
       aria-label="r8ro home"
@@ -16,7 +22,7 @@ export function AppLogo({ className, href = "/" }: AppLogoProps) {
       )}
       href={href}
     >
-      r<span className="text-primary">8</span>ro
+      r<span className={accentClassName}>8</span>ro
     </Link>
   );
 }

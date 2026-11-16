@@ -109,7 +109,6 @@ export default function RootLayout({
                 closeButton
                 mobileOffset={{ bottom: 88 }}
                 position="bottom-right"
-                richColors
               />
             </AuthProvider>
           </ThemeProvider>

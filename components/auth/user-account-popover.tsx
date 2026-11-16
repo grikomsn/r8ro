@@ -211,14 +211,14 @@ export function UserAccountPopover({
             ) : (
               <>
                 <button
-                  className="group flex max-w-full items-center gap-1.5 rounded font-bold hover:text-primary"
+                  className="group flex max-w-full items-center gap-1.5 rounded font-bold hover:text-brand-text"
                   onClick={startRename}
                   type="button"
                 >
                   <span className="truncate">{name}</span>
                   <Pencil
                     aria-hidden="true"
-                    className="h-3 w-3 shrink-0 text-muted-foreground group-hover:text-primary"
+                    className="h-3 w-3 shrink-0 text-muted-foreground group-hover:text-brand-text"
                   />
                   <span className="sr-only">Change name</span>
                 </button>
