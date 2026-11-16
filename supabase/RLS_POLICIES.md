@@ -77,6 +77,19 @@ The author clears every vote in their session with
 `public.clear_poker_votes(session_id)`, which checks the session authorship
 itself.
 
+`poker_participants.has_voted` is kept in step by the
+`poker_votes_sync_has_voted` trigger, and the
+`poker_participants_protect_has_voted` trigger discards a direct client write
+to it (`20261116120100_poker_participant_vote_status.sql`).
+
+### `poker_rounds`
+
+- `poker_rounds_select_policy`: anyone who can access the session.
+- `poker_rounds_delete_policy`: the session author.
+- There is no insert or update policy. Rows are written by
+  `public.complete_poker_round(session_id, estimate, next_story)`, which checks
+  the session authorship itself (`20261116120200_poker_rounds.sql`).
+
 ## Realtime
 
 `20260106120000_enable_realtime_replication.sql` gives all application tables

@@ -6,7 +6,10 @@ export interface RetroBoard {
   is_locked: boolean;
   is_public: boolean;
   slug: string;
+  /** Seconds left when the timer was paused part way, otherwise null. */
+  timer_remaining_seconds: number | null;
   timer_running: boolean;
+  /** Configured timer duration in seconds. */
   timer_seconds: number;
   timer_started_at: string | null;
   title: string;
@@ -51,6 +54,8 @@ export interface PokerSession {
 }
 
 export interface PokerParticipant {
+  /** Maintained by the database; true when the participant has a vote. */
+  has_voted: boolean;
   id: string;
   is_observer: boolean;
   is_online: boolean;
@@ -66,4 +71,18 @@ export interface PokerVote {
   session_id: string;
   user_id: string;
   vote_value: string;
+}
+
+export interface PokerRoundVote {
+  username: string;
+  value: string;
+}
+
+export interface PokerRound {
+  created_at: string;
+  estimate: string | null;
+  id: string;
+  session_id: string;
+  story: string | null;
+  votes: PokerRoundVote[];
 }
