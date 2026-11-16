@@ -49,21 +49,35 @@ export function JoinSessionModal({
   }, [isInitialized, displayName]);
 
   useEffect(() => {
+    if (!isInitialized) {
+      return;
+    }
     let cancelled = false;
-    createClient()
-      .from(kind === "retro" ? "retro_boards" : "poker_sessions")
-      .select("title, author_name")
-      .eq("slug", slug)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (!cancelled && data) {
-          setPreview(data);
-        }
-      });
+    const supabase = createClient();
+
+    const loadPreview = async () => {
+      // On a first visit the anonymous session is created moments before
+      // this screen renders. Waiting for it matters: a request sent without
+      // it is answered as a signed-out visitor, which the select policy
+      // gives an empty result, and the title and host never appeared.
+      await supabase.auth.getSession();
+      const { data } = await supabase
+        .from(kind === "retro" ? "retro_boards" : "poker_sessions")
+        .select("title, author_name")
+        .eq("slug", slug)
+        .maybeSingle();
+      if (!cancelled && data) {
+        setPreview(data);
+      }
+    };
+
+    loadPreview().catch((error) => {
+      console.error("Failed to load the session preview:", error);
+    });
     return () => {
       cancelled = true;
     };
-  }, [kind, slug]);
+  }, [isInitialized, kind, slug]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
