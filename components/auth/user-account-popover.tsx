@@ -1,14 +1,30 @@
 "use client";
 
-import { Code, Download, ShieldCheck, User, UserCircle } from "lucide-react";
+import {
+  Check,
+  Code,
+  Download,
+  Pencil,
+  ShieldCheck,
+  User,
+  UserCircle,
+  X,
+} from "lucide-react";
+import type React from "react";
 import { useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { useAuth } from "@/hooks/use-auth";
+import {
+  USERNAME_MAX_LENGTH,
+  validateUsername,
+} from "@/lib/constants/username";
 import { exportMyData } from "@/lib/utils/export-my-data";
 
 interface UserAccountPopoverProps {
@@ -18,10 +34,46 @@ interface UserAccountPopoverProps {
 export function UserAccountPopover({
   variant = "default",
 }: UserAccountPopoverProps) {
-  const { userId, displayName, isAnonymous, linkGitHubIdentity, isLoading } =
-    useAuth();
+  const {
+    userId,
+    displayName,
+    isAnonymous,
+    linkGitHubIdentity,
+    isLoading,
+    updateDisplayName,
+  } = useAuth();
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState("");
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
+  const [nameError, setNameError] = useState("");
+
+  const startRename = () => {
+    setNameDraft(displayName ?? "");
+    setNameError("");
+    setIsRenaming(true);
+  };
+
+  const saveName = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const validationError = validateUsername(nameDraft);
+    if (validationError) {
+      setNameError(validationError);
+      return;
+    }
+    const trimmed = nameDraft.trim();
+    if (trimmed !== displayName) {
+      const saved = await updateDisplayName(trimmed);
+      if (!saved) {
+        setNameError("Could not save your name. Please try again.");
+        return;
+      }
+      toast.success("Name updated", {
+        description: "Open boards and sessions show your new name.",
+      });
+    }
+    setIsRenaming(false);
+  };
 
   const handleLinkGitHub = async () => {
     const result = await linkGitHubIdentity();
@@ -117,14 +169,65 @@ export function UserAccountPopover({
         <div className="space-y-4 p-4">
           {/* User Info */}
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="font-bold text-muted-foreground text-xs uppercase">
-                Display Name
-              </span>
-              <span className="font-semibold text-sm">
-                {displayName || "Not set"}
-              </span>
-            </div>
+            {isRenaming ? (
+              <form className="space-y-1.5" onSubmit={saveName}>
+                <label
+                  className="font-bold text-muted-foreground text-xs uppercase"
+                  htmlFor="account-display-name"
+                >
+                  Display name
+                </label>
+                <div className="flex items-center gap-1.5">
+                  <Input
+                    autoFocus
+                    className="h-8 rounded-lg"
+                    id="account-display-name"
+                    maxLength={USERNAME_MAX_LENGTH}
+                    onChange={(e) => {
+                      setNameDraft(e.target.value);
+                      setNameError("");
+                    }}
+                    value={nameDraft}
+                  />
+                  <Button
+                    aria-label="Save name"
+                    className="h-8 w-8 shrink-0 rounded-lg p-0"
+                    type="submit"
+                  >
+                    <Check aria-hidden="true" className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    aria-label="Cancel"
+                    className="h-8 w-8 shrink-0 rounded-lg p-0"
+                    onClick={() => setIsRenaming(false)}
+                    type="button"
+                    variant="ghost"
+                  >
+                    <X aria-hidden="true" className="h-4 w-4" />
+                  </Button>
+                </div>
+                {nameError && (
+                  <p className="text-destructive text-xs" role="alert">
+                    {nameError}
+                  </p>
+                )}
+              </form>
+            ) : (
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-bold text-muted-foreground text-xs uppercase">
+                  Display Name
+                </span>
+                <button
+                  className="flex min-w-0 items-center gap-1.5 rounded font-semibold text-sm hover:text-primary"
+                  onClick={startRename}
+                  type="button"
+                >
+                  <span className="truncate">{displayName || "Not set"}</span>
+                  <Pencil aria-hidden="true" className="h-3 w-3 shrink-0" />
+                  <span className="sr-only">Change name</span>
+                </button>
+              </div>
+            )}
             <div className="flex items-center justify-between">
               <span className="font-bold text-muted-foreground text-xs uppercase">
                 User ID

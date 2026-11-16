@@ -6,30 +6,21 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/hooks/use-auth";
 import "./globals.css";
 
-import {
-  Lato,
-  Lato as V0_Font_Lato,
-  Libre_Baskerville as V0_Font_Libre_Baskerville,
-  Space_Mono as V0_Font_Space_Mono,
-} from "next/font/google";
-
-// Initialize fonts
-const _lato = V0_Font_Lato({
-  subsets: ["latin"],
-  weight: ["100", "300", "400", "700", "900"],
-});
-const _spaceMono = V0_Font_Space_Mono({
-  subsets: ["latin"],
-  weight: ["400", "700"],
-});
-const _libreBaskerville = V0_Font_Libre_Baskerville({
-  subsets: ["latin"],
-  weight: ["400", "700"],
-});
+import { Lato, Space_Mono } from "next/font/google";
+import { Toaster } from "@/components/ui/sonner";
 
 const lato = Lato({
   subsets: ["latin"],
-  weight: ["100", "300", "400", "700", "900"],
+  weight: ["400", "700", "900"],
+  variable: "--font-lato",
+  display: "swap",
+});
+
+const spaceMono = Space_Mono({
+  subsets: ["latin"],
+  weight: ["400", "700"],
+  variable: "--font-space-mono",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -88,8 +79,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={`${lato.className} antialiased`}>
+    <html
+      className={`${lato.variable} ${spaceMono.variable}`}
+      lang="en"
+      suppressHydrationWarning
+    >
+      <body className="font-sans antialiased">
         <a
           className="sr-only focus-visible:not-sr-only focus-visible:absolute focus-visible:top-4 focus-visible:left-4 focus-visible:z-[100] focus-visible:rounded-md focus-visible:bg-background focus-visible:px-3 focus-visible:py-2 focus-visible:font-bold"
           href="#main-content"
@@ -109,6 +104,7 @@ export default function RootLayout({
               <div id="main-content" tabIndex={-1}>
                 {children}
               </div>
+              <Toaster closeButton position="bottom-right" richColors />
             </AuthProvider>
           </ThemeProvider>
         </ErrorBoundary>
