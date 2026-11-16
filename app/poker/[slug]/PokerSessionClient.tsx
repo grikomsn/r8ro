@@ -24,6 +24,7 @@ import type {
   PokerSession,
   PokerVote,
 } from "@/lib/types";
+import { cn } from "@/lib/utils";
 import { downloadTextFile } from "@/lib/utils/download";
 import {
   getErrorMessage,
@@ -833,7 +834,7 @@ export default function PokerSessionClient() {
   }
 
   if (showJoinModal) {
-    return <JoinSessionModal onJoin={handleJoin} submitLabel="Join session" />;
+    return <JoinSessionModal kind="poker" onJoin={handleJoin} slug={slug} />;
   }
 
   if (loading) {
@@ -875,69 +876,86 @@ export default function PokerSessionClient() {
   const votedCount = voters.filter(
     (p) => p.has_voted || (p.user_id === userId && myVote)
   ).length;
-  const onlineCount = participants.filter((p) => p.is_online).length;
   const roundNumber = rounds.length + 1;
 
+  const revealed = session.votes_revealed;
+
   return (
-    <div className="flex min-h-dvh flex-col bg-secondary">
+    <div className="flex min-h-dvh flex-col bg-canvas">
       <SessionHeader
+        currentUserId={userId}
         isAuthor={isAuthor}
+        isObserver={myParticipant?.is_observer ?? false}
         onCopyMarkdown={handleCopyMarkdown}
         onDeleteSession={handleDeleteSession}
         onDownloadMarkdown={handleDownloadMarkdown}
-        onlineCount={onlineCount}
         onTitleUpdate={handleEditSessionTitle}
+        onToggleObserver={handleToggleObserver}
         onToggleVisibility={handleToggleVisibility}
         onUpdateScale={handleUpdateScale}
-        participantCount={participants.length}
+        participants={participants}
         roundNumber={roundNumber}
         session={session}
       />
 
       <main
         aria-label="Poker session"
-        className="mx-auto grid w-full max-w-7xl flex-1 items-start gap-4 p-3 md:p-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] lg:gap-5"
+        className={cn(
+          "mx-auto grid w-full max-w-6xl flex-1 items-start gap-3 p-3 md:gap-4 md:p-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] lg:gap-5",
+          isAuthor && "max-md:pb-24"
+        )}
         data-session-capture
       >
-        <div className="grid min-w-0 gap-4 lg:gap-5">
-          <RoundPanel
-            isAuthor={isAuthor}
-            onClearVotes={handleClearVotes}
-            onNextRound={() => setNextRoundOpen(true)}
-            onStoryUpdate={handleEditStory}
-            onToggleReveal={handleToggleReveal}
-            onToggleVoting={handleToggleVoting}
-            pendingActions={pendingActions}
-            roundNumber={roundNumber}
-            session={session}
-            votedCount={votedCount}
-            voterCount={voters.length}
-          />
-          <VotingCards
-            isObserver={myParticipant?.is_observer ?? false}
-            isPending={!!pendingActions.vote}
-            isVotingActive={session.is_voting_active}
-            onToggleObserver={handleToggleObserver}
-            onVote={handleVote}
-            scale={session.voting_scale}
-            selectedValue={myVote?.vote_value ?? null}
-            votesRevealed={session.votes_revealed}
-          />
+        {/* On phones both columns flatten into one list, ordered so the
+            results come before the (now inactive) hand once votes are
+            revealed. */}
+        <div className="grid min-w-0 gap-4 max-lg:contents lg:gap-5">
+          <div className="order-1 min-w-0">
+            <RoundPanel
+              isAuthor={isAuthor}
+              onClearVotes={handleClearVotes}
+              onNextRound={() => setNextRoundOpen(true)}
+              onStoryUpdate={handleEditStory}
+              onToggleReveal={handleToggleReveal}
+              onToggleVoting={handleToggleVoting}
+              pendingActions={pendingActions}
+              roundNumber={roundNumber}
+              session={session}
+              votedCount={votedCount}
+              voterCount={voters.length}
+            />
+          </div>
+          <div className={cn("min-w-0", revealed ? "order-3" : "order-2")}>
+            <VotingCards
+              isObserver={myParticipant?.is_observer ?? false}
+              isPending={!!pendingActions.vote}
+              isVotingActive={session.is_voting_active}
+              onToggleObserver={handleToggleObserver}
+              onVote={handleVote}
+              scale={session.voting_scale}
+              selectedValue={myVote?.vote_value ?? null}
+              votesRevealed={revealed}
+            />
+          </div>
         </div>
-        <div className="grid min-w-0 gap-4 lg:sticky lg:top-4 lg:gap-5">
-          <VoteResults
-            authorId={session.author_id}
-            currentUserId={userId}
-            participants={participants}
-            scale={session.voting_scale}
-            votes={votes}
-            votesRevealed={session.votes_revealed}
-          />
-          <RoundHistory
-            canDelete={isAuthor}
-            onDelete={handleDeleteRound}
-            rounds={rounds}
-          />
+        <div className="grid min-w-0 gap-4 max-lg:contents lg:sticky lg:top-[4.5rem] lg:gap-5">
+          <div className={cn("min-w-0", revealed ? "order-2" : "order-3")}>
+            <VoteResults
+              authorId={session.author_id}
+              currentUserId={userId}
+              participants={participants}
+              scale={session.voting_scale}
+              votes={votes}
+              votesRevealed={revealed}
+            />
+          </div>
+          <div className="order-4 min-w-0">
+            <RoundHistory
+              canDelete={isAuthor}
+              onDelete={handleDeleteRound}
+              rounds={rounds}
+            />
+          </div>
         </div>
       </main>
 
