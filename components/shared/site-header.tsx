@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserAccountPopover } from "@/components/auth/user-account-popover";
 import { AppLogo } from "@/components/shared/app-logo";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
@@ -47,7 +46,6 @@ export function SiteHeader() {
           </nav>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <ThemeToggle />
           <UserAccountPopover />
         </div>
       </div>

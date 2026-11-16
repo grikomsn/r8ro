@@ -104,7 +104,13 @@ export default function RootLayout({
               <div id="main-content" tabIndex={-1}>
                 {children}
               </div>
-              <Toaster closeButton position="bottom-right" richColors />
+              {/* On phones toasts sit above the pinned composer and host bar. */}
+              <Toaster
+                closeButton
+                mobileOffset={{ bottom: 88 }}
+                position="bottom-right"
+                richColors
+              />
             </AuthProvider>
           </ThemeProvider>
         </ErrorBoundary>

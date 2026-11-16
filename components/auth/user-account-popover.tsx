@@ -4,15 +4,18 @@ import {
   Check,
   Code,
   Download,
+  Monitor,
+  Moon,
   Pencil,
   ShieldCheck,
-  User,
-  UserCircle,
+  Sun,
   X,
 } from "lucide-react";
+import { useTheme } from "next-themes";
 import type React from "react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { Avatar } from "@/components/shared/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -25,10 +28,54 @@ import {
   USERNAME_MAX_LENGTH,
   validateUsername,
 } from "@/lib/constants/username";
+import { cn } from "@/lib/utils";
 import { exportMyData } from "@/lib/utils/export-my-data";
 
 interface UserAccountPopoverProps {
+  /** "compact" shows only the avatar, for crowded session headers. */
   variant?: "default" | "compact";
+}
+
+const THEMES = [
+  { value: "light", label: "Light", icon: Sun },
+  { value: "dark", label: "Dark", icon: Moon },
+  { value: "system", label: "Auto", icon: Monitor },
+] as const;
+
+function ThemeSwitcher() {
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  return (
+    <div
+      aria-label="Theme"
+      className="grid grid-cols-3 gap-1 rounded-lg bg-muted p-1"
+      role="radiogroup"
+    >
+      {THEMES.map(({ value, label, icon: Icon }) => {
+        const active = mounted && theme === value;
+        return (
+          <button
+            aria-checked={active}
+            className={cn(
+              "flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 font-semibold text-xs transition-colors",
+              active
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+            key={value}
+            onClick={() => setTheme(value)}
+            role="radio"
+            type="button"
+          >
+            <Icon aria-hidden="true" className="h-3.5 w-3.5" />
+            {label}
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 export function UserAccountPopover({
@@ -43,10 +90,15 @@ export function UserAccountPopover({
     updateDisplayName,
   } = useAuth();
   const [isExporting, setIsExporting] = useState(false);
-  const [exportError, setExportError] = useState("");
   const [isRenaming, setIsRenaming] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
   const [nameError, setNameError] = useState("");
+
+  if (!userId) {
+    return null;
+  }
+
+  const name = displayName || "Guest";
 
   const startRename = () => {
     setNameDraft(displayName ?? "");
@@ -69,7 +121,7 @@ export function UserAccountPopover({
         return;
       }
       toast.success("Name updated", {
-        description: "Open boards and sessions show your new name.",
+        description: "Boards and sessions you open show your new name.",
       });
     }
     setIsRenaming(false);
@@ -78,110 +130,54 @@ export function UserAccountPopover({
   const handleLinkGitHub = async () => {
     const result = await linkGitHubIdentity();
     if (!result.success) {
-      console.error(`Failed to link GitHub: ${result.error}`);
+      toast.error("Could not start GitHub linking", {
+        description: result.error,
+      });
     }
   };
 
   const handleExport = async () => {
     setIsExporting(true);
-    setExportError("");
     try {
       await exportMyData();
     } catch (error) {
       console.error("Failed to export data:", error);
-      setExportError("Export failed. Please try again.");
+      toast.error("Export failed", { description: "Please try again." });
     } finally {
       setIsExporting(false);
     }
   };
 
-  if (!userId) {
-    return null;
-  }
-
-  const isCompact = variant === "compact";
-  const toneClasses = isAnonymous
-    ? {
-        avatar: "bg-primary/20",
-        dot: "bg-primary",
-        icon: "text-primary",
-        label: "text-foreground",
-        trigger:
-          "border-primary/50 bg-primary/10 hover:border-primary hover:bg-primary/20",
-      }
-    : {
-        avatar: "bg-chart-4/50",
-        dot: "bg-chart-3",
-        icon: "text-chart-3",
-        label: "text-foreground",
-        trigger:
-          "border-chart-3/40 bg-chart-4/25 hover:border-chart-3 hover:bg-chart-4/40",
-      };
-
   return (
     <Popover>
       <PopoverTrigger asChild>
         <button
-          aria-label="User account menu"
-          className={`group flex items-center gap-2 rounded-full border-2 transition-[border-color,background-color,box-shadow] hover:shadow-md ${toneClasses.trigger} ${isCompact ? "py-1 pr-2.5 pl-1" : "py-1.5 pr-3 pl-1.5"}`}
+          aria-label={`Account and settings for ${name}`}
+          className={cn(
+            "flex h-9 shrink-0 items-center gap-2 rounded-full outline-none transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring",
+            variant === "compact" ? "w-9 justify-center" : "pr-3 pl-0.5"
+          )}
           type="button"
         >
-          {/* Avatar circle with status indicator */}
-          <div className="relative">
-            <div
-              className={`flex items-center justify-center rounded-full ${toneClasses.avatar} ${isCompact ? "h-6 w-6" : "h-7 w-7"}`}
-            >
-              {isAnonymous ? (
-                <UserCircle
-                  className={`${toneClasses.icon} ${isCompact ? "h-4 w-4" : "h-5 w-5"}`}
-                />
-              ) : (
-                <Code
-                  className={`${toneClasses.icon} ${isCompact ? "h-3.5 w-3.5" : "h-4 w-4"}`}
-                />
-              )}
-            </div>
-            {/* Status dot */}
-            <div
-              className={`absolute -right-0.5 -bottom-0.5 rounded-full border-2 border-background ${toneClasses.dot} ${isCompact ? "h-2.5 w-2.5" : "h-3 w-3"}`}
-            />
-          </div>
-
-          {/* Display name or anonymous label */}
-          <span
-            className={`max-w-[100px] truncate font-semibold ${toneClasses.label} ${isCompact ? "text-xs" : "text-sm"}`}
-          >
-            {displayName || (isAnonymous ? "Guest" : "User")}
-          </span>
+          <Avatar name={name} size="md" />
+          {variant === "default" && (
+            <span className="hidden max-w-28 truncate font-semibold text-sm sm:inline">
+              {name}
+            </span>
+          )}
         </button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 rounded-xl p-0">
-        <div className="rounded-t-xl border-border border-b-2 bg-muted px-4 py-3">
-          <div className="flex items-center gap-2">
-            <User
-              aria-hidden="true"
-              className="h-5 w-5 text-muted-foreground"
-            />
-            <h3 className="font-bold text-base uppercase">Account</h3>
-          </div>
-        </div>
-
-        <div className="space-y-4 p-4">
-          {/* User Info */}
-          <div className="space-y-2">
+        <div className="flex items-center gap-3 border-border border-b-2 p-4">
+          <Avatar name={name} />
+          <div className="min-w-0 flex-1">
             {isRenaming ? (
-              <form className="space-y-1.5" onSubmit={saveName}>
-                <label
-                  className="font-bold text-muted-foreground text-xs uppercase"
-                  htmlFor="account-display-name"
-                >
-                  Display name
-                </label>
-                <div className="flex items-center gap-1.5">
+              <form className="space-y-1" onSubmit={saveName}>
+                <div className="flex items-center gap-1">
                   <Input
+                    aria-label="Display name"
                     autoFocus
                     className="h-8 rounded-lg"
-                    id="account-display-name"
                     maxLength={USERNAME_MAX_LENGTH}
                     onChange={(e) => {
                       setNameDraft(e.target.value);
@@ -213,112 +209,71 @@ export function UserAccountPopover({
                 )}
               </form>
             ) : (
-              <div className="flex items-center justify-between gap-2">
-                <span className="font-bold text-muted-foreground text-xs uppercase">
-                  Display Name
-                </span>
+              <>
                 <button
-                  className="flex min-w-0 items-center gap-1.5 rounded font-semibold text-sm hover:text-primary"
+                  className="group flex max-w-full items-center gap-1.5 rounded font-bold hover:text-primary"
                   onClick={startRename}
                   type="button"
                 >
-                  <span className="truncate">{displayName || "Not set"}</span>
-                  <Pencil aria-hidden="true" className="h-3 w-3 shrink-0" />
+                  <span className="truncate">{name}</span>
+                  <Pencil
+                    aria-hidden="true"
+                    className="h-3 w-3 shrink-0 text-muted-foreground group-hover:text-primary"
+                  />
                   <span className="sr-only">Change name</span>
                 </button>
-              </div>
-            )}
-            <div className="flex items-center justify-between">
-              <span className="font-bold text-muted-foreground text-xs uppercase">
-                User ID
-              </span>
-              <code className="font-mono font-semibold text-xs">
-                {userId.slice(0, 8)}…
-              </code>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="font-bold text-muted-foreground text-xs uppercase">
-                Status
-              </span>
-              <div className="flex items-center gap-1.5">
-                {isAnonymous ? (
-                  <>
-                    <div className="h-2 w-2 rounded-full bg-primary" />
-                    <span className="font-semibold text-primary text-xs">
-                      Anonymous
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <ShieldCheck
-                      aria-hidden="true"
-                      className="h-3.5 w-3.5 text-chart-3"
-                    />
-                    <span className="font-semibold text-chart-3 text-xs">
-                      Linked
-                    </span>
-                  </>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Export Section */}
-          <div className="h-px bg-border" />
-          <div className="space-y-3">
-            <div className="rounded-xl bg-muted p-3">
-              <p className="font-medium text-muted-foreground text-xs">
-                <strong className="text-foreground">Download your data</strong>{" "}
-                to keep a copy of every board, card and vote you created or
-                joined.
-              </p>
-            </div>
-            <Button
-              className="w-full rounded-xl"
-              disabled={isExporting}
-              onClick={handleExport}
-              size="lg"
-              variant="outline"
-            >
-              <Download aria-hidden="true" className="mr-2 h-4 w-4" />
-              {isExporting ? "Preparing…" : "Export my data"}
-            </Button>
-            {exportError && (
-              <p className="text-center text-[10px] text-destructive">
-                {exportError}
-              </p>
-            )}
-          </div>
-
-          {/* Upgrade Section */}
-          {isAnonymous && (
-            <>
-              <div className="h-px bg-border" />
-              <div className="space-y-3">
-                <div className="rounded-xl bg-muted p-3">
-                  <p className="font-medium text-muted-foreground text-xs">
-                    <strong className="text-foreground">
-                      Upgrade your account
-                    </strong>{" "}
-                    to keep your data permanently and access it from any device.
-                  </p>
-                </div>
-                <Button
-                  className="w-full rounded-xl"
-                  disabled={isLoading}
-                  onClick={handleLinkGitHub}
-                  size="lg"
-                >
-                  <Code aria-hidden="true" className="mr-2 h-4 w-4" />
-                  Link GitHub Account
-                </Button>
-                <p className="text-center text-[10px] text-muted-foreground">
-                  Linking transfers your current boards and votes to your GitHub
-                  account. Export a copy first if you want a backup.
+                <p className="flex items-center gap-1 text-muted-foreground text-xs">
+                  {isAnonymous ? (
+                    "Guest on this browser"
+                  ) : (
+                    <>
+                      <ShieldCheck aria-hidden="true" className="h-3.5 w-3.5" />
+                      Linked to GitHub
+                    </>
+                  )}
                 </p>
-              </div>
-            </>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-4 p-4">
+          <div className="space-y-1.5">
+            <p className="font-bold text-muted-foreground text-xs uppercase tracking-wide">
+              Appearance
+            </p>
+            <ThemeSwitcher />
+          </div>
+
+          {isAnonymous && (
+            <div className="space-y-2 rounded-xl bg-muted p-3">
+              <p className="text-muted-foreground text-xs">
+                <strong className="text-foreground">Keep your boards</strong> on
+                any device by linking GitHub. Your boards and votes move with
+                you.
+              </p>
+              <Button
+                className="w-full rounded-lg"
+                disabled={isLoading}
+                onClick={handleLinkGitHub}
+                size="sm"
+              >
+                <Code aria-hidden="true" className="mr-2 h-4 w-4" />
+                Link GitHub account
+              </Button>
+            </div>
           )}
+
+          <Button
+            className="w-full justify-start rounded-lg"
+            disabled={isExporting}
+            onClick={handleExport}
+            size="sm"
+            variant="ghost"
+          >
+            <Download aria-hidden="true" className="mr-2 h-4 w-4" />
+            {isExporting ? "Preparing…" : "Export all my data (JSON)"}
+          </Button>
         </div>
       </PopoverContent>
     </Popover>

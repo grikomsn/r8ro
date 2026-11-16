@@ -15,4 +15,4 @@ export function useMediaQuery(query: string) {
   );
 }
 
-export const XL_QUERY = "(min-width: 1280px)";
+export const SM_QUERY = "(min-width: 640px)";
