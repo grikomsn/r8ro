@@ -31,7 +31,7 @@ export default async function AuthCodeErrorPage({
       <div className="w-full max-w-md space-y-6 rounded-2xl border-2 border-border bg-background p-6 text-center shadow-md md:p-8">
         <div className="space-y-2">
           <h1 className="font-black text-2xl text-foreground">
-            Authentication Error
+            Authentication error
           </h1>
           {message ? (
             <p className="text-muted-foreground">{message.body}</p>

@@ -40,8 +40,11 @@ export const COLUMN_CONFIG: Record<
   {
     composer: string;
     dot: string;
+    /** Light tint of the column colour behind the white cards. */
+    lane: string;
+    /** Wayfindr-style filled pill for the column title. */
+    pill: string;
     prompt: string;
-    stripe: string;
     title: string;
   }
 > = {
@@ -50,21 +53,24 @@ export const COLUMN_CONFIG: Record<
     composer: "Something that went well…",
     prompt: "What helped the team this sprint?",
     dot: "bg-success",
-    stripe: "border-t-success",
+    lane: "bg-success/[0.07]",
+    pill: "bg-success text-success-foreground",
   },
   to_improve: {
     title: "To improve",
     composer: "Something to improve…",
     prompt: "What slowed us down or felt painful?",
-    dot: "bg-destructive",
-    stripe: "border-t-destructive",
+    dot: "bg-mauve",
+    lane: "bg-mauve/[0.07]",
+    pill: "bg-mauve text-mauve-foreground",
   },
   action_items: {
     title: "Action items",
     composer: "An action item, and who owns it…",
     prompt: "What will we change next sprint, and who owns it?",
-    dot: "bg-chart-2",
-    stripe: "border-t-chart-2",
+    dot: "bg-periwinkle",
+    lane: "bg-periwinkle/[0.14]",
+    pill: "bg-periwinkle text-ink",
   },
 };
 
@@ -446,8 +452,9 @@ export function RetroColumn({
     <section
       aria-labelledby={`column-${columnType}-heading`}
       className={cn(
-        "flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border-2 border-border border-t-4 bg-muted transition-colors",
-        config.stripe,
+        // Each lane is tinted with its column colour, so the white cards
+        // stand out and the three columns read apart at a glance.
+        "relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border-2 border-border bg-background transition-colors",
         isDragOver && !isLocked && "bg-primary/10 ring-2 ring-primary"
       )}
       onDragLeave={(e) => {
@@ -465,24 +472,27 @@ export function RetroColumn({
       }}
       onDrop={handleDrop}
     >
-      <div className="flex items-center gap-2 px-3 pt-2.5 pb-2 max-md:sr-only">
-        <span
-          aria-hidden="true"
-          className={cn("h-2.5 w-2.5 rounded-full", config.dot)}
-        />
+      <div
+        aria-hidden="true"
+        className={cn("pointer-events-none absolute inset-0", config.lane)}
+      />
+      <div className="relative flex items-center gap-2 px-3 pt-3 pb-2 max-md:sr-only">
         <h2
-          className="min-w-0 flex-1 truncate font-black text-base"
+          className={cn(
+            "min-w-0 truncate rounded-full px-3 py-1 font-bold text-sm",
+            config.pill
+          )}
           id={`column-${columnType}-heading`}
         >
           {config.title}
         </h2>
-        <span className="rounded-full bg-background px-2 py-0.5 font-bold text-muted-foreground text-xs tabular-nums">
+        <span className="ml-auto font-bold text-muted-foreground text-sm tabular-nums">
           {cards.length}
           <span className="sr-only"> cards</span>
         </span>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto px-2.5 pb-3 max-md:pt-2.5">
+      <div className="relative flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto px-2.5 pb-3 max-md:pt-2.5">
         {!isLocked && (
           <div className="max-md:hidden">
             <CardComposer columnType={columnType} onAddCard={onAddCard} />

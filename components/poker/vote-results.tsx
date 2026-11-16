@@ -224,7 +224,7 @@ export function VoteResults({
                   className={cn(
                     "min-w-9 rounded-lg border-2 px-2 py-0.5 text-center font-black font-mono",
                     isExtreme
-                      ? "border-destructive bg-destructive/10"
+                      ? "border-mauve bg-mauve/15"
                       : "border-primary bg-primary/15"
                   )}
                 >

@@ -1,7 +1,16 @@
 import { cn } from "@/lib/utils";
 
-// Spread around the colour wheel so neighbouring names rarely share a hue.
-const HUES = [28, 200, 340, 95, 265, 50, 175, 310, 140, 230, 5, 75];
+// Wayfindr's flat accents and tints of them, all readable with navy ink.
+const COLORS = [
+  "#efba5a",
+  "#b8d8e4",
+  "#b1ceb3",
+  "#a6b6f1",
+  "#f6d4fb",
+  "#e2bfdf",
+  "#9fcbb8",
+  "#f5d48f",
+];
 const WORD_SEPARATOR = /[\s_-]+/;
 const CAPITAL = /[A-Z]/g;
 
@@ -37,16 +46,16 @@ interface AvatarProps {
 }
 
 export function Avatar({ className, name, online, size = "md" }: AvatarProps) {
-  const hue = HUES[hashName(name) % HUES.length];
+  const color = COLORS[hashName(name) % COLORS.length];
   return (
     <span
       aria-hidden="true"
       className={cn(
-        "relative inline-flex shrink-0 select-none items-center justify-center rounded-full font-bold text-neutral-900 ring-2 ring-background",
+        "relative inline-flex shrink-0 select-none items-center justify-center rounded-full font-bold text-ink ring-2 ring-background",
         size === "sm" ? "h-7 w-7 text-[11px]" : "h-8 w-8 text-xs",
         className
       )}
-      style={{ backgroundColor: `hsl(${hue} 75% 78%)` }}
+      style={{ backgroundColor: color }}
     >
       {initialsOf(name)}
       {online !== undefined && (

@@ -42,7 +42,7 @@ interface RoundPanelProps {
 
 function StatusChip({ session }: { session: PokerSession }) {
   const [label, className] = session.votes_revealed
-    ? ["Revealed", "border-chart-2 bg-chart-2 text-primary-foreground"]
+    ? ["Revealed", "border-periwinkle bg-periwinkle text-ink"]
     : session.is_voting_active
       ? ["Voting open", "border-success bg-success text-success-foreground"]
       : ["Voting paused", "border-border bg-muted text-muted-foreground"];

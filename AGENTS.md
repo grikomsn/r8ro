@@ -60,7 +60,14 @@ No Jest/Vitest/Playwright configured. Validation chain: `pnpm check-types` → `
 - `components/ui/**` linter disabled — treat as vendor
 - `biome-ignore` comments are used where needed (see `lib/supabase/*.ts`)
 
-## Import Conventions
+## Design Tokens
+
+- Colours come from the Wayfindr websites (wayfindr.io, bundle.wayfindr.io) and live only in `app/globals.css`; never hard-code hex values in components.
+- Navy `foreground` ink on white `background` panels over a grey `canvas` page. Amber `primary` is the one brand and action colour; use `text-brand-text` when amber must be readable as text.
+- Category accents: `success` (went well), `mauve` (to improve), `periwinkle` (action items, "revealed"), plus `sky`, `pink`, `sage`. Text on pastels uses `text-ink`.
+- Dark mode is navy-based (`.dark` block). Check every change in both themes.
+
+
 
 - `ultracite fix` auto-sorts: Externals (alphabetically, including React/Next) → `@/` → relative
 - Use `import type` for type-only imports (inline `import { type X }` is also accepted)

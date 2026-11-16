@@ -357,7 +357,7 @@ export function SessionLanding({
         <span className="text-muted-foreground">You appear as</span>
         <span className="font-bold">{username || displayName}</span>
         <button
-          className="ml-auto font-semibold text-sm underline underline-offset-2 hover:text-primary"
+          className="ml-auto font-semibold text-sm underline underline-offset-2 hover:text-brand-text"
           onClick={() => setIsEditingName(true)}
           type="button"
         >
@@ -394,9 +394,14 @@ export function SessionLanding({
   ) : null;
 
   return (
-    <div className="flex min-h-dvh flex-col bg-canvas">
+    <div className="relative flex min-h-dvh flex-col bg-canvas">
       <SiteHeader />
-      <main className="mx-auto grid w-full max-w-6xl flex-1 gap-6 px-4 py-8 md:py-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] lg:gap-10">
+      {/* Wayfindr-style amber hero band; the form card overlaps its edge. */}
+      <div
+        aria-hidden="true"
+        className="absolute inset-x-0 top-16 h-[17.5rem] rounded-b-[2.5rem] bg-primary sm:h-[16rem] md:h-[18rem] md:rounded-b-[4rem] dark:bg-muted"
+      />
+      <main className="relative mx-auto grid w-full max-w-6xl flex-1 gap-6 px-4 py-8 md:py-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] lg:gap-10">
         {/* On phones the sections flatten into one list so that your own
             sessions come right after the form, before the feature list. */}
         <div className="max-lg:contents lg:space-y-6">
@@ -490,7 +495,7 @@ export function SessionLanding({
                   </div>
                   {errorBox}
                   <Button
-                    className="h-12 w-full rounded-xl border-2 border-border bg-accent font-bold text-accent-foreground text-base shadow-md hover:bg-accent/90"
+                    className="h-12 w-full rounded-xl border-2 border-border font-bold text-base shadow-md"
                     disabled={isDisabled}
                     type="submit"
                   >

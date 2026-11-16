@@ -97,8 +97,13 @@ export function JoinSessionModal({
   const homeHref = kind === "retro" ? "/" : "/poker";
 
   return (
-    <div className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-canvas p-4">
-      <AppLogo href={homeHref} />
+    // An amber field like Wayfindr Bundle's sign-in page.
+    <div className="flex min-h-dvh flex-col items-center justify-center gap-6 bg-primary p-4 dark:bg-canvas">
+      <AppLogo
+        accentClassName="text-ink dark:text-primary"
+        className="text-ink dark:text-foreground"
+        href={homeHref}
+      />
       <div className="w-full max-w-md rounded-2xl border-2 border-border bg-background p-6 shadow-lg md:p-8">
         <p className="flex items-center gap-1.5 font-bold text-muted-foreground text-xs uppercase tracking-wide">
           <Icon aria-hidden="true" className="h-4 w-4" />
@@ -163,7 +168,7 @@ export function JoinSessionModal({
         </form>
       </div>
       <Link
-        className="text-muted-foreground text-sm underline underline-offset-2 hover:text-foreground"
+        className="text-ink/80 text-sm underline underline-offset-2 hover:text-ink dark:text-muted-foreground dark:hover:text-foreground"
         href={homeHref}
       >
         Start your own instead

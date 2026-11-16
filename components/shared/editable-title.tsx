@@ -96,7 +96,7 @@ export function EditableTitle({
     <h1 className="min-w-0">
       <button
         aria-label={`${label}: ${value}. Click to edit`}
-        className="group flex max-w-full items-center gap-1.5 rounded-md text-left font-bold text-base outline-none transition-colors hover:text-primary focus-visible:ring-2 focus-visible:ring-ring md:text-lg"
+        className="group flex max-w-full items-center gap-1.5 rounded-md text-left font-bold text-base outline-none transition-colors hover:text-brand-text focus-visible:ring-2 focus-visible:ring-ring md:text-lg"
         onClick={() => setIsEditing(true)}
         title={value}
         type="button"
