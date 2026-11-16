@@ -32,7 +32,7 @@ export function RoundHistory({
     >
       <div className="flex items-baseline justify-between gap-2">
         <h2
-          className="flex items-center gap-1.5 font-bold text-muted-foreground text-sm uppercase tracking-wide"
+          className="flex items-center gap-1.5 font-bold text-muted-foreground text-xs uppercase tracking-wide"
           id="history-heading"
         >
           <History aria-hidden="true" className="h-4 w-4" />

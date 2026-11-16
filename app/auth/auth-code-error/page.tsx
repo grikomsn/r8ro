@@ -27,10 +27,10 @@ export default async function AuthCodeErrorPage({
   const message = reason ? MESSAGES[reason] : undefined;
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <div className="w-full max-w-md space-y-6 rounded-xl border-2 border-border bg-card p-8 text-center shadow-lg">
+    <div className="flex min-h-dvh items-center justify-center bg-canvas p-4">
+      <div className="w-full max-w-md space-y-6 rounded-2xl border-2 border-border bg-background p-6 text-center shadow-md md:p-8">
         <div className="space-y-2">
-          <h1 className="font-bold text-3xl text-foreground">
+          <h1 className="font-black text-2xl text-foreground">
             Authentication Error
           </h1>
           {message ? (

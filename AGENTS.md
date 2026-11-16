@@ -27,7 +27,7 @@ No Jest/Vitest/Playwright configured. Validation chain: `pnpm check-types` → `
 - `app/new/route.ts`: retro board creation (server); poker sessions are created client-side
 - `app/auth/callback/route.ts`, `app/auth/link/start/route.ts`: OAuth callback and account-linking API routes
 - `components/retro/`, `components/poker/`: feature modules
-- `components/shared/`: cross-feature components (join modal, participants panel, private access overlay)
+- `components/shared/`: cross-feature components (session topbar, presence button, share menu, join screen, session landing, avatars)
 - `components/ui/`: shadcn primitives (linter disabled — treat as vendor)
 - `hooks/use-auth.ts`: central auth hook (anonymous-first + GitHub binding)
 - `lib/supabase/`: four clients — `client.ts` (browser singleton), `server.ts` (RSC), `proxy.ts` (middleware), `admin.ts` (service role)

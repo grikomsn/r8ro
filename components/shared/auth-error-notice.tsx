@@ -1,5 +1,7 @@
 "use client";
 
+import { WifiOff } from "lucide-react";
+import { FullPageMessage } from "@/components/shared/full-page-status";
 import { Button } from "@/components/ui/button";
 
 interface AuthErrorNoticeProps {
@@ -13,17 +15,19 @@ interface AuthErrorNoticeProps {
  */
 export function AuthErrorNotice({ message }: AuthErrorNoticeProps) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-secondary px-4">
-      <div
-        className="max-w-md rounded-2xl border-2 border-border bg-background p-8 shadow-md"
-        role="alert"
-      >
-        <p className="font-bold text-primary text-xl">Session unavailable</p>
-        <p className="mt-2 text-muted-foreground text-sm">{message}</p>
-        <Button className="mt-6" onClick={() => window.location.reload()}>
-          Retry
+    <FullPageMessage
+      description={message}
+      homeHref="/"
+      icon={<WifiOff aria-hidden="true" className="h-6 w-6" />}
+      primary={
+        <Button
+          className="rounded-lg font-bold"
+          onClick={() => window.location.reload()}
+        >
+          Try again
         </Button>
-      </div>
-    </div>
+      }
+      title="Could not connect"
+    />
   );
 }

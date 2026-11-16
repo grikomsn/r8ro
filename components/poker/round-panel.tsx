@@ -98,7 +98,7 @@ export function RoundPanel({
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2
-          className="font-bold text-muted-foreground text-sm uppercase tracking-wide"
+          className="font-bold text-muted-foreground text-xs uppercase tracking-wide"
           id="round-heading"
         >
           Round {roundNumber} · Story
@@ -183,12 +183,14 @@ export function RoundPanel({
       {isAuthor && (
         <div
           aria-label="Host controls"
-          className="mt-4 flex flex-wrap items-center gap-2 border-border border-t-2 pt-4"
+          // On phones the controls are pinned to the bottom of the screen so
+          // the host can reveal or move on without scrolling back up.
+          className="flex items-center gap-2 max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-30 max-md:border-border max-md:border-t-2 max-md:bg-background max-md:px-3 max-md:pt-2 max-md:pb-[max(0.5rem,env(safe-area-inset-bottom))] md:mt-4 md:flex-wrap md:border-border md:border-t-2 md:pt-4"
           role="toolbar"
         >
           {session.votes_revealed ? (
             <Button
-              className="h-10 rounded-lg font-bold"
+              className="h-10 rounded-lg font-bold max-md:h-12 max-md:flex-1"
               disabled={pendingActions.nextRound}
               onClick={onNextRound}
             >
@@ -198,7 +200,7 @@ export function RoundPanel({
           ) : (
             <Button
               className={cn(
-                "h-10 rounded-lg font-bold",
+                "h-10 rounded-lg font-bold max-md:h-12 max-md:flex-1",
                 allVoted && "ring-2 ring-primary ring-offset-2"
               )}
               disabled={pendingActions.toggleReveal || votedCount === 0}
@@ -214,43 +216,45 @@ export function RoundPanel({
 
           {session.votes_revealed ? (
             <Button
-              className="h-10 rounded-lg font-bold"
+              aria-label="Hide votes"
+              className="h-10 rounded-lg font-bold max-md:h-12 max-md:w-12 max-md:p-0"
               disabled={pendingActions.toggleReveal}
               onClick={onToggleReveal}
               variant="outline"
             >
-              <EyeOff aria-hidden="true" className="mr-1.5 h-4 w-4" />
-              Hide votes
+              <EyeOff aria-hidden="true" className="h-4 w-4 md:mr-1.5" />
+              <span className="max-md:hidden">Hide votes</span>
             </Button>
           ) : (
             <Button
-              className="h-10 rounded-lg font-bold"
+              aria-label={
+                session.is_voting_active ? "Pause voting" : "Open voting"
+              }
+              className="h-10 rounded-lg font-bold max-md:h-12 max-md:w-12 max-md:p-0"
               disabled={pendingActions.toggleVoting}
               onClick={onToggleVoting}
               variant="outline"
             >
               {session.is_voting_active ? (
-                <>
-                  <Pause aria-hidden="true" className="mr-1.5 h-4 w-4" />
-                  Pause voting
-                </>
+                <Pause aria-hidden="true" className="h-4 w-4 md:mr-1.5" />
               ) : (
-                <>
-                  <Play aria-hidden="true" className="mr-1.5 h-4 w-4" />
-                  Open voting
-                </>
+                <Play aria-hidden="true" className="h-4 w-4 md:mr-1.5" />
               )}
+              <span className="max-md:hidden">
+                {session.is_voting_active ? "Pause voting" : "Open voting"}
+              </span>
             </Button>
           )}
 
           <Button
-            className="h-10 rounded-lg font-bold"
+            aria-label="Revote"
+            className="h-10 rounded-lg font-bold max-md:h-12 max-md:w-12 max-md:p-0"
             disabled={pendingActions.clearVotes || votedCount === 0}
             onClick={() => setConfirmClear(true)}
             variant="ghost"
           >
-            <RotateCcw aria-hidden="true" className="mr-1.5 h-4 w-4" />
-            Revote
+            <RotateCcw aria-hidden="true" className="h-4 w-4 md:mr-1.5" />
+            <span className="max-md:hidden">Revote</span>
           </Button>
         </div>
       )}

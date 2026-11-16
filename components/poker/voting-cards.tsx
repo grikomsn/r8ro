@@ -1,6 +1,7 @@
 "use client";
 
 import { Check, Glasses } from "lucide-react";
+import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -65,33 +66,45 @@ export function VotingCards({
       <p aria-live="polite" className="sr-only" role="status">
         {announcement}
       </p>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2
-          className="font-bold text-muted-foreground text-sm uppercase tracking-wide"
-          id="vote-heading"
-        >
-          Your vote
-        </h2>
-        <Button
-          aria-pressed={isObserver}
-          className="h-8 rounded-lg text-xs"
-          onClick={onToggleObserver}
-          title={
-            isObserver
-              ? "Join the vote again"
-              : "Watch without voting, for example as a product owner"
-          }
-          variant={isObserver ? "secondary" : "ghost"}
-        >
-          <Glasses aria-hidden="true" className="mr-1.5 h-4 w-4" />
-          {isObserver ? "Observing · join vote" : "Observe only"}
-        </Button>
-      </div>
+      <h2
+        className="font-bold text-muted-foreground text-xs uppercase tracking-wide"
+        id="vote-heading"
+      >
+        Your vote
+      </h2>
+
+      {isObserver && (
+        <div className="mt-3 flex items-center gap-3 rounded-xl border-2 border-border border-dashed px-3 py-2.5">
+          <Glasses aria-hidden="true" className="h-5 w-5 shrink-0" />
+          <p className="min-w-0 flex-1 text-sm">
+            You are observing. You see the results but do not vote.
+          </p>
+          <Button
+            className="h-8 shrink-0 rounded-lg font-bold"
+            onClick={onToggleObserver}
+            size="sm"
+            variant="outline"
+          >
+            Join vote
+          </Button>
+        </div>
+      )}
 
       <div
         aria-label="Voting cards"
-        className="mt-3 grid grid-cols-[repeat(auto-fill,minmax(4.25rem,1fr))] gap-2 md:grid-cols-[repeat(auto-fill,minmax(5rem,1fr))] md:gap-3"
+        // Two even rows on phones and tablets, one row on wide screens, so a
+        // scale never wraps with a lonely card or two.
+        className={cn(
+          "mt-3 grid grid-cols-[repeat(var(--cols-half),minmax(0,1fr))] gap-2 md:gap-3 lg:grid-cols-[repeat(var(--cols-all),minmax(0,1fr))] lg:gap-2",
+          isObserver && "hidden"
+        )}
         role="group"
+        style={
+          {
+            "--cols-half": Math.ceil(scale.length / 2),
+            "--cols-all": scale.length,
+          } as React.CSSProperties
+        }
       >
         {scale.map((value) => {
           const isSelected = selectedValue === value;
@@ -102,7 +115,7 @@ export function VotingCards({
               }
               aria-pressed={isSelected}
               className={cn(
-                "relative flex aspect-[3/4] items-center justify-center rounded-xl border-2 font-black text-2xl shadow-sm transition-[transform,border-color,box-shadow,background-color,opacity] duration-150 md:text-3xl",
+                "relative flex aspect-[4/5] items-center justify-center rounded-xl border-2 font-black text-xl shadow-xs transition-[transform,border-color,box-shadow,background-color,opacity] duration-150 sm:aspect-[3/4] sm:text-2xl md:text-3xl lg:text-2xl",
                 isSelected
                   ? "-translate-y-1 border-primary bg-primary text-primary-foreground shadow-md"
                   : "border-border bg-background",
@@ -128,7 +141,9 @@ export function VotingCards({
         })}
       </div>
 
-      <p className="mt-3 text-muted-foreground text-sm">{hint}</p>
+      {!isObserver && (
+        <p className="mt-3 text-muted-foreground text-sm">{hint}</p>
+      )}
     </section>
   );
 }

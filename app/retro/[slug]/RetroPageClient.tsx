@@ -1,9 +1,14 @@
 "use client";
 
+import { Lock } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { BoardHeader } from "@/components/retro/board-header";
+import {
+  BoardHeader,
+  type CardSortMode,
+} from "@/components/retro/board-header";
+import { MobileComposer } from "@/components/retro/mobile-composer";
 import {
   COLUMN_CONFIG,
   COLUMN_ORDER,
@@ -15,16 +20,8 @@ import {
   FullPageMessage,
 } from "@/components/shared/full-page-status";
 import { JoinSessionModal } from "@/components/shared/join-session-modal";
-import { ParticipantsPanel } from "@/components/shared/participants-panel";
 import { PrivateAccessOverlay } from "@/components/shared/private-access-overlay";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetTitle,
-} from "@/components/ui/sheet";
 import { useAuth } from "@/hooks/use-auth";
-import { useMediaQuery, XL_QUERY } from "@/hooks/use-media-query";
 import { computeRemainingSeconds, getTimerBase } from "@/hooks/use-retro-timer";
 import { createClient } from "@/lib/supabase/client";
 import type {
@@ -43,6 +40,8 @@ import {
 import { retroToMarkdown } from "@/lib/utils/export-markdown";
 import { addRecentBoard } from "@/lib/utils/recent-boards";
 import { UNIQUE_VIOLATION_CODE } from "@/lib/utils/slug";
+
+const SORT_STORAGE_KEY = "r8ro-retro-sort";
 
 interface PresenceState {
   online_at: number;
@@ -86,15 +85,31 @@ export default function RetroPageClient() {
     {}
   );
 
-  const isXl = useMediaQuery(XL_QUERY);
-  // The participants list is docked on wide screens and a drawer otherwise,
-  // so it starts open only where it does not cover the board.
-  // Crossing the breakpoint resets it, so shrinking the window does not
-  // leave a drawer covering the board.
-  const [participantsOpen, setParticipantsOpen] = useState(false);
+  // "auto" keeps cards in the order they were added while the board is open,
+  // so they do not jump under someone's finger as others vote, and ranks them
+  // by votes once the host locks the board for discussion. An explicit
+  // choice is remembered per browser.
+  const [sortMode, setSortMode] = useState<CardSortMode>("auto");
   useEffect(() => {
-    setParticipantsOpen(isXl);
-  }, [isXl]);
+    try {
+      const saved = localStorage.getItem(SORT_STORAGE_KEY);
+      if (saved === "added" || saved === "votes" || saved === "auto") {
+        setSortMode(saved);
+      }
+    } catch {
+      // Storage can be unavailable, for example in a private window.
+    }
+  }, []);
+  const handleSortChange = useCallback((mode: CardSortMode) => {
+    setSortMode(mode);
+    try {
+      localStorage.setItem(SORT_STORAGE_KEY, mode);
+    } catch {
+      // Ignore; the choice still applies to this visit.
+    }
+  }, []);
+
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
 
   const boardRef = useRef(board);
   const cardsRef = useRef(cards);
@@ -783,11 +798,13 @@ export default function RetroPageClient() {
           .update(patch)
           .eq("id", cardId);
         throwIfSupabaseError(updateError, failureLabel);
+        return previous;
       } catch (updateError) {
         reportActionError(failureLabel, updateError);
         setCards((prev) =>
           prev.map((c) => (c.id === cardId ? { ...c, ...previous } : c))
         );
+        return null;
       } finally {
         setPending(key, false);
       }
@@ -807,13 +824,31 @@ export default function RetroPageClient() {
   );
 
   const handleMoveCard = useCallback(
-    (cardId: string, columnType: ColumnType) =>
-      updateCard(
+    async (cardId: string, columnType: ColumnType) => {
+      const previous = await updateCard(
         cardId,
         `move-${cardId}`,
         { column_type: columnType },
         "Could not move the card"
-      ),
+      );
+      if (!previous) {
+        return;
+      }
+      // On phones the card leaves the visible column, so say where it went.
+      toast.success(`Moved to “${COLUMN_CONFIG[columnType].title}”`, {
+        action: {
+          label: "Undo",
+          onClick: () => {
+            updateCard(
+              cardId,
+              `move-${cardId}`,
+              { column_type: previous.column_type },
+              "Could not undo the move"
+            );
+          },
+        },
+      });
+    },
     [updateCard]
   );
 
@@ -867,7 +902,7 @@ export default function RetroPageClient() {
   }
 
   if (showJoinModal) {
-    return <JoinSessionModal onJoin={handleJoin} submitLabel="Join retro" />;
+    return <JoinSessionModal kind="retro" onJoin={handleJoin} slug={slug} />;
   }
 
   if (loading) {
@@ -905,124 +940,156 @@ export default function RetroPageClient() {
     );
   }
 
-  const onlineCount = participants.filter((p) => p.is_online).length;
   const voteCount = cards.reduce((sum, card) => sum + card.votes, 0);
-  const participantsPanel = (
-    <ParticipantsPanel
-      authorId={board.author_id}
-      currentUserId={userId}
-      participants={participants}
-    />
-  );
+  const effectiveSortMode =
+    sortMode === "auto" ? (board.is_locked ? "votes" : "added") : sortMode;
+
+  // On phones one column is shown at a time; a horizontal swipe moves to the
+  // neighbouring column.
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    const start = touchStart.current;
+    touchStart.current = null;
+    const touch = e.changedTouches[0];
+    if (!(start && touch)) {
+      return;
+    }
+    const dx = touch.clientX - start.x;
+    const dy = touch.clientY - start.y;
+    if (Math.abs(dx) < 60 || Math.abs(dy) > Math.abs(dx) * 0.6) {
+      return;
+    }
+    const index = COLUMN_ORDER.indexOf(activeColumn);
+    const next = COLUMN_ORDER[index + (dx < 0 ? 1 : -1)];
+    if (next) {
+      setActiveColumn(next);
+    }
+  };
 
   return (
-    <div className="flex h-dvh flex-col overflow-hidden bg-secondary">
+    <div className="flex h-dvh flex-col overflow-hidden bg-canvas">
       <BoardHeader
         board={board}
         cardCount={cards.length}
+        currentUserId={userId}
         isAuthor={isAuthor}
         onCopyMarkdown={handleCopyMarkdown}
         onDeleteBoard={handleDeleteBoard}
         onDownloadMarkdown={handleDownloadMarkdown}
-        onlineCount={onlineCount}
         onSetTimer={handleSetTimer}
+        onSortChange={handleSortChange}
         onTimerExpire={handleTimerExpire}
         onTimerReset={handleTimerReset}
         onTimerToggle={handleTimerToggle}
         onTitleUpdate={handleEditBoardTitle}
         onToggleLock={handleToggleLock}
-        onToggleParticipants={() => setParticipantsOpen((open) => !open)}
         onToggleVisibility={handleToggleVisibility}
-        participantCount={participants.length}
-        participantsOpen={participantsOpen}
+        participants={participants}
+        sortMode={sortMode}
         voteCount={voteCount}
       />
 
-      <div className="flex min-h-0 flex-1">
-        <main
-          aria-label="Retro board"
-          className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 p-2 md:p-4"
-          data-board-capture
+      {board.is_locked && (
+        <div
+          className="flex items-center justify-center gap-2 border-border border-b-2 bg-primary/15 px-3 py-1.5 text-sm"
+          role="status"
         >
-          <div
-            aria-label="Columns"
-            className="grid shrink-0 grid-cols-3 gap-1 rounded-xl border-2 border-border bg-background p-1 md:hidden"
-            role="tablist"
-          >
-            {COLUMN_ORDER.map((type) => (
-              <button
-                aria-selected={activeColumn === type}
-                className={cn(
-                  "flex items-center justify-center gap-1.5 rounded-lg px-1 py-2 font-bold text-xs transition-colors",
-                  activeColumn === type
-                    ? cn(COLUMN_CONFIG[type].header, "shadow-sm")
-                    : "text-muted-foreground"
-                )}
-                key={type}
-                onClick={() => setActiveColumn(type)}
-                role="tab"
-                type="button"
-              >
-                <span className="truncate">{COLUMN_CONFIG[type].title}</span>
-                <span className="rounded bg-background/80 px-1 text-foreground tabular-nums">
-                  {cardsByColumn[type].length}
-                </span>
-              </button>
-            ))}
-          </div>
+          <Lock aria-hidden="true" className="h-4 w-4 shrink-0" />
+          <span className="min-w-0 truncate">
+            <strong>Locked for discussion.</strong>{" "}
+            <span className="max-sm:hidden">Cards and votes are frozen.</span>
+          </span>
+          {isAuthor && (
+            <button
+              className="shrink-0 rounded font-bold underline underline-offset-2"
+              onClick={handleToggleLock}
+              type="button"
+            >
+              Unlock
+            </button>
+          )}
+        </div>
+      )}
 
-          <div className="grid min-h-0 flex-1 gap-3 md:grid-cols-3 md:gap-4">
-            {COLUMN_ORDER.map((type) => (
-              <div
-                className={cn(
-                  "min-h-0 min-w-0",
-                  activeColumn === type ? "flex flex-col" : "hidden",
-                  "md:flex md:flex-col"
-                )}
-                key={type}
-              >
-                <RetroColumn
-                  cards={cardsByColumn[type]}
-                  columnType={type}
-                  currentUserId={userId ?? ""}
-                  draggedCardId={draggedCardId}
-                  isLocked={board.is_locked}
-                  myVotes={myVotes}
-                  onAddCard={handleAddCard}
-                  onDeleteCard={handleDeleteCard}
-                  onEditCard={handleEditCard}
-                  onMoveCard={handleMoveCard}
-                  onVoteCard={handleVoteCard}
-                  pendingActions={pendingActions}
-                  setDraggedCardId={setDraggedCardId}
-                />
-              </div>
-            ))}
-          </div>
-        </main>
-
-        {isXl && participantsOpen && (
-          <aside
-            aria-label="Participants"
-            className="my-4 mr-4 hidden w-72 shrink-0 overflow-hidden rounded-xl border-2 border-border bg-background shadow-sm xl:block"
-          >
-            {participantsPanel}
-          </aside>
-        )}
-      </div>
-
-      <Sheet
-        onOpenChange={setParticipantsOpen}
-        open={!isXl && participantsOpen}
+      <main
+        aria-label="Retro board"
+        className="mx-auto flex min-h-0 w-full max-w-[1600px] flex-1 flex-col gap-2 p-2 md:p-4"
+        data-board-capture
+        onTouchEnd={handleTouchEnd}
+        onTouchStart={(e) => {
+          const touch = e.touches[0];
+          touchStart.current = touch
+            ? { x: touch.clientX, y: touch.clientY }
+            : null;
+        }}
       >
-        <SheetContent className="w-80 gap-0 p-0" side="right">
-          <SheetTitle className="sr-only">Participants</SheetTitle>
-          <SheetDescription className="sr-only">
-            People on this board and whether they are online.
-          </SheetDescription>
-          {participantsPanel}
-        </SheetContent>
-      </Sheet>
+        <div
+          aria-label="Columns"
+          className="grid shrink-0 grid-cols-3 gap-1 rounded-xl border-2 border-border bg-muted p-1 md:hidden"
+          role="tablist"
+        >
+          {COLUMN_ORDER.map((type) => (
+            <button
+              aria-selected={activeColumn === type}
+              className={cn(
+                "flex min-w-0 items-center justify-center gap-1.5 rounded-lg px-1 py-2 font-bold text-xs transition-colors",
+                activeColumn === type
+                  ? "bg-background text-foreground shadow-sm"
+                  : "text-muted-foreground"
+              )}
+              key={type}
+              onClick={() => setActiveColumn(type)}
+              role="tab"
+              type="button"
+            >
+              <span
+                aria-hidden="true"
+                className={cn(
+                  "h-2 w-2 shrink-0 rounded-full",
+                  COLUMN_CONFIG[type].dot
+                )}
+              />
+              <span className="truncate">{COLUMN_CONFIG[type].title}</span>
+              <span className="tabular-nums opacity-70">
+                {cardsByColumn[type].length}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <div className="grid min-h-0 flex-1 gap-3 md:grid-cols-3 md:gap-4">
+          {COLUMN_ORDER.map((type) => (
+            <div
+              className={cn(
+                "min-h-0 min-w-0",
+                activeColumn === type ? "flex flex-col" : "hidden",
+                "md:flex md:flex-col"
+              )}
+              key={type}
+            >
+              <RetroColumn
+                cards={cardsByColumn[type]}
+                columnType={type}
+                currentUserId={userId ?? ""}
+                draggedCardId={draggedCardId}
+                isLocked={board.is_locked}
+                myVotes={myVotes}
+                onAddCard={handleAddCard}
+                onDeleteCard={handleDeleteCard}
+                onEditCard={handleEditCard}
+                onMoveCard={handleMoveCard}
+                onVoteCard={handleVoteCard}
+                pendingActions={pendingActions}
+                setDraggedCardId={setDraggedCardId}
+                sortMode={effectiveSortMode}
+              />
+            </div>
+          ))}
+        </div>
+      </main>
+
+      {!board.is_locked && (
+        <MobileComposer columnType={activeColumn} onAddCard={handleAddCard} />
+      )}
     </div>
   );
 }

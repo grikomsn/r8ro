@@ -24,12 +24,25 @@
 - Deleting a card is confirmed before it happens, because it removes the card
   and its votes for every participant.
 - Each participant sees which cards they voted on, and can withdraw a vote by
-  clicking it again. Cards are ordered by votes, then by creation time.
+  clicking it again.
+- Card order is a per-browser choice in the board menu. "Automatic" (the
+  default) keeps cards in the order they were added while the board is open,
+  so they do not move under someone's finger as others vote, and ranks them by
+  votes once the host locks the board for discussion. "Oldest first" and
+  "Most votes" are fixed orders.
 - Card text keeps line breaks. Enter adds or saves a card, Shift+Enter adds a
   new line, and Escape cancels. The add-card composer stays open so several
   cards can be added in a row.
 - On phones one column is shown at a time, with a switcher that shows each
-  column's card count.
+  column's card count; a horizontal swipe moves to the next column. Cards are
+  added from a composer pinned to the bottom of the screen
+  (`components/retro/mobile-composer.tsx`). Moving a card shows a notice with
+  an Undo action, because on a phone it leaves the visible column.
+- Each card has one menu with Edit, Move to another column, and Delete. On
+  desktop it appears on hover or focus; cards can also be dragged between
+  columns.
+- A locked board shows a banner under the header; the host can unlock it from
+  there.
 - The author can change the title, visibility, lock state, timer, and delete
   the board.
 - The timer pauses and resumes. `timer_seconds` is the configured duration
@@ -54,14 +67,20 @@ handlers track or untrack the current user.
 
 ## Main Components
 
+- `components/shared/session-topbar.tsx`: the one-row header shared by retro
+  boards and poker sessions.
 - `components/retro/board-header.tsx`: title, session code, card and vote
-  counts, timer, participants toggle, share and export menu, host settings.
+  counts, timer, who is here, share and export, and the board menu (card
+  order for everyone; lock, visibility and delete for the host). On phones
+  sharing moves into the board menu.
 - `components/retro/timer-control.tsx` and `hooks/use-retro-timer.ts`: the
   shared timer. Everyone sees it; the host gets start, pause, resume, reset,
   and duration presets in a popover.
 - `components/retro/retro-column.tsx`
-- `components/shared/participants-panel.tsx`: docked on wide screens, a
-  drawer otherwise.
+- `components/shared/presence-button.tsx`: avatars of the other people online,
+  opening the full participant list.
+- `components/shared/join-session-modal.tsx`: the first screen of a shared
+  link for someone without a name yet. It shows the board title and host.
 - `components/shared/private-access-overlay.tsx`
 
 The current SQL rules are summarized in

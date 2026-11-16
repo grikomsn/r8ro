@@ -2,6 +2,7 @@
 
 import { Check, Crown, Glasses, Lightbulb, PartyPopper } from "lucide-react";
 import { useMemo } from "react";
+import { Avatar } from "@/components/shared/avatar";
 import type { PokerParticipant, PokerVote } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { computePokerStats } from "@/lib/utils/poker-stats";
@@ -76,7 +77,7 @@ export function VoteResults({
     >
       <div className="flex items-baseline justify-between gap-2">
         <h2
-          className="font-bold text-muted-foreground text-sm uppercase tracking-wide"
+          className="font-bold text-muted-foreground text-xs uppercase tracking-wide"
           id="results-heading"
         >
           {votesRevealed ? "Results" : "Votes"}
@@ -196,16 +197,14 @@ export function VoteResults({
               )}
               key={participant.id}
             >
-              <span
-                aria-label={participant.is_online ? "Online" : "Offline"}
-                className={cn(
-                  "h-2 w-2 shrink-0 rounded-full",
-                  participant.is_online
-                    ? "bg-success"
-                    : "bg-muted-foreground/40"
-                )}
-                role="img"
+              <Avatar
+                name={participant.username}
+                online={participant.is_online}
+                size="sm"
               />
+              <span className="sr-only">
+                {participant.is_online ? "Online" : "Away"}
+              </span>
               <span className="min-w-0 flex-1 truncate font-semibold text-sm">
                 {participant.username}
                 {isYou && (

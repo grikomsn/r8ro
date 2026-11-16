@@ -9,8 +9,8 @@
 - Joining accepts a session code or a pasted link, verifies that the session
   can be selected, stores it in recent history, and opens `/poker/[slug]`.
 - New and newly joined participant rows set `is_observer` to `false`. Any
-  participant can switch to observing from their hand; their vote is withdrawn
-  first, and observers are not counted as voters.
+  participant can switch to observing from the session menu; their vote is
+  withdrawn first, and observers are not counted as voters.
 - Every scale includes `?`. Fibonacci and T-shirt also include `☕` for a
   break. Neither counts as an estimate.
 
@@ -53,9 +53,11 @@ and vote changes on `poker-${slug}`. Supabase Presence and
 
 - `components/poker/session-header.tsx`
 - `components/poker/round-panel.tsx`: current story and the host controls
-  (reveal, pause or open voting, revote, next story).
-- `components/poker/voting-cards.tsx`: the participant's hand, with the
-  observer toggle.
+  (reveal, pause or open voting, revote, next story). On phones the controls
+  are pinned to the bottom of the screen, and once votes are revealed the
+  results move above the hand.
+- `components/poker/voting-cards.tsx`: the participant's hand. Two even rows
+  on phones and tablets, one row on wide screens.
 - `components/poker/vote-results.tsx`: who has voted, then results after the
   reveal.
 - `components/poker/round-history.tsx` and

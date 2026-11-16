@@ -126,7 +126,7 @@ export default function PokerClientPage() {
                 <span className="w-20 shrink-0 font-bold text-sm">
                   {VOTING_SCALE_LABELS[type]}
                 </span>
-                <span className="truncate font-mono text-muted-foreground text-xs">
+                <span className="min-w-0 truncate font-mono text-muted-foreground text-xs">
                   {VOTING_SCALES[type].join(" · ")}
                 </span>
               </label>

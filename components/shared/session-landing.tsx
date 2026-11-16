@@ -151,7 +151,7 @@ function SessionList({
 }
 
 const tabTriggerClass =
-  "gap-2 rounded-none border-transparent border-b-4 py-3.5 font-bold text-sm uppercase data-[state=active]:border-primary data-[state=active]:bg-background data-[state=active]:text-foreground md:text-base";
+  "gap-2 rounded-none border-transparent border-b-4 py-3.5 font-bold text-sm data-[state=active]:border-primary data-[state=active]:bg-background data-[state=active]:text-foreground md:text-base";
 
 export function SessionLanding({
   createExtras,
@@ -177,6 +177,7 @@ export function SessionLanding({
     isInitialized,
   } = useAuth();
   const [username, setUsername] = useState("");
+  const [isEditingName, setIsEditingName] = useState(false);
   const [title, setTitle] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
@@ -350,24 +351,38 @@ export function SessionLanding({
 
   const isDisabled = isSubmitting || authLoading || !userId;
 
-  const nameField = (id: string) => (
-    <div className="space-y-2">
-      <Label className="font-bold text-sm" htmlFor={id}>
-        Your name
-      </Label>
-      <Input
-        autoComplete="name"
-        className="h-11 rounded-xl border-2 border-border bg-background px-4 text-base"
-        id={id}
-        maxLength={USERNAME_MAX_LENGTH}
-        name="username"
-        onChange={(e) => setUsername(e.target.value)}
-        placeholder="How others will see you"
-        required
-        value={username}
-      />
-    </div>
-  );
+  const nameField = (id: string) =>
+    displayName && !isEditingName ? (
+      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl bg-muted px-4 py-3 text-sm">
+        <span className="text-muted-foreground">You appear as</span>
+        <span className="font-bold">{username || displayName}</span>
+        <button
+          className="ml-auto font-semibold text-sm underline underline-offset-2 hover:text-primary"
+          onClick={() => setIsEditingName(true)}
+          type="button"
+        >
+          Change
+        </button>
+      </p>
+    ) : (
+      <div className="space-y-2">
+        <Label className="font-bold text-sm" htmlFor={id}>
+          Your name
+        </Label>
+        <Input
+          autoComplete="name"
+          autoFocus={isEditingName}
+          className="h-11 rounded-xl border-2 border-border bg-background px-4 text-base"
+          id={id}
+          maxLength={USERNAME_MAX_LENGTH}
+          name="username"
+          onChange={(e) => setUsername(e.target.value)}
+          placeholder="How others will see you"
+          required
+          value={username}
+        />
+      </div>
+    );
 
   const errorBox = error ? (
     <p
@@ -379,16 +394,21 @@ export function SessionLanding({
   ) : null;
 
   return (
-    <div className="flex min-h-dvh flex-col bg-secondary">
+    <div className="flex min-h-dvh flex-col bg-canvas">
       <SiteHeader />
       <main className="mx-auto grid w-full max-w-6xl flex-1 gap-6 px-4 py-8 md:py-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] lg:gap-10">
-        <div className="space-y-6">
-          <section aria-labelledby="landing-heading" className="space-y-3">
+        {/* On phones the sections flatten into one list so that your own
+            sessions come right after the form, before the feature list. */}
+        <div className="max-lg:contents lg:space-y-6">
+          <section
+            aria-labelledby="landing-heading"
+            className="space-y-2 max-lg:order-1 md:space-y-3"
+          >
             <p className="font-bold text-foreground/70 text-sm uppercase tracking-wide">
               {eyebrow}
             </p>
             <h1
-              className="font-black text-3xl leading-tight md:text-4xl"
+              className="font-black text-2xl leading-tight sm:text-3xl md:text-4xl"
               id="landing-heading"
             >
               {heading}
@@ -398,7 +418,7 @@ export function SessionLanding({
             </p>
           </section>
 
-          <div className="overflow-hidden rounded-2xl border-2 border-border bg-background shadow-lg">
+          <div className="overflow-hidden rounded-2xl border-2 border-border bg-background shadow-lg max-lg:order-2">
             <Tabs
               className="w-full gap-0"
               defaultValue="create"
@@ -481,7 +501,7 @@ export function SessionLanding({
             </Tabs>
           </div>
 
-          <ul className="grid grid-cols-3 gap-2 sm:gap-3">
+          <ul className="grid grid-cols-3 gap-2 max-lg:order-4 sm:gap-3">
             {features.map(
               ({ icon: Icon, title: featureTitle, description: text }) => (
                 <li
@@ -501,7 +521,14 @@ export function SessionLanding({
 
         <aside
           aria-label={`Your ${noun}s`}
-          className="h-fit overflow-hidden rounded-2xl border-2 border-border bg-background shadow-md lg:sticky lg:top-6"
+          className={cn(
+            "h-fit overflow-hidden rounded-2xl border-2 border-border bg-background shadow-md max-lg:order-3 lg:sticky lg:top-6",
+            // A first visit on a phone has nothing to list yet.
+            mine.length === 0 &&
+              recentItems.length === 0 &&
+              mineState !== "loading" &&
+              "max-lg:hidden"
+          )}
         >
           <Tabs className="w-full gap-0" defaultValue="mine">
             <TabsList className="grid h-auto w-full grid-cols-2 rounded-none border-border border-b-2 bg-muted p-0">
