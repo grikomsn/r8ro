@@ -1,24 +1,31 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Users } from "lucide-react";
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
-
-import { BoardBottomNav } from "@/components/retro/board-bottom-nav";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import { BoardHeader } from "@/components/retro/board-header";
-import { RetroColumn } from "@/components/retro/retro-column";
+import {
+  COLUMN_CONFIG,
+  COLUMN_ORDER,
+  RetroColumn,
+} from "@/components/retro/retro-column";
 import { AuthErrorNotice } from "@/components/shared/auth-error-notice";
+import {
+  FullPageLoading,
+  FullPageMessage,
+} from "@/components/shared/full-page-status";
 import { JoinSessionModal } from "@/components/shared/join-session-modal";
 import { ParticipantsPanel } from "@/components/shared/participants-panel";
 import { PrivateAccessOverlay } from "@/components/shared/private-access-overlay";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { useAuth } from "@/hooks/use-auth";
+import { useMediaQuery, XL_QUERY } from "@/hooks/use-media-query";
+import { computeRemainingSeconds, getTimerBase } from "@/hooks/use-retro-timer";
 import { createClient } from "@/lib/supabase/client";
 import type {
   ColumnType,
@@ -26,9 +33,16 @@ import type {
   RetroCard,
   RetroParticipant,
 } from "@/lib/types";
+import { cn } from "@/lib/utils";
+import { downloadTextFile } from "@/lib/utils/download";
+import {
+  getErrorMessage,
+  reportActionError,
+  throwIfSupabaseError,
+} from "@/lib/utils/errors";
+import { retroToMarkdown } from "@/lib/utils/export-markdown";
 import { addRecentBoard } from "@/lib/utils/recent-boards";
-
-const DEFAULT_TIMER_DURATION = 300;
+import { UNIQUE_VIOLATION_CODE } from "@/lib/utils/slug";
 
 interface PresenceState {
   online_at: number;
@@ -36,21 +50,14 @@ interface PresenceState {
   username: string;
 }
 
-function getErrorMessage(error: unknown, fallback: string) {
-  if (error instanceof Error && error.message) {
-    return error.message;
+function upsertById<T extends { id: string }>(list: T[], item: T) {
+  const index = list.findIndex((existing) => existing.id === item.id);
+  if (index === -1) {
+    return [...list, item];
   }
-
-  return fallback;
-}
-
-function throwIfSupabaseError(
-  error: { message?: string } | null,
-  fallback: string
-) {
-  if (error) {
-    throw new Error(error.message || fallback);
-  }
+  const next = [...list];
+  next[index] = item;
+  return next;
 }
 
 export default function RetroPageClient() {
@@ -68,24 +75,40 @@ export default function RetroPageClient() {
   const [board, setBoard] = useState<RetroBoard | null>(null);
   const [cards, setCards] = useState<RetroCard[]>([]);
   const [participants, setParticipants] = useState<RetroParticipant[]>([]);
+  const [myVotes, setMyVotes] = useState<Set<string>>(() => new Set());
   const [userName, setUserName] = useState<string | null>(null);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [draggedCard, setDraggedCard] = useState<RetroCard | null>(null);
-  const [showSidebar, setShowSidebar] = useState(true);
-  const [timerDuration, setTimerDuration] = useState(DEFAULT_TIMER_DURATION);
+  const [draggedCardId, setDraggedCardId] = useState<string | null>(null);
+  const [activeColumn, setActiveColumn] = useState<ColumnType>("went_well");
   const [pendingActions, setPendingActions] = useState<Record<string, boolean>>(
     {}
   );
 
+  const isXl = useMediaQuery(XL_QUERY);
+  // The participants list is docked on wide screens and a drawer otherwise,
+  // so it starts open only where it does not cover the board.
+  // Crossing the breakpoint resets it, so shrinking the window does not
+  // leave a drawer covering the board.
+  const [participantsOpen, setParticipantsOpen] = useState(false);
+  useEffect(() => {
+    setParticipantsOpen(isXl);
+  }, [isXl]);
+
   const boardRef = useRef(board);
   const cardsRef = useRef(cards);
+  const myVotesRef = useRef(myVotes);
   const hasSubscribedRef = useRef(false);
   boardRef.current = board;
   cardsRef.current = cards;
+  myVotesRef.current = myVotes;
 
-  const isAuthor = board && userId === board.author_id;
+  const isAuthor = !!board && userId === board.author_id;
+
+  const setPending = useCallback((key: string, value: boolean) => {
+    setPendingActions((prev) => ({ ...prev, [key]: value }));
+  }, []);
 
   useEffect(() => {
     if (!authInitialized) {
@@ -139,14 +162,37 @@ export default function RetroPageClient() {
     throwIfSupabaseError(cardsRes.error, "Failed to load cards");
     throwIfSupabaseError(participantsRes.error, "Failed to load participants");
 
+    const loadedCards: RetroCard[] = cardsRes.data ?? [];
+    let votedCardIds = new Set<string>();
+
+    if (userId && loadedCards.length > 0) {
+      const { data: votes, error: votesError } = await supabase
+        .from("retro_card_votes")
+        .select("card_id")
+        .eq("user_id", userId)
+        .in(
+          "card_id",
+          loadedCards.map((card) => card.id)
+        );
+      throwIfSupabaseError(votesError, "Failed to load your votes");
+      votedCardIds = new Set((votes ?? []).map((vote) => vote.card_id));
+    }
+
     // The vote count is maintained in the database by
-    // public.sync_retro_card_vote_count, so the card row is authoritative
-    // and no separate vote query is needed.
-    setCards(cardsRes.data || []);
-    setParticipants(participantsRes.data || []);
+    // public.sync_retro_card_vote_count, so the card row is authoritative.
+    setCards(loadedCards);
+    setMyVotes(votedCardIds);
+    setParticipants((previous) => {
+      // Keep presence-derived online state for rows that already exist.
+      const online = new Map(previous.map((p) => [p.user_id, p.is_online]));
+      return (participantsRes.data ?? []).map((p) => ({
+        ...p,
+        is_online: online.get(p.user_id) ?? p.is_online,
+      }));
+    });
 
     return { board: boardData, participants: participantsRes.data ?? [] };
-  }, [slug]);
+  }, [slug, userId]);
 
   useEffect(() => {
     if (!(userId && userName)) {
@@ -165,7 +211,7 @@ export default function RetroPageClient() {
         }
 
         if (!loaded) {
-          setError("Board not found");
+          setError("not-found");
           setLoading(false);
           return;
         }
@@ -192,15 +238,21 @@ export default function RetroPageClient() {
               }
             );
           throwIfSupabaseError(upsertError, "Failed to join board");
+        } else if (existing.username !== userName) {
+          // The display name changed since the last visit.
+          await supabase
+            .from("retro_participants")
+            .update({ username: userName })
+            .eq("id", existing.id);
         }
 
         if (!cancelled) {
           setLoading(false);
         }
-      } catch (error: unknown) {
+      } catch (loadError: unknown) {
         if (!cancelled) {
-          console.error("Failed to load retro board:", error);
-          setError(getErrorMessage(error, "Failed to load board"));
+          console.error("Failed to load retro board:", loadError);
+          setError(getErrorMessage(loadError, "Failed to load board"));
           setLoading(false);
         }
       }
@@ -232,6 +284,13 @@ export default function RetroPageClient() {
       },
     });
 
+    const trackPresence = () =>
+      channel.track({
+        user_id: userId,
+        username: userName,
+        online_at: Date.now(),
+      });
+
     channel
       .on(
         "postgres_changes",
@@ -243,8 +302,22 @@ export default function RetroPageClient() {
         },
         (payload) => {
           if (payload.eventType === "UPDATE" && payload.new) {
-            setBoard(payload.new as RetroBoard);
+            const updated = payload.new as RetroBoard;
+            const previous = boardRef.current;
+            if (
+              previous &&
+              updated.author_id !== userId &&
+              previous.is_locked !== updated.is_locked
+            ) {
+              toast.info(
+                updated.is_locked
+                  ? "The host locked the board"
+                  : "The host unlocked the board"
+              );
+            }
+            setBoard(updated);
           } else if (payload.eventType === "DELETE") {
+            toast.info("This board was deleted by the host");
             router.push("/");
           }
         }
@@ -258,28 +331,14 @@ export default function RetroPageClient() {
           filter: `board_id=eq.${boardId}`,
         },
         (payload) => {
-          if (payload.eventType === "INSERT" && payload.new) {
-            setCards((prev) => {
-              const newCard = payload.new as RetroCard;
-              const existingIndex = prev.findIndex((c) => c.id === newCard.id);
-              if (existingIndex !== -1) {
-                const updated = [...prev];
-                updated[existingIndex] = newCard;
-                return updated;
-              }
-              return [...prev, newCard];
-            });
-          } else if (payload.eventType === "UPDATE" && payload.new) {
+          if (
+            (payload.eventType === "INSERT" ||
+              payload.eventType === "UPDATE") &&
+            payload.new
+          ) {
             // The database maintains the vote count, so the incoming card row
-            // is authoritative and must not have its count overwritten.
-            const updatedCard = payload.new as RetroCard;
-            setCards((prev) =>
-              prev.some((card) => card.id === updatedCard.id)
-                ? prev.map((card) =>
-                    card.id === updatedCard.id ? updatedCard : card
-                  )
-                : [...prev, updatedCard]
-            );
+            // is authoritative.
+            setCards((prev) => upsertById(prev, payload.new as RetroCard));
           } else if (payload.eventType === "DELETE") {
             setCards((prev) => prev.filter((c) => c.id !== payload.old.id));
           }
@@ -294,26 +353,13 @@ export default function RetroPageClient() {
           filter: `board_id=eq.${boardId}`,
         },
         (payload) => {
-          if (payload.eventType === "INSERT" && payload.new) {
-            setParticipants((prev) => {
-              const participant = payload.new as RetroParticipant;
-              const existingIndex = prev.findIndex(
-                (p) => p.id === participant.id
-              );
-              if (existingIndex !== -1) {
-                const updated = [...prev];
-                updated[existingIndex] = participant;
-                return updated;
-              }
-              return [...prev, participant];
-            });
-          } else if (payload.eventType === "UPDATE" && payload.new) {
+          if (
+            (payload.eventType === "INSERT" ||
+              payload.eventType === "UPDATE") &&
+            payload.new
+          ) {
             setParticipants((prev) =>
-              prev.map((part) =>
-                part.id === payload.new.id
-                  ? (payload.new as RetroParticipant)
-                  : part
-              )
+              upsertById(prev, payload.new as RetroParticipant)
             );
           } else if (payload.eventType === "DELETE") {
             setParticipants((prev) =>
@@ -326,13 +372,10 @@ export default function RetroPageClient() {
         const presenceState = channel.presenceState<PresenceState>();
         const onlineUserIds = new Set<string>();
 
-        for (const key of Object.keys(presenceState)) {
-          const presences = presenceState[key];
-          if (presences && presences.length > 0) {
-            const presence = presences[0] as PresenceState;
-            if (presence?.user_id) {
-              onlineUserIds.add(presence.user_id);
-            }
+        for (const presences of Object.values(presenceState)) {
+          const presence = presences?.[0];
+          if (presence?.user_id) {
+            onlineUserIds.add(presence.user_id);
           }
         }
 
@@ -345,11 +388,7 @@ export default function RetroPageClient() {
       })
       .subscribe(async (status) => {
         if (status === "SUBSCRIBED") {
-          await channel.track({
-            user_id: userId,
-            username: userName,
-            online_at: Date.now(),
-          });
+          await trackPresence();
 
           // Postgres changes are not replayed for a reconnect, so anything
           // that happened while the socket was down is missing. Re-read the
@@ -362,52 +401,37 @@ export default function RetroPageClient() {
                   setBoard(loaded.board);
                 }
               })
-              .catch((error) => {
-                console.error("Failed to refresh board:", error);
+              .catch((refreshError) => {
+                console.error("Failed to refresh board:", refreshError);
               });
           }
           hasSubscribedRef.current = true;
         }
       });
 
-    const handleVisibilityChange = async () => {
-      if (document.visibilityState === "hidden") {
-        const { error } = await supabase
-          .from("retro_participants")
-          .update({ is_online: false })
-          .eq("user_id", userId)
-          .eq("board_id", boardId);
-        if (error) {
-          console.error("Failed to update participant visibility:", error);
-        }
-        await channel.untrack();
-      } else if (document.visibilityState === "visible") {
-        const { error } = await supabase
-          .from("retro_participants")
-          .update({ is_online: true })
-          .eq("user_id", userId)
-          .eq("board_id", boardId);
-        if (error) {
-          console.error("Failed to update participant visibility:", error);
-        }
-        await channel.track({
-          user_id: userId,
-          username: userName,
-          online_at: Date.now(),
-        });
+    const setOnline = async (isOnline: boolean) => {
+      const { error: updateError } = await supabase
+        .from("retro_participants")
+        .update({ is_online: isOnline })
+        .eq("user_id", userId)
+        .eq("board_id", boardId);
+      if (updateError) {
+        console.error("Failed to update participant status:", updateError);
       }
     };
 
-    const handleBeforeUnload = async () => {
-      const { error } = await supabase
-        .from("retro_participants")
-        .update({ is_online: false })
-        .eq("user_id", userId)
-        .eq("board_id", boardId);
-
-      if (error) {
-        console.error("Failed to set participant offline:", error);
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === "hidden") {
+        await setOnline(false);
+        await channel.untrack();
+      } else if (document.visibilityState === "visible") {
+        await setOnline(true);
+        await trackPresence();
       }
+    };
+
+    const handleBeforeUnload = () => {
+      setOnline(false);
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
@@ -416,8 +440,8 @@ export default function RetroPageClient() {
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("beforeunload", handleBeforeUnload);
-      channel.untrack().catch((error) => {
-        console.error("Failed to untrack presence:", error);
+      channel.untrack().catch((untrackError) => {
+        console.error("Failed to untrack presence:", untrackError);
       });
       channel.unsubscribe();
     };
@@ -435,60 +459,180 @@ export default function RetroPageClient() {
     [userId]
   );
 
+  /**
+   * Applies a board change optimistically, writes it, and rolls back with a
+   * visible error if the write is rejected.
+   */
+  const updateBoard = useCallback(
+    async (key: string, patch: Partial<RetroBoard>, failureLabel: string) => {
+      const current = boardRef.current;
+      if (!current) {
+        return false;
+      }
+      const previous: Partial<RetroBoard> = {};
+      for (const field of Object.keys(patch) as (keyof RetroBoard)[]) {
+        (previous as Record<string, unknown>)[field] = current[field];
+      }
+
+      setPending(key, true);
+      setBoard((b) => (b ? { ...b, ...patch } : b));
+      try {
+        const { error: updateError } = await createClient()
+          .from("retro_boards")
+          .update(patch)
+          .eq("id", current.id);
+        throwIfSupabaseError(updateError, failureLabel);
+        return true;
+      } catch (updateError) {
+        reportActionError(failureLabel, updateError);
+        setBoard((b) => (b ? { ...b, ...previous } : b));
+        return false;
+      } finally {
+        setPending(key, false);
+      }
+    },
+    [setPending]
+  );
+
   const handleToggleVisibility = useCallback(async () => {
     const b = boardRef.current;
-    if (!b || pendingActions.toggleVisibility) {
+    if (!b) {
       return;
     }
-    setPendingActions((p) => ({ ...p, toggleVisibility: true }));
-    const previousValue = b.is_public;
-    setBoard((p) => (p ? { ...p, is_public: !p.is_public } : null));
-    try {
-      const { error } = await createClient()
-        .from("retro_boards")
-        .update({ is_public: !b.is_public })
-        .eq("id", b.id);
-      throwIfSupabaseError(error, "Failed to toggle visibility");
-    } catch (error) {
-      console.error("Failed to toggle visibility:", error);
-      setBoard((p) => (p ? { ...p, is_public: previousValue } : null));
-    } finally {
-      setPendingActions((p) => ({ ...p, toggleVisibility: false }));
+    const ok = await updateBoard(
+      "visibility",
+      { is_public: !b.is_public },
+      "Could not change visibility"
+    );
+    if (ok) {
+      toast.success(
+        b.is_public ? "Board is now private" : "Board is now public",
+        {
+          description: b.is_public
+            ? "Only people already on the board keep access."
+            : "Anyone with the link can join.",
+        }
+      );
     }
-  }, [pendingActions]);
+  }, [updateBoard]);
 
   const handleToggleLock = useCallback(async () => {
     const b = boardRef.current;
-    if (!b || pendingActions.toggleLock) {
+    if (!b) {
       return;
     }
-    setPendingActions((p) => ({ ...p, toggleLock: true }));
-    const previousValue = b.is_locked;
-    setBoard((p) => (p ? { ...p, is_locked: !p.is_locked } : null));
-    try {
-      const { error } = await createClient()
-        .from("retro_boards")
-        .update({ is_locked: !b.is_locked })
-        .eq("id", b.id);
-      throwIfSupabaseError(error, "Failed to toggle lock");
-    } catch (error) {
-      console.error("Failed to toggle lock:", error);
-      setBoard((p) => (p ? { ...p, is_locked: previousValue } : null));
-    } finally {
-      setPendingActions((p) => ({ ...p, toggleLock: false }));
+    const ok = await updateBoard(
+      "lock",
+      { is_locked: !b.is_locked },
+      b.is_locked ? "Could not unlock the board" : "Could not lock the board"
+    );
+    if (ok) {
+      toast.success(b.is_locked ? "Board unlocked" : "Board locked", {
+        description: b.is_locked
+          ? "Everyone can add, move and vote on cards again."
+          : "Cards and votes are frozen for everyone.",
+      });
     }
-  }, [pendingActions]);
+  }, [updateBoard]);
+
+  const handleEditBoardTitle = useCallback(
+    (title: string) =>
+      updateBoard("title", { title }, "Could not rename the board"),
+    [updateBoard]
+  );
+
+  const handleTimerToggle = useCallback(() => {
+    const b = boardRef.current;
+    if (!b) {
+      return;
+    }
+    if (b.timer_running) {
+      // Pause: remember what was left so that resume continues from there.
+      return updateBoard(
+        "timer",
+        {
+          timer_running: false,
+          timer_started_at: null,
+          timer_remaining_seconds: computeRemainingSeconds(b),
+        },
+        "Could not pause the timer"
+      );
+    }
+    const base = getTimerBase(b);
+    return updateBoard(
+      "timer",
+      {
+        timer_running: true,
+        timer_started_at: new Date().toISOString(),
+        timer_remaining_seconds: base > 0 ? base : null,
+      },
+      "Could not start the timer"
+    );
+  }, [updateBoard]);
+
+  const handleTimerReset = useCallback(
+    () =>
+      updateBoard(
+        "timer",
+        {
+          timer_running: false,
+          timer_started_at: null,
+          timer_remaining_seconds: null,
+        },
+        "Could not reset the timer"
+      ),
+    [updateBoard]
+  );
+
+  const handleSetTimer = useCallback(
+    (seconds: number) =>
+      updateBoard(
+        "timer",
+        {
+          timer_seconds: seconds,
+          timer_running: false,
+          timer_started_at: null,
+          timer_remaining_seconds: null,
+        },
+        "Could not change the timer"
+      ),
+    [updateBoard]
+  );
+
+  const handleTimerExpire = useCallback(() => {
+    toast.warning("Time's up!", { duration: 8000 });
+  }, []);
+
+  const handleDeleteBoard = useCallback(async () => {
+    const b = boardRef.current;
+    if (!b) {
+      return;
+    }
+    setPending("deleteBoard", true);
+    try {
+      const { error: deleteError } = await createClient()
+        .from("retro_boards")
+        .delete()
+        .eq("id", b.id);
+      throwIfSupabaseError(deleteError, "Failed to delete board");
+      toast.success("Board deleted");
+      router.push("/");
+    } catch (deleteError) {
+      reportActionError("Could not delete the board", deleteError);
+    } finally {
+      setPending("deleteBoard", false);
+    }
+  }, [router, setPending]);
 
   const handleAddCard = useCallback(
     async (columnType: ColumnType, content: string) => {
       const b = boardRef.current;
-      if (!(b && userId && userName) || pendingActions.addCard) {
+      if (!(b && userId && userName)) {
         return;
       }
-      setPendingActions((p) => ({ ...p, addCard: true }));
-      const tempId = `temp-${Date.now()}`;
-      setCards((p) => [
-        ...p,
+      const tempId = `temp-${crypto.randomUUID()}`;
+      setCards((prev) => [
+        ...prev,
         {
           id: tempId,
           board_id: b.id,
@@ -501,7 +645,7 @@ export default function RetroPageClient() {
         },
       ]);
       try {
-        const { data, error } = await createClient()
+        const { data, error: insertError } = await createClient()
           .from("retro_cards")
           .insert({
             board_id: b.id,
@@ -513,322 +657,209 @@ export default function RetroPageClient() {
           .select()
           .single();
 
-        throwIfSupabaseError(error, "Failed to add card");
+        throwIfSupabaseError(insertError, "Failed to add card");
 
-        if (data) {
-          setCards((p) =>
-            p.map((c) => (c.id === tempId ? { ...data, votes: 0 } : c))
-          );
-        } else {
-          setCards((p) => p.filter((c) => c.id !== tempId));
-        }
-      } catch (error) {
-        console.error("Failed to add card:", error);
-        setCards((p) => p.filter((c) => c.id !== tempId));
-      } finally {
-        setPendingActions((p) => ({ ...p, addCard: false }));
+        setCards((prev) => {
+          const withoutTemp = prev.filter((c) => c.id !== tempId);
+          // Realtime may already have delivered the row.
+          return data
+            ? upsertById(withoutTemp, data as RetroCard)
+            : withoutTemp;
+        });
+      } catch (insertError) {
+        reportActionError("Could not add the card", insertError);
+        setCards((prev) => prev.filter((c) => c.id !== tempId));
       }
     },
-    [userId, userName, pendingActions]
+    [userId, userName]
   );
 
   const handleVoteCard = useCallback(
     async (cardId: string) => {
-      if (!userId || pendingActions[`vote-${cardId}`]) {
+      const key = `vote-${cardId}`;
+      if (!userId) {
         return;
       }
+      const hadVoted = myVotesRef.current.has(cardId);
+      const delta = hadVoted ? -1 : 1;
 
-      const actionKey = `vote-${cardId}`;
+      const applyLocal = (voted: boolean, change: number) => {
+        setMyVotes((prev) => {
+          const next = new Set(prev);
+          if (voted) {
+            next.add(cardId);
+          } else {
+            next.delete(cardId);
+          }
+          return next;
+        });
+        setCards((prev) =>
+          prev.map((c) =>
+            c.id === cardId ? { ...c, votes: Math.max(0, c.votes + change) } : c
+          )
+        );
+      };
 
-      setPendingActions((p) => ({ ...p, [actionKey]: true }));
-
+      setPending(key, true);
+      applyLocal(!hadVoted, delta);
       const supabase = createClient();
 
       try {
-        const { data: existingVote, error: existingVoteError } = await supabase
-          .from("retro_card_votes")
-          .select("id")
-          .eq("card_id", cardId)
-          .eq("user_id", userId)
-          .maybeSingle();
-
-        throwIfSupabaseError(existingVoteError, "Failed to check vote state");
-
-        if (existingVote) {
-          const { error } = await supabase
+        if (hadVoted) {
+          const { error: deleteError } = await supabase
             .from("retro_card_votes")
             .delete()
-            .eq("id", existingVote.id);
-          throwIfSupabaseError(error, "Failed to remove vote");
+            .eq("card_id", cardId)
+            .eq("user_id", userId);
+          throwIfSupabaseError(deleteError, "Failed to remove vote");
         } else {
-          const { error } = await supabase
+          const { error: insertError } = await supabase
             .from("retro_card_votes")
             .insert({ card_id: cardId, user_id: userId });
-          throwIfSupabaseError(error, "Failed to add vote");
+          // A duplicate means another tab already voted, which is the state
+          // the user asked for.
+          if (insertError && insertError.code !== UNIQUE_VIOLATION_CODE) {
+            throw new Error(insertError.message || "Failed to add vote");
+          }
         }
-      } catch (error) {
-        console.error("Failed to vote on card:", error);
+      } catch (voteError) {
+        reportActionError("Could not save your vote", voteError);
+        applyLocal(hadVoted, -delta);
       } finally {
-        setPendingActions((p) => ({ ...p, [actionKey]: false }));
+        setPending(key, false);
       }
     },
-    [userId, pendingActions]
+    [userId, setPending]
   );
 
   const handleDeleteCard = useCallback(
     async (cardId: string) => {
-      if (pendingActions[`delete-${cardId}`]) {
-        return;
-      }
-      const actionKey = `delete-${cardId}`;
-      const card = cardsRef.current.find((c) => c.id === cardId);
-      const deletedCard = card;
+      const key = `delete-${cardId}`;
+      const deletedCard = cardsRef.current.find((c) => c.id === cardId);
 
-      setPendingActions((p) => ({ ...p, [actionKey]: true }));
-      setCards((p) => p.filter((c) => c.id !== cardId));
+      setPending(key, true);
+      setCards((prev) => prev.filter((c) => c.id !== cardId));
       try {
-        const { error } = await createClient()
+        const { error: deleteError } = await createClient()
           .from("retro_cards")
           .delete()
           .eq("id", cardId);
-        throwIfSupabaseError(error, "Failed to delete card");
-      } catch (error) {
-        console.error("Failed to delete card:", error);
+        throwIfSupabaseError(deleteError, "Failed to delete card");
+      } catch (deleteError) {
+        reportActionError("Could not delete the card", deleteError);
         if (deletedCard) {
-          setCards((p) => [...p, deletedCard]);
+          setCards((prev) => upsertById(prev, deletedCard));
         }
       } finally {
-        setPendingActions((p) => ({ ...p, [actionKey]: false }));
+        setPending(key, false);
       }
     },
-    [pendingActions]
+    [setPending]
+  );
+
+  const updateCard = useCallback(
+    async (
+      cardId: string,
+      key: string,
+      patch: Partial<Pick<RetroCard, "column_type" | "content">>,
+      failureLabel: string
+    ) => {
+      const card = cardsRef.current.find((c) => c.id === cardId);
+      if (!card) {
+        return;
+      }
+      const previous = {
+        column_type: card.column_type,
+        content: card.content,
+      };
+
+      setPending(key, true);
+      setCards((prev) =>
+        prev.map((c) => (c.id === cardId ? { ...c, ...patch } : c))
+      );
+      try {
+        const { error: updateError } = await createClient()
+          .from("retro_cards")
+          .update(patch)
+          .eq("id", cardId);
+        throwIfSupabaseError(updateError, failureLabel);
+      } catch (updateError) {
+        reportActionError(failureLabel, updateError);
+        setCards((prev) =>
+          prev.map((c) => (c.id === cardId ? { ...c, ...previous } : c))
+        );
+      } finally {
+        setPending(key, false);
+      }
+    },
+    [setPending]
   );
 
   const handleEditCard = useCallback(
-    async (cardId: string, content: string) => {
-      if (pendingActions[`edit-${cardId}`]) {
-        return;
-      }
-      const actionKey = `edit-${cardId}`;
-      const card = cardsRef.current.find((c) => c.id === cardId);
-      const previousContent = card?.content;
-
-      setPendingActions((p) => ({ ...p, [actionKey]: true }));
-      setCards((p) => p.map((c) => (c.id === cardId ? { ...c, content } : c)));
-      try {
-        const { error } = await createClient()
-          .from("retro_cards")
-          .update({ content })
-          .eq("id", cardId);
-        throwIfSupabaseError(error, "Failed to edit card");
-      } catch (error) {
-        console.error("Failed to edit card:", error);
-        if (previousContent !== undefined) {
-          setCards((p) =>
-            p.map((c) =>
-              c.id === cardId ? { ...c, content: previousContent } : c
-            )
-          );
-        }
-      } finally {
-        setPendingActions((p) => ({ ...p, [actionKey]: false }));
-      }
-    },
-    [pendingActions]
+    (cardId: string, content: string) =>
+      updateCard(
+        cardId,
+        `edit-${cardId}`,
+        { content },
+        "Could not edit the card"
+      ),
+    [updateCard]
   );
 
   const handleMoveCard = useCallback(
-    async (cardId: string, columnType: ColumnType) => {
-      if (pendingActions[`move-${cardId}`]) {
-        return;
-      }
-      const actionKey = `move-${cardId}`;
-      const card = cardsRef.current.find((c) => c.id === cardId);
-      const previousColumn = card?.column_type;
-
-      setPendingActions((p) => ({ ...p, [actionKey]: true }));
-      setCards((p) =>
-        p.map((c) => (c.id === cardId ? { ...c, column_type: columnType } : c))
-      );
-      try {
-        const { error } = await createClient()
-          .from("retro_cards")
-          .update({ column_type: columnType })
-          .eq("id", cardId);
-        throwIfSupabaseError(error, "Failed to move card");
-      } catch (error) {
-        console.error("Failed to move card:", error);
-        if (previousColumn !== undefined) {
-          setCards((p) =>
-            p.map((c) =>
-              c.id === cardId ? { ...c, column_type: previousColumn } : c
-            )
-          );
-        }
-      } finally {
-        setPendingActions((p) => ({ ...p, [actionKey]: false }));
-      }
-    },
-    [pendingActions]
+    (cardId: string, columnType: ColumnType) =>
+      updateCard(
+        cardId,
+        `move-${cardId}`,
+        { column_type: columnType },
+        "Could not move the card"
+      ),
+    [updateCard]
   );
 
-  const handleEditBoardTitle = useCallback(
-    async (title: string) => {
-      const b = boardRef.current;
-      if (!b || pendingActions.editTitle) {
-        return;
-      }
-      setPendingActions((p) => ({ ...p, editTitle: true }));
-      const previousTitle = b.title;
-      setBoard((p) => (p ? { ...p, title } : null));
-      try {
-        const { error } = await createClient()
-          .from("retro_boards")
-          .update({ title })
-          .eq("id", b.id);
-        throwIfSupabaseError(error, "Failed to edit board title");
-      } catch (error) {
-        console.error("Failed to edit board title:", error);
-        setBoard((p) => (p ? { ...p, title: previousTitle } : null));
-      } finally {
-        setPendingActions((p) => ({ ...p, editTitle: false }));
-      }
-    },
-    [pendingActions]
+  const participantNames = useMemo(
+    () =>
+      participants.map((p) => p.username).sort((a, b) => a.localeCompare(b)),
+    [participants]
   );
 
-  const handleDeleteBoard = useCallback(async () => {
+  const buildMarkdown = useCallback(() => {
     const b = boardRef.current;
-    if (!b || pendingActions.deleteBoard) {
-      return;
-    }
-    setPendingActions((p) => ({ ...p, deleteBoard: true }));
-    try {
-      const { error } = await createClient()
-        .from("retro_boards")
-        .delete()
-        .eq("id", b.id);
-      throwIfSupabaseError(error, "Failed to delete board");
-      router.push("/");
-    } catch (error) {
-      console.error("Failed to delete board:", error);
-    } finally {
-      setPendingActions((p) => ({ ...p, deleteBoard: false }));
-    }
-  }, [router, pendingActions]);
+    return b ? retroToMarkdown(b, cardsRef.current, participantNames) : "";
+  }, [participantNames]);
 
-  const handleTimerToggle = useCallback(async () => {
-    const b = boardRef.current;
-    if (!b || pendingActions.timerToggle) {
-      return;
-    }
-    setPendingActions((p) => ({ ...p, timerToggle: true }));
-    const running = !b.timer_running;
-    const startedAt = running ? new Date().toISOString() : null;
-    const previousRunning = b.timer_running;
-    const previousStartedAt = b.timer_started_at;
-    setBoard((p) =>
-      p ? { ...p, timer_running: running, timer_started_at: startedAt } : null
-    );
+  const handleCopyMarkdown = useCallback(async () => {
     try {
-      const { error } = await createClient()
-        .from("retro_boards")
-        .update({ timer_running: running, timer_started_at: startedAt })
-        .eq("id", b.id);
-      throwIfSupabaseError(error, "Failed to toggle timer");
-    } catch (error) {
-      console.error("Failed to toggle timer:", error);
-      setBoard((p) =>
-        p
-          ? {
-              ...p,
-              timer_running: previousRunning,
-              timer_started_at: previousStartedAt,
-            }
-          : null
-      );
-    } finally {
-      setPendingActions((p) => ({ ...p, timerToggle: false }));
+      await navigator.clipboard.writeText(buildMarkdown());
+      toast.success("Markdown copied", {
+        description: "Paste it into your wiki, ticket or chat.",
+      });
+    } catch (copyError) {
+      reportActionError("Could not copy the Markdown", copyError);
     }
-  }, [pendingActions]);
+  }, [buildMarkdown]);
 
-  const handleTimerReset = useCallback(async () => {
+  const handleDownloadMarkdown = useCallback(() => {
     const b = boardRef.current;
-    if (!b || pendingActions.timerReset) {
-      return;
+    if (b) {
+      downloadTextFile(`${b.slug}-retro.md`, buildMarkdown());
     }
-    setPendingActions((p) => ({ ...p, timerReset: true }));
-    const previousState = {
-      timer_running: b.timer_running,
-      timer_seconds: b.timer_seconds,
-      timer_started_at: b.timer_started_at,
+  }, [buildMarkdown]);
+
+  const cardsByColumn = useMemo(() => {
+    const grouped: Record<ColumnType, RetroCard[]> = {
+      went_well: [],
+      to_improve: [],
+      action_items: [],
     };
-    setBoard((p) =>
-      p
-        ? {
-            ...p,
-            timer_running: false,
-            timer_seconds: 300,
-            timer_started_at: null,
-          }
-        : null
-    );
-    try {
-      const { error } = await createClient()
-        .from("retro_boards")
-        .update({
-          timer_running: false,
-          timer_seconds: 300,
-          timer_started_at: null,
-        })
-        .eq("id", b.id);
-      throwIfSupabaseError(error, "Failed to reset timer");
-    } catch (error) {
-      console.error("Failed to reset timer:", error);
-      setBoard((p) => (p ? { ...p, ...previousState } : null));
-    } finally {
-      setPendingActions((p) => ({ ...p, timerReset: false }));
+    for (const card of cards) {
+      grouped[card.column_type]?.push(card);
     }
-  }, [pendingActions]);
-
-  const handleSetTimer = useCallback(
-    async (seconds: number) => {
-      const b = boardRef.current;
-      if (!b || pendingActions.setTimer) {
-        return;
-      }
-      setPendingActions((p) => ({ ...p, setTimer: true }));
-      const previousSeconds = b.timer_seconds;
-      setTimerDuration(seconds);
-      setBoard((p) => (p ? { ...p, timer_seconds: seconds } : null));
-      try {
-        const { error } = await createClient()
-          .from("retro_boards")
-          .update({ timer_seconds: seconds })
-          .eq("id", b.id);
-        throwIfSupabaseError(error, "Failed to set timer");
-      } catch (error) {
-        console.error("Failed to set timer:", error);
-        setTimerDuration(previousSeconds);
-        setBoard((p) => (p ? { ...p, timer_seconds: previousSeconds } : null));
-      } finally {
-        setPendingActions((p) => ({ ...p, setTimer: false }));
-      }
-    },
-    [pendingActions]
-  );
+    return grouped;
+  }, [cards]);
 
   if (!authInitialized) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-secondary">
-        <div className="rounded-2xl border-2 border-border bg-background p-8 shadow-md">
-          <div className="flex items-center gap-3">
-            <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-            <p className="font-bold text-xl">Loading…</p>
-          </div>
-        </div>
-      </div>
-    );
+    return <FullPageLoading />;
   }
 
   if (authError) {
@@ -836,34 +867,26 @@ export default function RetroPageClient() {
   }
 
   if (showJoinModal) {
-    return <JoinSessionModal onJoin={handleJoin} submitLabel="Join Retro" />;
+    return <JoinSessionModal onJoin={handleJoin} submitLabel="Join retro" />;
   }
 
   if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-secondary">
-        <div className="rounded-2xl border-2 border-border bg-background p-8 shadow-md">
-          <div className="flex items-center gap-3">
-            <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-            <p className="font-bold text-xl">Loading…</p>
-          </div>
-        </div>
-      </div>
-    );
+    return <FullPageLoading label="Loading board…" />;
   }
 
   if (error || !board) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-secondary">
-        <div className="rounded-2xl border-2 border-border bg-background p-8 shadow-md">
-          <p className="font-bold text-primary text-xl">
-            {error || "Board not found"}
-          </p>
-          <Link className="mt-4 inline-block underline" href="/">
-            Go back home
-          </Link>
-        </div>
-      </div>
+    return error && error !== "not-found" ? (
+      <FullPageMessage
+        description={error}
+        homeHref="/"
+        title="Could not load this board"
+      />
+    ) : (
+      <FullPageMessage
+        description={`There is no board at “${slug}”. It may have been deleted, or the link may be mistyped.`}
+        homeHref="/"
+        title="Board not found"
+      />
     );
   }
 
@@ -875,190 +898,131 @@ export default function RetroPageClient() {
   if (!(board.is_public || isAuthor || isParticipant)) {
     return (
       <PrivateAccessOverlay
-        description="This retro board is currently set to private. Only the session author can view and access it."
+        description="The host made this board private. Only people who joined before then can open it. Ask the host to make it public again."
         homeHref="/"
-        title="Private Board"
+        title="Private board"
       />
     );
   }
 
+  const onlineCount = participants.filter((p) => p.is_online).length;
+  const voteCount = cards.reduce((sum, card) => sum + card.votes, 0);
+  const participantsPanel = (
+    <ParticipantsPanel
+      authorId={board.author_id}
+      currentUserId={userId}
+      participants={participants}
+    />
+  );
+
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-secondary">
+    <div className="flex h-dvh flex-col overflow-hidden bg-secondary">
       <BoardHeader
         board={board}
-        currentUserId={userId || ""}
-        isAuthor={!!isAuthor}
+        cardCount={cards.length}
+        isAuthor={isAuthor}
+        onCopyMarkdown={handleCopyMarkdown}
         onDeleteBoard={handleDeleteBoard}
+        onDownloadMarkdown={handleDownloadMarkdown}
+        onlineCount={onlineCount}
         onSetTimer={handleSetTimer}
+        onTimerExpire={handleTimerExpire}
+        onTimerReset={handleTimerReset}
+        onTimerToggle={handleTimerToggle}
         onTitleUpdate={handleEditBoardTitle}
         onToggleLock={handleToggleLock}
-        onToggleSidebar={() => setShowSidebar(!showSidebar)}
+        onToggleParticipants={() => setParticipantsOpen((open) => !open)}
         onToggleVisibility={handleToggleVisibility}
         participantCount={participants.length}
-        showSidebar={showSidebar}
-        timerDuration={timerDuration}
+        participantsOpen={participantsOpen}
+        voteCount={voteCount}
       />
-      <div className="relative flex flex-1 overflow-x-hidden">
+
+      <div className="flex min-h-0 flex-1">
         <main
-          aria-label="Retro board columns"
-          className={`flex flex-1 gap-3 overflow-x-auto overscroll-x-none px-2 pt-3 pb-20 transition-all duration-300 ease-in-out md:gap-4 md:px-3 md:pt-4 md:pb-24 lg:gap-5 lg:px-4 lg:pt-5 ${showSidebar ? "xl:pr-2" : "xl:pr-4"}`}
+          aria-label="Retro board"
+          className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 p-2 md:p-4"
           data-board-capture
         >
-          <div className="w-[300px] flex-shrink-0 md:w-[320px] lg:w-[340px] xl:w-1/3 xl:min-w-[300px]">
-            <RetroColumn
-              cards={cards.filter((c) => c.column_type === "went_well")}
-              columnType="went_well"
-              draggedCard={draggedCard}
-              isLocked={board.is_locked}
-              onAddCard={handleAddCard}
-              onDeleteCard={handleDeleteCard}
-              onEditCard={handleEditCard}
-              onMoveCard={handleMoveCard}
-              onVoteCard={(cardId) => handleVoteCard(cardId)}
-              pendingActions={pendingActions}
-              setDraggedCard={setDraggedCard}
-              title="Went Well"
-            />
+          <div
+            aria-label="Columns"
+            className="grid shrink-0 grid-cols-3 gap-1 rounded-xl border-2 border-border bg-background p-1 md:hidden"
+            role="tablist"
+          >
+            {COLUMN_ORDER.map((type) => (
+              <button
+                aria-selected={activeColumn === type}
+                className={cn(
+                  "flex items-center justify-center gap-1.5 rounded-lg px-1 py-2 font-bold text-xs transition-colors",
+                  activeColumn === type
+                    ? cn(COLUMN_CONFIG[type].header, "shadow-sm")
+                    : "text-muted-foreground"
+                )}
+                key={type}
+                onClick={() => setActiveColumn(type)}
+                role="tab"
+                type="button"
+              >
+                <span className="truncate">{COLUMN_CONFIG[type].title}</span>
+                <span className="rounded bg-background/80 px-1 text-foreground tabular-nums">
+                  {cardsByColumn[type].length}
+                </span>
+              </button>
+            ))}
           </div>
-          <div className="w-[300px] flex-shrink-0 md:w-[320px] lg:w-[340px] xl:w-1/3 xl:min-w-[300px]">
-            <RetroColumn
-              cards={cards.filter((c) => c.column_type === "to_improve")}
-              columnType="to_improve"
-              draggedCard={draggedCard}
-              isLocked={board.is_locked}
-              onAddCard={handleAddCard}
-              onDeleteCard={handleDeleteCard}
-              onEditCard={handleEditCard}
-              onMoveCard={handleMoveCard}
-              onVoteCard={(cardId) => handleVoteCard(cardId)}
-              pendingActions={pendingActions}
-              setDraggedCard={setDraggedCard}
-              title="To Improve"
-            />
-          </div>
-          <div className="w-[300px] flex-shrink-0 md:w-[320px] lg:w-[340px] xl:w-1/3 xl:min-w-[300px]">
-            <RetroColumn
-              cards={cards.filter((c) => c.column_type === "action_items")}
-              columnType="action_items"
-              draggedCard={draggedCard}
-              isLocked={board.is_locked}
-              onAddCard={handleAddCard}
-              onDeleteCard={handleDeleteCard}
-              onEditCard={handleEditCard}
-              onMoveCard={handleMoveCard}
-              onVoteCard={(cardId) => handleVoteCard(cardId)}
-              pendingActions={pendingActions}
-              setDraggedCard={setDraggedCard}
-              title="Action Items"
-            />
+
+          <div className="grid min-h-0 flex-1 gap-3 md:grid-cols-3 md:gap-4">
+            {COLUMN_ORDER.map((type) => (
+              <div
+                className={cn(
+                  "min-h-0 min-w-0",
+                  activeColumn === type ? "flex flex-col" : "hidden",
+                  "md:flex md:flex-col"
+                )}
+                key={type}
+              >
+                <RetroColumn
+                  cards={cardsByColumn[type]}
+                  columnType={type}
+                  currentUserId={userId ?? ""}
+                  draggedCardId={draggedCardId}
+                  isLocked={board.is_locked}
+                  myVotes={myVotes}
+                  onAddCard={handleAddCard}
+                  onDeleteCard={handleDeleteCard}
+                  onEditCard={handleEditCard}
+                  onMoveCard={handleMoveCard}
+                  onVoteCard={handleVoteCard}
+                  pendingActions={pendingActions}
+                  setDraggedCardId={setDraggedCardId}
+                />
+              </div>
+            ))}
           </div>
         </main>
 
-        {showSidebar && (
-          <button
-            aria-label="Close participants sidebar"
-            className="fixed inset-0 z-40 bg-foreground/50 xl:hidden"
-            onClick={() => setShowSidebar(false)}
-            type="button"
-          />
-        )}
-
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                aria-controls="participants-sidebar-mobile"
-                aria-expanded={showSidebar}
-                aria-label={
-                  showSidebar
-                    ? "Hide participants sidebar"
-                    : "Show participants sidebar"
-                }
-                className={`fixed top-1/2 z-50 flex h-16 w-6 -translate-y-1/2 items-center justify-center rounded-l-lg border-2 border-border border-r-0 bg-background shadow-md transition-[right,background-color] duration-300 ease-in-out hover:bg-muted xl:hidden ${showSidebar ? "right-80" : "right-0"}`}
-                onClick={() => setShowSidebar(!showSidebar)}
-                type="button"
-              >
-                <Users aria-hidden="true" className="h-4 w-4" />
-                <span className="sr-only">
-                  {showSidebar ? "Hide sidebar" : "Show sidebar"}
-                </span>
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="left">
-              {showSidebar ? "Hide sidebar" : "Show sidebar"}
-            </TooltipContent>
-          </Tooltip>
-
-          <div
-            className={`relative my-4 mr-6 hidden flex-shrink-0 transition-[width,margin] duration-300 ease-in-out md:my-6 xl:block ${showSidebar ? "ml-2 w-[300px]" : "ml-0 w-0"}`}
-          >
-            <div
-              className={`absolute top-0 right-0 bottom-0 mr-[-24px] flex w-[300px] transition-transform duration-300 ease-in-out ${showSidebar ? "translate-x-0" : "translate-x-full"}`}
-            >
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    aria-controls="participants-sidebar"
-                    aria-expanded={showSidebar}
-                    aria-label={
-                      showSidebar
-                        ? "Hide participants sidebar"
-                        : "Show participants sidebar"
-                    }
-                    className="absolute top-1/2 left-0 z-20 flex h-14 w-5 -translate-x-full -translate-y-1/2 items-center justify-center rounded-l-md border-2 border-border border-r-0 bg-background shadow-sm transition-colors duration-200 hover:bg-muted"
-                    onClick={() => setShowSidebar(!showSidebar)}
-                    type="button"
-                  >
-                    {showSidebar ? (
-                      <ChevronRight aria-hidden="true" className="h-3 w-3" />
-                    ) : (
-                      <ChevronLeft aria-hidden="true" className="h-3 w-3" />
-                    )}
-                    <span className="sr-only">
-                      {showSidebar ? "Hide sidebar" : "Show sidebar"}
-                    </span>
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="left">
-                  {showSidebar ? "Hide sidebar" : "Show sidebar"}
-                </TooltipContent>
-              </Tooltip>
-
-              <aside
-                aria-label="Participants sidebar"
-                className="flex-1 overflow-hidden rounded-l-xl border-2 border-border border-r-0 bg-background shadow-sm"
-                id="participants-sidebar"
-              >
-                <ParticipantsPanel
-                  authorId={board.author_id || ""}
-                  onClose={() => setShowSidebar(false)}
-                  participants={participants}
-                />
-              </aside>
-            </div>
-          </div>
-
+        {isXl && participantsOpen && (
           <aside
-            aria-hidden={!showSidebar}
-            aria-label="Participants sidebar"
-            className={`fixed top-0 right-0 z-50 h-full w-80 min-w-80 border-border border-l-2 bg-background transition-transform duration-300 ease-in-out xl:hidden ${showSidebar ? "translate-x-0" : "translate-x-full"}`}
-            id="participants-sidebar-mobile"
+            aria-label="Participants"
+            className="my-4 mr-4 hidden w-72 shrink-0 overflow-hidden rounded-xl border-2 border-border bg-background shadow-sm xl:block"
           >
-            <ParticipantsPanel
-              authorId={board.author_id || ""}
-              onClose={() => setShowSidebar(false)}
-              participants={participants}
-            />
+            {participantsPanel}
           </aside>
-        </TooltipProvider>
+        )}
       </div>
-      <BoardBottomNav
-        board={board}
-        isAuthor={!!isAuthor}
-        onSetTimer={handleSetTimer}
-        onTimerReset={handleTimerReset}
-        onTimerToggle={handleTimerToggle}
-      />
+
+      <Sheet
+        onOpenChange={setParticipantsOpen}
+        open={!isXl && participantsOpen}
+      >
+        <SheetContent className="w-80 gap-0 p-0" side="right">
+          <SheetTitle className="sr-only">Participants</SheetTitle>
+          <SheetDescription className="sr-only">
+            People on this board and whether they are online.
+          </SheetDescription>
+          {participantsPanel}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
