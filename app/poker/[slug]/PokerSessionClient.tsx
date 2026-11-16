@@ -1,43 +1,57 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, Users } from "lucide-react";
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { ParticipantsTable } from "@/components/poker/participants-table";
-import { SessionBottomNav } from "@/components/poker/session-bottom-nav";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
+import { NextRoundDialog } from "@/components/poker/next-round-dialog";
+import { RoundHistory } from "@/components/poker/round-history";
+import { RoundPanel } from "@/components/poker/round-panel";
 import { SessionHeader } from "@/components/poker/session-header";
+import { VoteResults } from "@/components/poker/vote-results";
 import { VotingCards } from "@/components/poker/voting-cards";
 import { AuthErrorNotice } from "@/components/shared/auth-error-notice";
-import { JoinSessionModal } from "@/components/shared/join-session-modal";
-import { ParticipantsPanel } from "@/components/shared/participants-panel";
-import { PrivateAccessOverlay } from "@/components/shared/private-access-overlay";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+  FullPageLoading,
+  FullPageMessage,
+} from "@/components/shared/full-page-status";
+import { JoinSessionModal } from "@/components/shared/join-session-modal";
+import { PrivateAccessOverlay } from "@/components/shared/private-access-overlay";
 import { useAuth } from "@/hooks/use-auth";
 import { createClient } from "@/lib/supabase/client";
-import type { PokerParticipant, PokerSession, PokerVote } from "@/lib/types";
+import type {
+  PokerParticipant,
+  PokerRound,
+  PokerSession,
+  PokerVote,
+} from "@/lib/types";
+import { downloadTextFile } from "@/lib/utils/download";
+import {
+  getErrorMessage,
+  reportActionError,
+  throwIfSupabaseError,
+} from "@/lib/utils/errors";
+import { pokerToMarkdown } from "@/lib/utils/export-markdown";
+import { computePokerStats } from "@/lib/utils/poker-stats";
 import { addRecentPokerSession } from "@/lib/utils/recent-poker-sessions";
 
-function getErrorMessage(error: unknown, fallback: string) {
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-
-  return fallback;
+interface PresenceState {
+  online_at: number;
+  user_id: string;
+  username: string;
 }
 
-function throwIfSupabaseError(
-  error: { message?: string } | null,
-  fallback: string
-) {
-  if (error) {
-    throw new Error(error.message || fallback);
+function upsertById<T extends { id: string }>(list: T[], item: T) {
+  const index = list.findIndex((existing) => existing.id === item.id);
+  if (index === -1) {
+    return [...list, item];
   }
+  const next = [...list];
+  next[index] = item;
+  return next;
+}
+
+function byCreatedAt(a: { created_at: string }, b: { created_at: string }) {
+  return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
 }
 
 export default function PokerSessionClient() {
@@ -55,40 +69,90 @@ export default function PokerSessionClient() {
   const [session, setSession] = useState<PokerSession | null>(null);
   const [participants, setParticipants] = useState<PokerParticipant[]>([]);
   const [votes, setVotes] = useState<PokerVote[]>([]);
+  const [rounds, setRounds] = useState<PokerRound[]>([]);
   const [userName, setUserName] = useState<string | null>(null);
   const [showJoinModal, setShowJoinModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [showSidebar, setShowSidebar] = useState(true);
+  const [nextRoundOpen, setNextRoundOpen] = useState(false);
   const [pendingActions, setPendingActions] = useState<Record<string, boolean>>(
     {}
   );
 
   const sessionRef = useRef(session);
   const votesRef = useRef(votes);
+  const participantsRef = useRef(participants);
   const hasSubscribedRef = useRef(false);
   sessionRef.current = session;
   votesRef.current = votes;
+  participantsRef.current = participants;
 
-  const isAuthor = session && userId === session.author_id;
+  const isAuthor = !!session && userId === session.author_id;
+
+  const setPending = useCallback((key: string, value: boolean) => {
+    setPendingActions((prev) => ({ ...prev, [key]: value }));
+  }, []);
 
   // Votes are hidden until the session is revealed, so the list has to be
   // re-read whenever the reveal state changes or the socket reconnects.
-  const refetchVotes = useCallback(async () => {
-    const current = sessionRef.current;
-    if (!current) {
+  const refetchVotes = useCallback(async (sessionId?: string) => {
+    const id = sessionId ?? sessionRef.current?.id;
+    if (!id) {
       return;
     }
-    const { data, error } = await createClient()
+    const { data, error: fetchError } = await createClient()
       .from("poker_votes")
       .select("*")
-      .eq("session_id", current.id);
-    if (error) {
-      console.error("Failed to refresh votes:", error);
+      .eq("session_id", id);
+    if (fetchError) {
+      console.error("Failed to refresh votes:", fetchError);
       return;
     }
-    setVotes(data || []);
+    setVotes(data ?? []);
   }, []);
+
+  const refetchAll = useCallback(
+    async (sessionId: string) => {
+      const supabase = createClient();
+      const [sessionRes, participantsRes, roundsRes] = await Promise.all([
+        supabase
+          .from("poker_sessions")
+          .select("*")
+          .eq("id", sessionId)
+          .maybeSingle(),
+        supabase
+          .from("poker_participants")
+          .select("*")
+          .eq("session_id", sessionId),
+        supabase
+          .from("poker_rounds")
+          .select("*")
+          .eq("session_id", sessionId)
+          .order("created_at", { ascending: true }),
+      ]);
+      throwIfSupabaseError(sessionRes.error, "Failed to load session");
+      throwIfSupabaseError(
+        participantsRes.error,
+        "Failed to load participants"
+      );
+      throwIfSupabaseError(roundsRes.error, "Failed to load history");
+
+      if (sessionRes.data) {
+        setSession(sessionRes.data);
+      }
+      setParticipants((previous) => {
+        const online = new Map(previous.map((p) => [p.user_id, p.is_online]));
+        return (participantsRes.data ?? []).map((p) => ({
+          ...p,
+          is_online: online.get(p.user_id) ?? p.is_online,
+        }));
+      });
+      setRounds((roundsRes.data ?? []) as PokerRound[]);
+      await refetchVotes(sessionId);
+      return participantsRes.data ?? [];
+    },
+    [refetchVotes]
+  );
 
   useEffect(() => {
     if (!authInitialized) {
@@ -101,11 +165,9 @@ export default function PokerSessionClient() {
       return;
     }
 
-    // Use display name from auth, or show join modal if missing
     if (displayName) {
       setUserName(displayName);
     } else if (userId) {
-      // User has auth but no display name - show join modal to get name
       setShowJoinModal(true);
       setLoading(false);
     }
@@ -134,7 +196,7 @@ export default function PokerSessionClient() {
         throwIfSupabaseError(sessionError, "Failed to load session");
 
         if (!sessionData) {
-          setError("Session not found");
+          setError("not-found");
           setLoading(false);
           return;
         }
@@ -142,33 +204,12 @@ export default function PokerSessionClient() {
         setSession(sessionData);
         addRecentPokerSession(sessionData.slug, sessionData.title);
 
-        const [participantsRes, votesRes] = await Promise.all([
-          supabase
-            .from("poker_participants")
-            .select("*")
-            .eq("session_id", sessionData.id),
-          supabase
-            .from("poker_votes")
-            .select("*")
-            .eq("session_id", sessionData.id),
-        ]);
-
+        const loadedParticipants = await refetchAll(sessionData.id);
         if (cancelled) {
           return;
         }
 
-        throwIfSupabaseError(
-          participantsRes.error,
-          "Failed to load participants"
-        );
-        throwIfSupabaseError(votesRes.error, "Failed to load votes");
-
-        setParticipants(participantsRes.data || []);
-        setVotes(votesRes.data || []);
-
-        const existing = participantsRes.data?.find(
-          (p) => p.user_id === userId
-        );
+        const existing = loadedParticipants.find((p) => p.user_id === userId);
         if (!existing) {
           const { error: upsertError } = await supabase
             .from("poker_participants")
@@ -186,15 +227,21 @@ export default function PokerSessionClient() {
               }
             );
           throwIfSupabaseError(upsertError, "Failed to join session");
+        } else if (existing.username !== userName) {
+          // The display name changed since the last visit.
+          await supabase
+            .from("poker_participants")
+            .update({ username: userName })
+            .eq("id", existing.id);
         }
 
         if (!cancelled) {
           setLoading(false);
         }
-      } catch (error: unknown) {
+      } catch (loadError: unknown) {
         if (!cancelled) {
-          console.error("Failed to load poker session:", error);
-          setError(getErrorMessage(error, "Failed to load session"));
+          console.error("Failed to load poker session:", loadError);
+          setError(getErrorMessage(loadError, "Failed to load session"));
           setLoading(false);
         }
       }
@@ -204,9 +251,9 @@ export default function PokerSessionClient() {
     return () => {
       cancelled = true;
     };
-  }, [slug, userId, userName]);
+  }, [slug, userId, userName, refetchAll]);
 
-  // Set up realtime subscriptions after session is loaded
+  // Set up realtime subscriptions after the session is loaded.
   useEffect(() => {
     const sessionId = session?.id;
     if (!(sessionId && userId && userName)) {
@@ -227,6 +274,13 @@ export default function PokerSessionClient() {
       },
     });
 
+    const trackPresence = () =>
+      channel.track({
+        user_id: userId,
+        username: userName,
+        online_at: Date.now(),
+      });
+
     channel
       .on(
         "postgres_changes",
@@ -245,11 +299,12 @@ export default function PokerSessionClient() {
             // Votes stay hidden until the session is revealed, so the list has
             // to be re-read when the reveal state changes.
             if (wasRevealed !== updated.votes_revealed) {
-              refetchVotes().catch((error) => {
-                console.error("Failed to refresh votes:", error);
+              refetchVotes(sessionId).catch((refreshError) => {
+                console.error("Failed to refresh votes:", refreshError);
               });
             }
           } else if (payload.eventType === "DELETE") {
+            toast.info("This session was deleted by the host");
             router.push("/poker");
           }
         }
@@ -263,30 +318,23 @@ export default function PokerSessionClient() {
           filter: `session_id=eq.${sessionId}`,
         },
         (payload) => {
-          if (payload.eventType === "INSERT" && payload.new) {
-            setParticipants((p) => {
-              const participant = payload.new as PokerParticipant;
-              const existingIndex = p.findIndex(
-                (part) => part.id === participant.id
+          if (
+            (payload.eventType === "INSERT" ||
+              payload.eventType === "UPDATE") &&
+            payload.new
+          ) {
+            const incoming = payload.new as PokerParticipant;
+            setParticipants((prev) => {
+              // Presence is the source of truth for being online.
+              const known = prev.find((p) => p.id === incoming.id);
+              return upsertById(
+                prev,
+                known ? { ...incoming, is_online: known.is_online } : incoming
               );
-              if (existingIndex !== -1) {
-                const updated = [...p];
-                updated[existingIndex] = participant;
-                return updated;
-              }
-              return [...p, participant];
             });
-          } else if (payload.eventType === "UPDATE" && payload.new) {
-            setParticipants((p) =>
-              p.map((part) =>
-                part.id === payload.new.id
-                  ? (payload.new as PokerParticipant)
-                  : part
-              )
-            );
           } else if (payload.eventType === "DELETE") {
-            setParticipants((p) =>
-              p.filter((part) => part.id !== payload.old.id)
+            setParticipants((prev) =>
+              prev.filter((part) => part.id !== payload.old.id)
             );
           }
         }
@@ -300,43 +348,50 @@ export default function PokerSessionClient() {
           filter: `session_id=eq.${sessionId}`,
         },
         (payload) => {
-          if (payload.eventType === "INSERT" && payload.new) {
-            setVotes((v) => {
-              const vote = payload.new as PokerVote;
-              const existingIndex = v.findIndex((item) => item.id === vote.id);
-              if (existingIndex !== -1) {
-                const updated = [...v];
-                updated[existingIndex] = vote;
-                return updated;
-              }
-              return [...v, vote];
-            });
-          } else if (payload.eventType === "UPDATE" && payload.new) {
-            setVotes((v) =>
-              v.map((vote) =>
-                vote.id === payload.new.id ? (payload.new as PokerVote) : vote
-              )
-            );
+          if (
+            (payload.eventType === "INSERT" ||
+              payload.eventType === "UPDATE") &&
+            payload.new
+          ) {
+            setVotes((prev) => upsertById(prev, payload.new as PokerVote));
           } else if (payload.eventType === "DELETE") {
-            setVotes((v) => v.filter((vote) => vote.id !== payload.old.id));
+            setVotes((prev) => prev.filter((v) => v.id !== payload.old.id));
+          }
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "poker_rounds",
+          filter: `session_id=eq.${sessionId}`,
+        },
+        (payload) => {
+          if (payload.eventType === "INSERT" && payload.new) {
+            const round = payload.new as PokerRound;
+            setRounds((prev) => upsertById(prev, round).sort(byCreatedAt));
+            if (sessionRef.current?.author_id !== userId) {
+              toast.info(
+                round.estimate
+                  ? `Estimated ${round.estimate}: ${round.story ?? "story"}`
+                  : "Round saved",
+                { description: "The host started the next story." }
+              );
+            }
+          } else if (payload.eventType === "DELETE") {
+            setRounds((prev) => prev.filter((r) => r.id !== payload.old.id));
           }
         }
       )
       .on("presence", { event: "sync" }, () => {
-        const presenceState = channel.presenceState<{
-          user_id: string;
-          username: string;
-          online_at: number;
-        }>();
+        const presenceState = channel.presenceState<PresenceState>();
         const onlineUserIds = new Set<string>();
 
-        for (const key of Object.keys(presenceState)) {
-          const presences = presenceState[key];
-          if (presences && presences.length > 0) {
-            const presence = presences[0];
-            if (presence?.user_id) {
-              onlineUserIds.add(presence.user_id);
-            }
+        for (const presences of Object.values(presenceState)) {
+          const presence = presences?.[0];
+          if (presence?.user_id) {
+            onlineUserIds.add(presence.user_id);
           }
         }
 
@@ -349,61 +404,42 @@ export default function PokerSessionClient() {
       })
       .subscribe(async (status) => {
         if (status === "SUBSCRIBED") {
-          await channel.track({
-            user_id: userId,
-            username: userName,
-            online_at: Date.now(),
-          });
+          await trackPresence();
 
-          // Postgres changes are not replayed for a reconnect, so votes that
-          // changed while the socket was down would be missed.
+          // Postgres changes are not replayed for a reconnect, so anything
+          // that changed while the socket was down would be missed.
           if (hasSubscribedRef.current) {
-            refetchVotes().catch((error) => {
-              console.error("Failed to refresh votes:", error);
+            refetchAll(sessionId).catch((refreshError) => {
+              console.error("Failed to refresh session:", refreshError);
             });
           }
           hasSubscribedRef.current = true;
         }
       });
 
-    const handleVisibilityChange = async () => {
-      if (document.visibilityState === "hidden") {
-        const { error } = await supabase
-          .from("poker_participants")
-          .update({ is_online: false })
-          .eq("user_id", userId)
-          .eq("session_id", sessionId);
-        if (error) {
-          console.error("Failed to update participant visibility:", error);
-        }
-        await channel.untrack();
-      } else if (document.visibilityState === "visible") {
-        const { error } = await supabase
-          .from("poker_participants")
-          .update({ is_online: true })
-          .eq("user_id", userId)
-          .eq("session_id", sessionId);
-        if (error) {
-          console.error("Failed to update participant visibility:", error);
-        }
-        await channel.track({
-          user_id: userId,
-          username: userName,
-          online_at: Date.now(),
-        });
+    const setOnline = async (isOnline: boolean) => {
+      const { error: updateError } = await supabase
+        .from("poker_participants")
+        .update({ is_online: isOnline })
+        .eq("user_id", userId)
+        .eq("session_id", sessionId);
+      if (updateError) {
+        console.error("Failed to update participant status:", updateError);
       }
     };
 
-    const handleBeforeUnload = async () => {
-      const { error } = await supabase
-        .from("poker_participants")
-        .update({ is_online: false })
-        .eq("user_id", userId)
-        .eq("session_id", sessionId);
-
-      if (error) {
-        console.error("Failed to set participant offline:", error);
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === "hidden") {
+        await setOnline(false);
+        await channel.untrack();
+      } else if (document.visibilityState === "visible") {
+        await setOnline(true);
+        await trackPresence();
       }
+    };
+
+    const handleBeforeUnload = () => {
+      setOnline(false);
     };
 
     document.addEventListener("visibilitychange", handleVisibilityChange);
@@ -412,12 +448,12 @@ export default function PokerSessionClient() {
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("beforeunload", handleBeforeUnload);
-      channel.untrack().catch((error) => {
-        console.error("Failed to untrack presence:", error);
+      channel.untrack().catch((untrackError) => {
+        console.error("Failed to untrack presence:", untrackError);
       });
       channel.unsubscribe();
     };
-  }, [session?.id, slug, userId, userName, router, refetchVotes]);
+  }, [session?.id, slug, userId, userName, router, refetchVotes, refetchAll]);
 
   const handleJoin = useCallback(
     (username: string) => {
@@ -431,246 +467,365 @@ export default function PokerSessionClient() {
     [userId]
   );
 
+  /**
+   * Applies a session change optimistically, writes it, and rolls back with
+   * a visible error if the write is rejected.
+   */
+  const updateSession = useCallback(
+    async (key: string, patch: Partial<PokerSession>, failureLabel: string) => {
+      const current = sessionRef.current;
+      if (!current) {
+        return false;
+      }
+      const previous: Partial<PokerSession> = {};
+      for (const field of Object.keys(patch) as (keyof PokerSession)[]) {
+        (previous as Record<string, unknown>)[field] = current[field];
+      }
+
+      setPending(key, true);
+      setSession((s) => (s ? { ...s, ...patch } : s));
+      try {
+        const { error: updateError } = await createClient()
+          .from("poker_sessions")
+          .update(patch)
+          .eq("id", current.id);
+        throwIfSupabaseError(updateError, failureLabel);
+        return true;
+      } catch (updateError) {
+        reportActionError(failureLabel, updateError);
+        setSession((s) => (s ? { ...s, ...previous } : s));
+        return false;
+      } finally {
+        setPending(key, false);
+      }
+    },
+    [setPending]
+  );
+
   const handleToggleVisibility = useCallback(async () => {
     const s = sessionRef.current;
-    if (!s || pendingActions.toggleVisibility) {
+    if (!s) {
       return;
     }
-    setPendingActions((p) => ({ ...p, toggleVisibility: true }));
-    const previousValue = s.is_public;
-    setSession((p) => (p ? { ...p, is_public: !p.is_public } : null));
-    try {
-      const { error } = await createClient()
-        .from("poker_sessions")
-        .update({ is_public: !s.is_public })
-        .eq("id", s.id);
-      throwIfSupabaseError(error, "Failed to toggle visibility");
-    } catch (error) {
-      console.error("Failed to toggle visibility:", error);
-      setSession((p) => (p ? { ...p, is_public: previousValue } : null));
-    } finally {
-      setPendingActions((p) => ({ ...p, toggleVisibility: false }));
-    }
-  }, [pendingActions]);
-
-  const handleToggleVoting = useCallback(async () => {
-    const s = sessionRef.current;
-    if (!s || pendingActions.toggleVoting) {
-      return;
-    }
-    setPendingActions((p) => ({ ...p, toggleVoting: true }));
-    const previousValue = s.is_voting_active;
-    setSession((p) =>
-      p ? { ...p, is_voting_active: !p.is_voting_active } : null
+    const ok = await updateSession(
+      "toggleVisibility",
+      { is_public: !s.is_public },
+      "Could not change visibility"
     );
-    try {
-      const { error } = await createClient()
-        .from("poker_sessions")
-        .update({ is_voting_active: !s.is_voting_active })
-        .eq("id", s.id);
-      throwIfSupabaseError(error, "Failed to toggle voting");
-    } catch (error) {
-      console.error("Failed to toggle voting:", error);
-      setSession((p) => (p ? { ...p, is_voting_active: previousValue } : null));
-    } finally {
-      setPendingActions((p) => ({ ...p, toggleVoting: false }));
+    if (ok) {
+      toast.success(
+        s.is_public ? "Session is now private" : "Session is now public"
+      );
     }
-  }, [pendingActions]);
+  }, [updateSession]);
+
+  const handleToggleVoting = useCallback(() => {
+    const s = sessionRef.current;
+    if (!s) {
+      return;
+    }
+    return updateSession(
+      "toggleVoting",
+      { is_voting_active: !s.is_voting_active },
+      "Could not change voting"
+    );
+  }, [updateSession]);
 
   const handleToggleReveal = useCallback(async () => {
     const s = sessionRef.current;
-    if (!s || pendingActions.toggleReveal) {
+    if (!s) {
       return;
     }
-    setPendingActions((p) => ({ ...p, toggleReveal: true }));
-    const previousValue = s.votes_revealed;
-    setSession((p) => (p ? { ...p, votes_revealed: !p.votes_revealed } : null));
-    try {
-      const { error } = await createClient()
-        .from("poker_sessions")
-        .update({ votes_revealed: !s.votes_revealed })
-        .eq("id", s.id);
-      throwIfSupabaseError(error, "Failed to toggle reveal");
-    } catch (error) {
-      console.error("Failed to toggle reveal:", error);
-      setSession((p) => (p ? { ...p, votes_revealed: previousValue } : null));
-    } finally {
-      setPendingActions((p) => ({ ...p, toggleReveal: false }));
+    const ok = await updateSession(
+      "toggleReveal",
+      { votes_revealed: !s.votes_revealed },
+      s.votes_revealed ? "Could not hide votes" : "Could not reveal votes"
+    );
+    if (ok) {
+      await refetchVotes();
     }
-  }, [pendingActions]);
+  }, [updateSession, refetchVotes]);
+
+  const clearAllVotes = useCallback(async () => {
+    const s = sessionRef.current;
+    if (!s) {
+      return;
+    }
+    // A direct delete can only remove the caller's own vote, because the
+    // delete policy is scoped to the caller's user id. The RPC performs an
+    // author scoped delete instead.
+    const { error: clearError } = await createClient().rpc(
+      "clear_poker_votes",
+      { p_session_id: s.id }
+    );
+    throwIfSupabaseError(clearError, "Failed to clear votes");
+  }, []);
 
   const handleClearVotes = useCallback(async () => {
     const s = sessionRef.current;
-    if (!(s && userId) || pendingActions.clearVotes) {
+    if (!s) {
       return;
     }
-    setPendingActions((p) => ({ ...p, clearVotes: true }));
+    setPending("clearVotes", true);
     const previousVotes = votesRef.current;
     setVotes([]);
     try {
-      // A direct delete can only remove the caller's own vote, because the
-      // delete policy is scoped to the caller's user id. The RPC performs an
-      // author scoped delete instead.
-      const { error } = await createClient().rpc("clear_poker_votes", {
-        p_session_id: s.id,
+      await clearAllVotes();
+      await updateSession(
+        "toggleReveal",
+        { votes_revealed: false, is_voting_active: true },
+        "Could not reopen voting"
+      );
+      toast.success("Votes cleared", {
+        description: "Everyone can vote again.",
       });
-      throwIfSupabaseError(error, "Failed to clear votes");
-    } catch (error) {
-      console.error("Failed to clear votes:", error);
+    } catch (clearError) {
+      reportActionError("Could not clear the votes", clearError);
       setVotes(previousVotes);
     } finally {
-      setPendingActions((p) => ({ ...p, clearVotes: false }));
+      setPending("clearVotes", false);
     }
-  }, [userId, pendingActions]);
+  }, [clearAllVotes, setPending, updateSession]);
 
-  const handleVote = useCallback(
-    async (voteValue: string) => {
+  const handleCompleteRound = useCallback(
+    async (estimate: string, nextStory: string) => {
       const s = sessionRef.current;
-      if (!(userId && s) || pendingActions.vote) {
+      if (!s) {
         return;
       }
-      setPendingActions((p) => ({ ...p, vote: true }));
-      const supabase = createClient();
-
+      setPending("nextRound", true);
       try {
-        const { data: existingVote, error: existingVoteError } = await supabase
-          .from("poker_votes")
-          .select("id")
-          .eq("session_id", s.id)
-          .eq("user_id", userId)
-          .maybeSingle();
-
-        throwIfSupabaseError(existingVoteError, "Failed to check vote state");
-
-        if (existingVote) {
-          const { error } = await supabase
-            .from("poker_votes")
-            .update({ vote_value: voteValue })
-            .eq("id", existingVote.id);
-          throwIfSupabaseError(error, "Failed to update vote");
-        } else {
-          const { error } = await supabase.from("poker_votes").insert({
-            session_id: s.id,
-            user_id: userId,
-            vote_value: voteValue,
-          });
-          throwIfSupabaseError(error, "Failed to submit vote");
-        }
-      } catch (error) {
-        console.error("Failed to submit vote:", error);
+        const { error: rpcError } = await createClient().rpc(
+          "complete_poker_round",
+          {
+            p_session_id: s.id,
+            p_estimate: estimate,
+            p_next_story: nextStory,
+          }
+        );
+        throwIfSupabaseError(rpcError, "Failed to save the round");
+        setNextRoundOpen(false);
+        await refetchAll(s.id);
+        toast.success(
+          estimate.trim() ? `Saved estimate ${estimate.trim()}` : "Round saved",
+          { description: "Voting is open for the next story." }
+        );
+      } catch (rpcError) {
+        reportActionError("Could not save the round", rpcError);
       } finally {
-        setPendingActions((p) => ({ ...p, vote: false }));
+        setPending("nextRound", false);
       }
     },
-    [userId, pendingActions]
+    [refetchAll, setPending]
   );
 
-  const handleEditSessionTitle = useCallback(
-    async (title: string) => {
+  const handleDeleteRound = useCallback(async (roundId: string) => {
+    let removed: PokerRound | undefined;
+    setRounds((prev) => {
+      removed = prev.find((r) => r.id === roundId);
+      return prev.filter((r) => r.id !== roundId);
+    });
+    const { error: deleteError } = await createClient()
+      .from("poker_rounds")
+      .delete()
+      .eq("id", roundId);
+    if (deleteError) {
+      reportActionError("Could not delete the round", deleteError);
+      const restored = removed;
+      if (restored) {
+        setRounds((prev) => upsertById(prev, restored).sort(byCreatedAt));
+      }
+    }
+  }, []);
+
+  const handleVote = useCallback(
+    async (voteValue: string | null) => {
       const s = sessionRef.current;
-      if (!s || pendingActions.editTitle) {
+      if (!(userId && s)) {
         return;
       }
-      setPendingActions((p) => ({ ...p, editTitle: true }));
-      const previousTitle = s.title;
-      setSession((p) => (p ? { ...p, title } : null));
+      const existing = votesRef.current.find((v) => v.user_id === userId);
+      const previousVotes = votesRef.current;
+
+      setPending("vote", true);
+      if (voteValue === null) {
+        setVotes((prev) => prev.filter((v) => v.user_id !== userId));
+      } else if (existing) {
+        setVotes((prev) =>
+          prev.map((v) =>
+            v.id === existing.id ? { ...v, vote_value: voteValue } : v
+          )
+        );
+      }
+
+      const supabase = createClient();
       try {
-        const { error } = await createClient()
-          .from("poker_sessions")
-          .update({ title })
-          .eq("id", s.id);
-        throwIfSupabaseError(error, "Failed to edit session title");
-      } catch (error) {
-        console.error("Failed to edit session title:", error);
-        setSession((p) => (p ? { ...p, title: previousTitle } : null));
+        if (voteValue === null) {
+          const { error: deleteError } = await supabase
+            .from("poker_votes")
+            .delete()
+            .eq("session_id", s.id)
+            .eq("user_id", userId);
+          throwIfSupabaseError(deleteError, "Failed to withdraw vote");
+        } else if (existing) {
+          const { error: updateError } = await supabase
+            .from("poker_votes")
+            .update({ vote_value: voteValue })
+            .eq("id", existing.id);
+          throwIfSupabaseError(updateError, "Failed to change vote");
+        } else {
+          const { data, error: insertError } = await supabase
+            .from("poker_votes")
+            .insert({
+              session_id: s.id,
+              user_id: userId,
+              vote_value: voteValue,
+            })
+            .select()
+            .single();
+          throwIfSupabaseError(insertError, "Failed to submit vote");
+          if (data) {
+            setVotes((prev) => upsertById(prev, data as PokerVote));
+          }
+        }
+      } catch (voteError) {
+        reportActionError("Could not save your vote", voteError);
+        setVotes(previousVotes);
       } finally {
-        setPendingActions((p) => ({ ...p, editTitle: false }));
+        setPending("vote", false);
       }
     },
-    [pendingActions]
+    [userId, setPending]
+  );
+
+  const handleToggleObserver = useCallback(async () => {
+    const s = sessionRef.current;
+    const me = participantsRef.current.find((p) => p.user_id === userId);
+    if (!(s && me && userId)) {
+      return;
+    }
+    const becomeObserver = !me.is_observer;
+    setParticipants((prev) =>
+      prev.map((p) =>
+        p.id === me.id ? { ...p, is_observer: becomeObserver } : p
+      )
+    );
+    const supabase = createClient();
+    try {
+      if (becomeObserver) {
+        // An observer's vote would still count, so it is withdrawn first.
+        await supabase
+          .from("poker_votes")
+          .delete()
+          .eq("session_id", s.id)
+          .eq("user_id", userId);
+        setVotes((prev) => prev.filter((v) => v.user_id !== userId));
+      }
+      const { error: updateError } = await supabase
+        .from("poker_participants")
+        .update({ is_observer: becomeObserver })
+        .eq("id", me.id);
+      throwIfSupabaseError(updateError, "Failed to change role");
+    } catch (roleError) {
+      reportActionError("Could not change your role", roleError);
+      setParticipants((prev) =>
+        prev.map((p) =>
+          p.id === me.id ? { ...p, is_observer: !becomeObserver } : p
+        )
+      );
+    }
+  }, [userId]);
+
+  const handleEditSessionTitle = useCallback(
+    (title: string) =>
+      updateSession("editTitle", { title }, "Could not rename the session"),
+    [updateSession]
   );
 
   const handleEditStory = useCallback(
-    async (story: string) => {
-      const s = sessionRef.current;
-      if (!s || pendingActions.editStory) {
-        return;
-      }
-      setPendingActions((p) => ({ ...p, editStory: true }));
-      const previousStory = s.current_story;
-      setSession((p) => (p ? { ...p, current_story: story || null } : null));
-      try {
-        const { error } = await createClient()
-          .from("poker_sessions")
-          .update({ current_story: story || null })
-          .eq("id", s.id);
-        throwIfSupabaseError(error, "Failed to edit story");
-      } catch (error) {
-        console.error("Failed to edit story:", error);
-        setSession((p) => (p ? { ...p, current_story: previousStory } : null));
-      } finally {
-        setPendingActions((p) => ({ ...p, editStory: false }));
+    (story: string) =>
+      updateSession(
+        "editStory",
+        { current_story: story || null },
+        "Could not save the story"
+      ),
+    [updateSession]
+  );
+
+  const handleUpdateScale = useCallback(
+    async (scale: string[]) => {
+      const ok = await updateSession(
+        "updateScale",
+        { voting_scale: scale },
+        "Could not change the scale"
+      );
+      // Votes cast on the old scale may not exist on the new one.
+      if (ok && participantsRef.current.some((p) => p.has_voted)) {
+        try {
+          await clearAllVotes();
+          setVotes([]);
+          toast.info("Votes cleared because the scale changed");
+        } catch (clearError) {
+          reportActionError("Could not clear the old votes", clearError);
+        }
       }
     },
-    [pendingActions]
+    [updateSession, clearAllVotes]
   );
 
   const handleDeleteSession = useCallback(async () => {
     const s = sessionRef.current;
-    if (!s || pendingActions.deleteSession) {
+    if (!s) {
       return;
     }
-    setPendingActions((p) => ({ ...p, deleteSession: true }));
+    setPending("deleteSession", true);
     try {
-      const { error } = await createClient()
+      const { error: deleteError } = await createClient()
         .from("poker_sessions")
         .delete()
         .eq("id", s.id);
-      throwIfSupabaseError(error, "Failed to delete session");
+      throwIfSupabaseError(deleteError, "Failed to delete session");
+      toast.success("Session deleted");
       router.push("/poker");
-    } catch (error) {
-      console.error("Failed to delete session:", error);
+    } catch (deleteError) {
+      reportActionError("Could not delete the session", deleteError);
     } finally {
-      setPendingActions((p) => ({ ...p, deleteSession: false }));
+      setPending("deleteSession", false);
     }
-  }, [router, pendingActions]);
+  }, [router, setPending]);
 
-  const handleUpdateScale = useCallback(
-    async (scale: string[]) => {
-      const s = sessionRef.current;
-      if (!s || pendingActions.updateScale) {
-        return;
-      }
-      setPendingActions((p) => ({ ...p, updateScale: true }));
-      const previousScale = s.voting_scale;
-      setSession((p) => (p ? { ...p, voting_scale: scale } : null));
-      try {
-        const { error } = await createClient()
-          .from("poker_sessions")
-          .update({ voting_scale: scale })
-          .eq("id", s.id);
-        throwIfSupabaseError(error, "Failed to update scale");
-      } catch (error) {
-        console.error("Failed to update scale:", error);
-        setSession((p) => (p ? { ...p, voting_scale: previousScale } : null));
-      } finally {
-        setPendingActions((p) => ({ ...p, updateScale: false }));
-      }
-    },
-    [pendingActions]
-  );
+  const handleCopyMarkdown = useCallback(async () => {
+    const s = sessionRef.current;
+    if (!s) {
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(pokerToMarkdown(s, rounds));
+      toast.success("Markdown copied");
+    } catch (copyError) {
+      reportActionError("Could not copy the Markdown", copyError);
+    }
+  }, [rounds]);
+
+  const handleDownloadMarkdown = useCallback(() => {
+    const s = sessionRef.current;
+    if (s) {
+      downloadTextFile(`${s.slug}-poker.md`, pokerToMarkdown(s, rounds));
+    }
+  }, [rounds]);
+
+  const suggestion = useMemo(() => {
+    if (!session?.votes_revealed || votes.length === 0) {
+      return null;
+    }
+    return computePokerStats(
+      session.voting_scale,
+      votes.map((v) => ({ value: v.vote_value, voter: v.user_id }))
+    ).suggestion;
+  }, [session?.votes_revealed, session?.voting_scale, votes]);
 
   if (!authInitialized) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-secondary">
-        <div className="rounded-2xl border-2 border-border bg-background p-8 shadow-md">
-          <div className="flex items-center gap-3">
-            <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-            <p className="font-bold text-xl">Loading…</p>
-          </div>
-        </div>
-      </div>
-    );
+    return <FullPageLoading />;
   }
 
   if (authError) {
@@ -678,208 +833,123 @@ export default function PokerSessionClient() {
   }
 
   if (showJoinModal) {
-    return (
-      <JoinSessionModal onJoin={handleJoin} submitLabel="Join Poker Session" />
-    );
+    return <JoinSessionModal onJoin={handleJoin} submitLabel="Join session" />;
   }
 
   if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-secondary">
-        <div className="rounded-2xl border-2 border-border bg-background p-8 shadow-md">
-          <div className="flex items-center gap-3">
-            <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-            <p className="font-bold text-xl">Loading…</p>
-          </div>
-        </div>
-      </div>
-    );
+    return <FullPageLoading label="Loading session…" />;
   }
 
   if (error || !session) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-secondary">
-        <div className="rounded-2xl border-2 border-border bg-background p-8 shadow-md">
-          <p className="font-bold text-primary text-xl">
-            {error || "Session not found"}
-          </p>
-          <Link className="mt-4 inline-block underline" href="/poker">
-            Go back home
-          </Link>
-        </div>
-      </div>
+    return error && error !== "not-found" ? (
+      <FullPageMessage
+        description={error}
+        homeHref="/poker"
+        title="Could not load this session"
+      />
+    ) : (
+      <FullPageMessage
+        description={`There is no poker session at “${slug}”. It may have been deleted, or the link may be mistyped.`}
+        homeHref="/poker"
+        title="Session not found"
+      />
     );
   }
 
   // Existing participants keep access to a session the author made private.
   // The database allows this, so the client gate has to match it.
-  const isParticipant = participants.some((p) => p.user_id === userId);
+  const myParticipant = participants.find((p) => p.user_id === userId);
 
-  if (!(session.is_public || isAuthor || isParticipant)) {
+  if (!(session.is_public || isAuthor || myParticipant)) {
     return (
       <PrivateAccessOverlay
-        description="This poker session is currently set to private. Only the session author can view and access it."
+        description="The host made this session private. Only people who joined before then can open it. Ask the host to make it public again."
         homeHref="/poker"
-        title="Private Session"
+        title="Private session"
       />
     );
   }
 
   const myVote = votes.find((v) => v.user_id === userId);
-  const myParticipant = participants.find((p) => p.user_id === userId);
+  const voters = participants.filter((p) => !p.is_observer);
+  const votedCount = voters.filter(
+    (p) => p.has_voted || (p.user_id === userId && myVote)
+  ).length;
+  const onlineCount = participants.filter((p) => p.is_online).length;
+  const roundNumber = rounds.length + 1;
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-secondary">
+    <div className="flex min-h-dvh flex-col bg-secondary">
       <SessionHeader
-        currentUserId={userId ?? undefined}
-        isAuthor={isAuthor ?? false}
+        isAuthor={isAuthor}
+        onCopyMarkdown={handleCopyMarkdown}
         onDeleteSession={handleDeleteSession}
-        onStoryUpdate={handleEditStory}
+        onDownloadMarkdown={handleDownloadMarkdown}
+        onlineCount={onlineCount}
         onTitleUpdate={handleEditSessionTitle}
-        onToggleSidebar={() => setShowSidebar(!showSidebar)}
         onToggleVisibility={handleToggleVisibility}
         onUpdateScale={handleUpdateScale}
         participantCount={participants.length}
+        roundNumber={roundNumber}
         session={session}
-        showSidebar={showSidebar}
       />
-      <div className="relative flex flex-1 overflow-x-hidden">
-        {/* Main content area */}
-        <main
-          aria-label="Poker session"
-          className={`flex flex-1 flex-col gap-6 overflow-y-auto overscroll-y-none px-2 pt-4 transition-[padding] duration-300 ease-in-out md:px-3 md:pt-5 lg:px-4 ${showSidebar ? "xl:pr-2" : "xl:pr-4"}`}
-          data-session-capture
-        >
+
+      <main
+        aria-label="Poker session"
+        className="mx-auto grid w-full max-w-7xl flex-1 items-start gap-4 p-3 md:p-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] lg:gap-5"
+        data-session-capture
+      >
+        <div className="grid min-w-0 gap-4 lg:gap-5">
+          <RoundPanel
+            isAuthor={isAuthor}
+            onClearVotes={handleClearVotes}
+            onNextRound={() => setNextRoundOpen(true)}
+            onStoryUpdate={handleEditStory}
+            onToggleReveal={handleToggleReveal}
+            onToggleVoting={handleToggleVoting}
+            pendingActions={pendingActions}
+            roundNumber={roundNumber}
+            session={session}
+            votedCount={votedCount}
+            voterCount={voters.length}
+          />
           <VotingCards
             isObserver={myParticipant?.is_observer ?? false}
+            isPending={!!pendingActions.vote}
             isVotingActive={session.is_voting_active}
+            onToggleObserver={handleToggleObserver}
             onVote={handleVote}
             scale={session.voting_scale}
-            selectedValue={myVote?.vote_value || null}
+            selectedValue={myVote?.vote_value ?? null}
             votesRevealed={session.votes_revealed}
           />
-          <ParticipantsTable
+        </div>
+        <div className="grid min-w-0 gap-4 lg:sticky lg:top-4 lg:gap-5">
+          <VoteResults
             authorId={session.author_id}
-            currentUserId={userId ?? null}
-            isAuthor={isAuthor ?? false}
+            currentUserId={userId}
             participants={participants}
             scale={session.voting_scale}
             votes={votes}
             votesRevealed={session.votes_revealed}
           />
-        </main>
-
-        {/* Mobile overlay backdrop */}
-        {showSidebar && (
-          <button
-            aria-label="Close participants sidebar"
-            className="fixed inset-0 z-40 bg-foreground/50 xl:hidden"
-            onClick={() => setShowSidebar(false)}
-            type="button"
+          <RoundHistory
+            canDelete={isAuthor}
+            onDelete={handleDeleteRound}
+            rounds={rounds}
           />
-        )}
+        </div>
+      </main>
 
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button
-                aria-controls="participants-sidebar-mobile"
-                aria-expanded={showSidebar}
-                aria-label={
-                  showSidebar
-                    ? "Hide participants sidebar"
-                    : "Show participants sidebar"
-                }
-                className={`fixed top-1/2 z-50 flex h-16 w-6 -translate-y-1/2 items-center justify-center rounded-l-lg border-2 border-border border-r-0 bg-background shadow-md transition-[right,background-color] duration-300 ease-in-out hover:bg-muted xl:hidden ${showSidebar ? "right-80" : "right-0"}`}
-                onClick={() => setShowSidebar(!showSidebar)}
-                type="button"
-              >
-                <Users aria-hidden="true" className="h-4 w-4" />
-                <span className="sr-only">
-                  {showSidebar ? "Hide sidebar" : "Show sidebar"}
-                </span>
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="left">
-              {showSidebar ? "Hide sidebar" : "Show sidebar"}
-            </TooltipContent>
-          </Tooltip>
-
-          <div
-            className={`relative my-4 mr-6 hidden flex-shrink-0 transition-[width,margin] duration-300 ease-in-out md:my-6 xl:block ${showSidebar ? "ml-2 w-[300px]" : "ml-0 w-0"}`}
-          >
-            {/* Sidebar container - fixed width, uses translate for slide */}
-            <div
-              className={`absolute top-0 right-0 bottom-0 mr-[-24px] flex w-[300px] transition-transform duration-300 ease-in-out ${showSidebar ? "translate-x-0" : "translate-x-full"}`}
-            >
-              {/* Toggle button - attached to left edge of sidebar */}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    aria-controls="participants-sidebar"
-                    aria-expanded={showSidebar}
-                    aria-label={
-                      showSidebar
-                        ? "Hide participants sidebar"
-                        : "Show participants sidebar"
-                    }
-                    className="absolute top-1/2 left-0 z-20 flex h-14 w-5 -translate-x-full -translate-y-1/2 items-center justify-center rounded-l-md border-2 border-border border-r-0 bg-background shadow-sm transition-colors duration-200 hover:bg-muted"
-                    onClick={() => setShowSidebar(!showSidebar)}
-                    type="button"
-                  >
-                    {showSidebar ? (
-                      <ChevronRight aria-hidden="true" className="h-3 w-3" />
-                    ) : (
-                      <ChevronLeft aria-hidden="true" className="h-3 w-3" />
-                    )}
-                    <span className="sr-only">
-                      {showSidebar ? "Hide sidebar" : "Show sidebar"}
-                    </span>
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent side="left">
-                  {showSidebar ? "Hide sidebar" : "Show sidebar"}
-                </TooltipContent>
-              </Tooltip>
-
-              {/* Sidebar content */}
-              <aside
-                aria-label="Participants sidebar"
-                className="flex-1 overflow-hidden rounded-l-xl border-2 border-border border-r-0 bg-background shadow-sm"
-                id="participants-sidebar"
-              >
-                <ParticipantsPanel
-                  authorId={session.author_id}
-                  onClose={() => setShowSidebar(false)}
-                  participants={participants}
-                  showObservers
-                />
-              </aside>
-            </div>
-          </div>
-
-          <aside
-            aria-hidden={!showSidebar}
-            aria-label="Participants sidebar"
-            className={`fixed top-0 right-0 z-50 h-full w-80 min-w-80 border-border border-l-2 bg-background transition-transform duration-300 ease-in-out xl:hidden ${showSidebar ? "translate-x-0" : "translate-x-full"}`}
-            id="participants-sidebar-mobile"
-          >
-            <ParticipantsPanel
-              authorId={session.author_id}
-              onClose={() => setShowSidebar(false)}
-              participants={participants}
-              showObservers
-            />
-          </aside>
-        </TooltipProvider>
-      </div>
       {isAuthor && (
-        <SessionBottomNav
-          isAuthor={isAuthor}
-          onClearVotes={handleClearVotes}
-          onToggleReveal={handleToggleReveal}
-          onToggleVoting={handleToggleVoting}
-          session={session}
+        <NextRoundDialog
+          currentStory={session.current_story}
+          isSubmitting={!!pendingActions.nextRound}
+          onOpenChange={setNextRoundOpen}
+          onSubmit={handleCompleteRound}
+          open={nextRoundOpen}
+          scale={session.voting_scale}
+          suggestion={suggestion}
         />
       )}
     </div>
