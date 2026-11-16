@@ -22,6 +22,33 @@ export const metadata: Metadata = {
   },
 };
 
+const jsonLd = JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  name: "r8ro",
+  description:
+    "Realtime retrospective boards with cards, voting, presence, a shared timer and Markdown export.",
+  url: "https://r8ro.app",
+  applicationCategory: "BusinessApplication",
+  operatingSystem: "Web",
+  featureList: [
+    "Realtime cards and votes",
+    "Participant presence",
+    "Shared timer with pause and resume",
+    "Public, private, and locked boards",
+    "Markdown and image export",
+  ],
+  browserRequirements: "Requires JavaScript. Requires HTML5.",
+});
+
 export default function Page() {
-  return <RetroClientPage />;
+  return (
+    <>
+      <script
+        dangerouslySetInnerHTML={{ __html: jsonLd }}
+        type="application/ld+json"
+      />
+      <RetroClientPage />
+    </>
+  );
 }
