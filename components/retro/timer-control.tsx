@@ -51,7 +51,7 @@ export function TimerControl({
   const display = (
     <span
       className={cn(
-        "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border-2 px-2.5 font-black font-mono text-base tabular-nums md:text-lg",
+        "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border-2 px-2 font-black font-mono text-sm tabular-nums sm:px-2.5 sm:text-base",
         isExpired
           ? "animate-pulse border-destructive bg-destructive text-destructive-foreground"
           : isRunning && remaining <= 30
@@ -61,7 +61,7 @@ export function TimerControl({
               : "border-border bg-background"
       )}
     >
-      <Clock aria-hidden="true" className="h-4 w-4" />
+      <Clock aria-hidden="true" className="h-4 w-4 max-sm:hidden" />
       {formatDuration(remaining)}
       {isPaused && (
         <Pause aria-hidden="true" className="h-3.5 w-3.5 opacity-70" />
