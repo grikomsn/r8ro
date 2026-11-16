@@ -27,13 +27,14 @@ migration that creates it.
 
 | Table | Purpose | Important constraints |
 | --- | --- | --- |
-| `retro_boards` | Board settings and timer state | Unique `slug`; author references `auth.users` |
+| `retro_boards` | Board settings and timer state (`timer_seconds` is the duration, `timer_remaining_seconds` what was left when paused) | Unique `slug`; author references `auth.users` |
 | `retro_cards` | Cards in one of three columns | Board and author foreign keys |
 | `retro_participants` | Board membership and online state | Unique `(board_id, user_id)` |
 | `retro_card_votes` | Per-user card votes | Unique `(card_id, user_id)` |
 | `poker_sessions` | Session settings, story, scale, and reveal state | Unique `slug`; author references `auth.users` |
-| `poker_participants` | Session membership, observer flag, and online state | Unique `(session_id, user_id)` |
+| `poker_participants` | Session membership, observer flag, online state, and `has_voted` | Unique `(session_id, user_id)` |
 | `poker_votes` | Per-user estimates | Unique `(session_id, user_id)` |
+| `poker_rounds` | Finished stories: story, agreed estimate, and a votes snapshot | Session foreign key with cascade delete |
 
 ## Access Helpers
 
@@ -62,6 +63,14 @@ migration that creates it.
   revealed. A participant always sees their own vote.
 - `clear_poker_votes(session_id)` removes every vote in a session. It is
   restricted to the session author.
+- `complete_poker_round(session_id, estimate, next_story)` records the current
+  story with its votes in `poker_rounds`, clears the votes, and opens voting on
+  the next story in one transaction. It is restricted to the session author.
+- `poker_participants.has_voted` is maintained by triggers on `poker_votes`,
+  so everyone can see who has voted before the reveal without seeing values.
+  A client write to it is ignored.
+- `poker_rounds` is readable by anyone with access to the session. Rows are
+  created only through `complete_poker_round`; the author can delete one.
 - `retro_cards.votes` is maintained by the database and is the authoritative
   count. A participant cannot write it directly.
 
@@ -70,7 +79,9 @@ See `supabase/RLS_POLICIES.md` for policy names and source files.
 ## Realtime
 
 `20260106120000_enable_realtime_replication.sql` sets `REPLICA IDENTITY FULL`
-and adds all seven application tables to the `supabase_realtime` publication.
+and adds all seven original application tables to the `supabase_realtime`
+publication. `20261116120200_poker_rounds.sql` adds `poker_rounds` the same
+way.
 
 `20260714150754_harden_security_definer_functions.sql` pins helper search
 paths, enforces service-role-only execution for account merging, and removes

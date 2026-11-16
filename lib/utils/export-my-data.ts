@@ -9,6 +9,7 @@ interface ExportBoard {
 
 interface ExportPokerSession {
   participants: Record<string, unknown>[];
+  rounds: Record<string, unknown>[];
   session: Record<string, unknown>;
   votes: Record<string, unknown>[];
 }
@@ -244,7 +245,16 @@ export async function exportMyData(): Promise<void> {
         .range(from, to)
     );
 
-    pokerSessions.push({ session, participants, votes });
+    const rounds = await fetchAll((from, to) =>
+      supabase
+        .from("poker_rounds")
+        .select("*")
+        .eq("session_id", sessionId)
+        .order("created_at", { ascending: true })
+        .range(from, to)
+    );
+
+    pokerSessions.push({ session, participants, rounds, votes });
   }
 
   const payload: ExportPayload = {

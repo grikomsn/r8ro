@@ -8,7 +8,8 @@
   helper functions, the board-lock trigger, and baseline RLS.
 - `migrations/20250101000000_create_poker_tables.sql`: poker schema and RLS.
 - Later migrations: poker default state, Realtime replication, retro policy
-  changes, and guest-account merging.
+  changes, guest-account merging, retro timer pause/resume, poker vote status
+  (`has_voted`), and poker round history (`poker_rounds`).
 - `schema.sql`: static reference dump of the retro schema.
 - `RLS_POLICIES.md`: concise policy reference.
 
@@ -31,6 +32,7 @@ its tables and would fail.
 - `poker_sessions`
 - `poker_participants`
 - `poker_votes`
+- `poker_rounds`
 
 All tables have RLS enabled. Realtime configuration is defined by
 `20260106120000_enable_realtime_replication.sql`.

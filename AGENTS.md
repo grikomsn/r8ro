@@ -21,7 +21,7 @@ No Jest/Vitest/Playwright configured. Validation chain: `pnpm check-types` → `
 ## Architecture
 
 - `app/`: Next.js 16 App Router (routes, layouts, API routes). Root `proxy.ts` is the middleware entry point (auth session refresh via `lib/supabase/proxy.ts`).
-- `app/client-page.tsx`, `app/poker/client-page.tsx`: landing pages (create/join UI)
+- `app/client-page.tsx`, `app/poker/client-page.tsx`: landing pages; both render `components/shared/session-landing.tsx` (create/join UI, your sessions, recent)
 - `app/retro/[slug]/RetroPageClient.tsx`: retro orchestration (client)
 - `app/poker/[slug]/PokerSessionClient.tsx`: poker orchestration (client)
 - `app/new/route.ts`: retro board creation (server); poker sessions are created client-side

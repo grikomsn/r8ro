@@ -22,6 +22,32 @@ export const metadata: Metadata = {
   },
 };
 
+const jsonLd = JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  name: "r8ro",
+  description:
+    "Realtime planning poker with hidden votes, reveal, statistics and round history.",
+  url: "https://r8ro.app/poker",
+  applicationCategory: "BusinessApplication",
+  operatingSystem: "Web",
+  featureList: [
+    "Votes hidden until reveal",
+    "Fibonacci, T-shirt, and linear scales",
+    "Consensus and suggested estimate",
+    "Round history with Markdown export",
+  ],
+  browserRequirements: "Requires JavaScript. Requires HTML5.",
+});
+
 export default function PokerPage() {
-  return <PokerClientPage />;
+  return (
+    <>
+      <script
+        dangerouslySetInnerHTML={{ __html: jsonLd }}
+        type="application/ld+json"
+      />
+      <PokerClientPage />
+    </>
+  );
 }

@@ -14,21 +14,26 @@ Supabase. The deployed app is [r8ro.app](https://r8ro.app).
 ### Retrospectives
 
 - Three columns: Went Well, To Improve, and Action Items.
-- Realtime cards, votes, participants, and presence.
-- Shared timer and recent-board history.
+- Realtime cards, votes, participants, and presence. You can see which cards
+  you voted on.
+- Shared timer with pause, resume, reset, and duration presets.
+- Export as Markdown (action items become a task list) or as an image.
+- Your boards and recently visited boards on the home page.
 - Author controls for title, visibility, lock state, and deletion.
 - Unlocked boards let participants add, edit, move, delete, and vote on cards.
 - Locked boards are frozen for everyone, including the author.
 
 ### Planning Poker
 
-- Fibonacci, T-shirt, and linear voting scales.
-- Realtime participants, votes, and presence.
-- Author controls for title, story, visibility, voting state, vote reveal, vote
-  clearing, and scale.
-- Vote statistics after reveal: minimum, maximum, average, mode and outliers
-  for a numeric scale, and a distribution for a non-numeric one.
+- Fibonacci, T-shirt, and linear voting scales, with `?` and a break card.
+- Realtime participants, votes, and presence. Everyone sees who has voted
+  before the reveal, but not the values.
 - Votes stay hidden until the session is revealed, enforced by the database.
+- After the reveal: distribution, consensus, a suggested estimate, and the
+  lowest and highest voters when the spread is wide.
+- "Next story" saves the story, estimate, and votes to a round history, which
+  can be exported as Markdown.
+- Observer mode for people who watch without voting.
 
 Every visitor signs in through Supabase anonymous authentication. An anonymous
 account can optionally be linked to GitHub. A private board or session stays
@@ -65,7 +70,10 @@ pnpm dev
 
 `supabase start` applies every file in `supabase/migrations/` and prints the
 local API URL and keys. Point `NEXT_PUBLIC_SUPABASE_URL` at
-`http://127.0.0.1:54321` and copy the printed keys into `.env.local`.
+`http://127.0.0.1:54321` and copy the printed keys into `.env.local`. If
+`.env.local` holds hosted credentials, put the local values in
+`.env.development.local` instead: `pnpm dev` reads it first, and it is
+ignored by git.
 
 With a hosted Supabase project:
 

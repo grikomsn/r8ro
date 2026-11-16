@@ -21,6 +21,8 @@
   --accent-foreground: #0a0a0a;
   --destructive: #d64545;
   --destructive-foreground: #ffffff;
+  --success: #23824a;
+  --success-foreground: #ffffff;
   --border: #e5dfd5;
   --input: #e5dfd5;
   --ring: #e8b563;
@@ -68,6 +70,8 @@
   --accent-foreground: #0a0a0a;
   --destructive: #e86565;
   --destructive-foreground: #ffffff;
+  --success: #5cc98a;
+  --success-foreground: #0a0a0a;
   --border: #3a3128;
   --input: #3a3128;
   --ring: #e8b563;
@@ -94,9 +98,8 @@
 
 @theme inline {
   /* Updated to use only Lato for all text */
-  --font-sans: "Lato", "Lato Fallback";
-  --font-mono: "Space Mono", "Space Mono Fallback";
-  --font-serif: "Libre Baskerville", "Libre Baskerville Fallback";
+  --font-sans: var(--font-lato), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-space-mono), ui-monospace, monospace;
 
   /* Normalized text size scale for consistency */
   --font-size-xs: 0.75rem; /* 12px */
@@ -126,6 +129,8 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
