@@ -48,10 +48,12 @@ export default function PokerClientPage() {
   const [scale, setScale] = useState<VotingScaleType>("fibonacci");
 
   const createSession = async ({
+    orgId,
     title,
     userId,
     username,
   }: {
+    orgId: string | null;
     title: string;
     userId: string;
     username: string;
@@ -67,6 +69,7 @@ export default function PokerClientPage() {
           title: finalTitle,
           author_id: userId,
           author_name: username,
+          org_id: orgId,
           voting_scale: [...VOTING_SCALES[scale]],
           is_public: true,
           votes_revealed: false,

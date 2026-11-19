@@ -17,6 +17,8 @@ import {
 import { JoinSessionModal } from "@/components/shared/join-session-modal";
 import { PrivateAccessOverlay } from "@/components/shared/private-access-overlay";
 import { useAuth } from "@/hooks/use-auth";
+import { useOrgManagerIds, useOrgRole } from "@/hooks/use-org-role";
+import { isOrgManager } from "@/lib/constants/organizations";
 import { createClient } from "@/lib/supabase/client";
 import type {
   PokerParticipant,
@@ -29,6 +31,7 @@ import { downloadTextFile } from "@/lib/utils/download";
 import {
   getErrorMessage,
   reportActionError,
+  throwIfNoRows,
   throwIfSupabaseError,
 } from "@/lib/utils/errors";
 import { pokerToMarkdown } from "@/lib/utils/export-markdown";
@@ -89,6 +92,24 @@ export default function PokerSessionClient() {
   participantsRef.current = participants;
 
   const isAuthor = !!session && userId === session.author_id;
+  // Owners and admins of the organization that owns the session host it too.
+  const {
+    isLoading: orgRoleLoading,
+    organization,
+    refresh: refreshOrgRole,
+    role: orgRole,
+  } = useOrgRole(session?.org_id ?? null);
+  const isHost = isAuthor || isOrgManager(orgRole);
+  // The member list is readable by members only, so non-members skip it.
+  const coHostIds = useOrgManagerIds(organization ? session?.org_id : null);
+  // Rounds this client completes are announced by its own success toast, so
+  // their realtime INSERT skips the "next story" notice; other hosts still
+  // get it. The INSERT can arrive before or after the RPC returns the round
+  // id, so both orders are handled, and the in-flight count is released by
+  // the RPC itself, never by the event, so a lost event cannot leave it set.
+  const ownRoundsInFlightRef = useRef(0);
+  const ownRoundIdsRef = useRef(new Set<string>());
+  const seenRoundIdsRef = useRef(new Set<string>());
 
   const setPending = useCallback((key: string, value: boolean) => {
     setPendingActions((prev) => ({ ...prev, [key]: value }));
@@ -372,7 +393,11 @@ export default function PokerSessionClient() {
           if (payload.eventType === "INSERT" && payload.new) {
             const round = payload.new as PokerRound;
             setRounds((prev) => upsertById(prev, round).sort(byCreatedAt));
-            if (sessionRef.current?.author_id !== userId) {
+            seenRoundIdsRef.current.add(round.id);
+            const isOwn =
+              ownRoundIdsRef.current.delete(round.id) ||
+              ownRoundsInFlightRef.current > 0;
+            if (!isOwn) {
               toast.info(
                 round.estimate
                   ? `Estimated ${round.estimate}: ${round.story ?? "story"}`
@@ -486,11 +511,18 @@ export default function PokerSessionClient() {
       setPending(key, true);
       setSession((s) => (s ? { ...s, ...patch } : s));
       try {
-        const { error: updateError } = await createClient()
+        const { data: updated, error: updateError } = await createClient()
           .from("poker_sessions")
           .update(patch)
-          .eq("id", current.id);
+          .eq("id", current.id)
+          .select("id");
         throwIfSupabaseError(updateError, failureLabel);
+        // Zero rows means you are no longer a host, for example because an
+        // organization owner changed your role while the session was open.
+        if (!updated || updated.length === 0) {
+          refreshOrgRole();
+        }
+        throwIfNoRows(updated, "You can no longer change this session.");
         return true;
       } catch (updateError) {
         reportActionError(failureLabel, updateError);
@@ -500,8 +532,30 @@ export default function PokerSessionClient() {
         setPending(key, false);
       }
     },
-    [setPending]
+    [setPending, refreshOrgRole]
   );
+
+  const handleToggleArchive = useCallback(async () => {
+    const current = sessionRef.current;
+    if (!current) {
+      return;
+    }
+    const archiving = !current.archived_at;
+    const ok = await updateSession(
+      "archive",
+      { archived_at: archiving ? new Date().toISOString() : null },
+      archiving
+        ? "Could not archive the session"
+        : "Could not restore the session"
+    );
+    if (ok) {
+      toast.success(archiving ? "Session archived" : "Session restored", {
+        description: archiving
+          ? "It moves to Archived in your sessions. Everyone can still open it."
+          : "It is back in your active sessions.",
+      });
+    }
+  }, [updateSession]);
 
   const handleToggleVisibility = useCallback(async () => {
     const s = sessionRef.current;
@@ -553,8 +607,8 @@ export default function PokerSessionClient() {
       return;
     }
     // A direct delete can only remove the caller's own vote, because the
-    // delete policy is scoped to the caller's user id. The RPC performs an
-    // author scoped delete instead.
+    // delete policy is scoped to the caller's user id. The RPC clears every
+    // vote and checks that the caller is a host instead.
     const { error: clearError } = await createClient().rpc(
       "clear_poker_votes",
       { p_session_id: s.id }
@@ -583,10 +637,12 @@ export default function PokerSessionClient() {
     } catch (clearError) {
       reportActionError("Could not clear the votes", clearError);
       setVotes(previousVotes);
+      // A refusal can mean you are no longer a host here.
+      refreshOrgRole();
     } finally {
       setPending("clearVotes", false);
     }
-  }, [clearAllVotes, setPending, updateSession]);
+  }, [clearAllVotes, setPending, updateSession, refreshOrgRole]);
 
   const handleCompleteRound = useCallback(
     async (estimate: string, nextStory: string) => {
@@ -595,8 +651,9 @@ export default function PokerSessionClient() {
         return;
       }
       setPending("nextRound", true);
+      ownRoundsInFlightRef.current += 1;
       try {
-        const { error: rpcError } = await createClient().rpc(
+        const { data: roundId, error: rpcError } = await createClient().rpc(
           "complete_poker_round",
           {
             p_session_id: s.id,
@@ -605,6 +662,14 @@ export default function PokerSessionClient() {
           }
         );
         throwIfSupabaseError(rpcError, "Failed to save the round");
+        // If the INSERT has not arrived yet, remember the id so that it is
+        // recognised as this client's own round when it does.
+        if (
+          typeof roundId === "string" &&
+          !seenRoundIdsRef.current.has(roundId)
+        ) {
+          ownRoundIdsRef.current.add(roundId);
+        }
         setNextRoundOpen(false);
         await refetchAll(s.id);
         toast.success(
@@ -613,31 +678,48 @@ export default function PokerSessionClient() {
         );
       } catch (rpcError) {
         reportActionError("Could not save the round", rpcError);
+        // A refusal can mean you are no longer a host here.
+        refreshOrgRole();
       } finally {
+        ownRoundsInFlightRef.current = Math.max(
+          0,
+          ownRoundsInFlightRef.current - 1
+        );
         setPending("nextRound", false);
       }
     },
-    [refetchAll, setPending]
+    [refetchAll, setPending, refreshOrgRole]
   );
 
-  const handleDeleteRound = useCallback(async (roundId: string) => {
-    let removed: PokerRound | undefined;
-    setRounds((prev) => {
-      removed = prev.find((r) => r.id === roundId);
-      return prev.filter((r) => r.id !== roundId);
-    });
-    const { error: deleteError } = await createClient()
-      .from("poker_rounds")
-      .delete()
-      .eq("id", roundId);
-    if (deleteError) {
-      reportActionError("Could not delete the round", deleteError);
-      const restored = removed;
-      if (restored) {
-        setRounds((prev) => upsertById(prev, restored).sort(byCreatedAt));
+  const handleDeleteRound = useCallback(
+    async (roundId: string) => {
+      let removed: PokerRound | undefined;
+      setRounds((prev) => {
+        removed = prev.find((r) => r.id === roundId);
+        return prev.filter((r) => r.id !== roundId);
+      });
+      const { data: deleted, error: deleteError } = await createClient()
+        .from("poker_rounds")
+        .delete()
+        .eq("id", roundId)
+        .select("id");
+      const refused = !deleteError && (!deleted || deleted.length === 0);
+      if (refused) {
+        refreshOrgRole();
       }
-    }
-  }, []);
+      if (deleteError || refused) {
+        reportActionError(
+          "Could not delete the round",
+          deleteError ?? new Error("You can no longer delete rounds here.")
+        );
+        const restored = removed;
+        if (restored) {
+          setRounds((prev) => upsertById(prev, restored).sort(byCreatedAt));
+        }
+      }
+    },
+    [refreshOrgRole]
+  );
 
   const handleVote = useCallback(
     async (voteValue: string | null) => {
@@ -781,11 +863,16 @@ export default function PokerSessionClient() {
     }
     setPending("deleteSession", true);
     try {
-      const { error: deleteError } = await createClient()
+      const { data: deleted, error: deleteError } = await createClient()
         .from("poker_sessions")
         .delete()
-        .eq("id", s.id);
+        .eq("id", s.id)
+        .select("id");
       throwIfSupabaseError(deleteError, "Failed to delete session");
+      if (!deleted || deleted.length === 0) {
+        refreshOrgRole();
+      }
+      throwIfNoRows(deleted, "You can no longer delete this session.");
       toast.success("Session deleted");
       router.push("/poker");
     } catch (deleteError) {
@@ -793,7 +880,7 @@ export default function PokerSessionClient() {
     } finally {
       setPending("deleteSession", false);
     }
-  }, [router, setPending]);
+  }, [router, setPending, refreshOrgRole]);
 
   const handleCopyMarkdown = useCallback(async () => {
     const s = sessionRef.current;
@@ -861,7 +948,18 @@ export default function PokerSessionClient() {
   // The database allows this, so the client gate has to match it.
   const myParticipant = participants.find((p) => p.user_id === userId);
 
-  if (!(session.is_public || isAuthor || myParticipant)) {
+  // Members of the owning organization may open a private session before
+  // they have a participant row, so wait for their role instead of flashing
+  // the private notice.
+  if (
+    session.org_id &&
+    orgRoleLoading &&
+    !(session.is_public || isAuthor || myParticipant)
+  ) {
+    return <FullPageLoading label="Loading session…" />;
+  }
+
+  if (!(session.is_public || isAuthor || myParticipant || orgRole)) {
     return (
       <PrivateAccessOverlay
         description="The host made this session private. Only people who joined before then can open it. Ask the host to make it public again."
@@ -884,15 +982,17 @@ export default function PokerSessionClient() {
     <div className="flex min-h-dvh flex-col bg-canvas">
       <SessionHeader
         currentUserId={userId}
-        isAuthor={isAuthor}
+        isAuthor={isHost}
         isObserver={myParticipant?.is_observer ?? false}
         onCopyMarkdown={handleCopyMarkdown}
         onDeleteSession={handleDeleteSession}
         onDownloadMarkdown={handleDownloadMarkdown}
         onTitleUpdate={handleEditSessionTitle}
+        onToggleArchive={handleToggleArchive}
         onToggleObserver={handleToggleObserver}
         onToggleVisibility={handleToggleVisibility}
         onUpdateScale={handleUpdateScale}
+        organization={organization}
         participants={participants}
         roundNumber={roundNumber}
         session={session}
@@ -902,7 +1002,7 @@ export default function PokerSessionClient() {
         aria-label="Poker session"
         className={cn(
           "mx-auto grid w-full max-w-6xl flex-1 items-start gap-3 p-3 md:gap-4 md:p-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] lg:gap-5",
-          isAuthor && "max-md:pb-24"
+          isHost && "max-md:pb-24"
         )}
         data-session-capture
       >
@@ -912,7 +1012,7 @@ export default function PokerSessionClient() {
         <div className="grid min-w-0 gap-4 max-lg:contents lg:gap-5">
           <div className="order-1 min-w-0">
             <RoundPanel
-              isAuthor={isAuthor}
+              isAuthor={isHost}
               onClearVotes={handleClearVotes}
               onNextRound={() => setNextRoundOpen(true)}
               onStoryUpdate={handleEditStory}
@@ -942,6 +1042,7 @@ export default function PokerSessionClient() {
           <div className={cn("min-w-0", revealed ? "order-2" : "order-3")}>
             <VoteResults
               authorId={session.author_id}
+              coHostIds={coHostIds}
               currentUserId={userId}
               participants={participants}
               scale={session.voting_scale}
@@ -951,7 +1052,7 @@ export default function PokerSessionClient() {
           </div>
           <div className="order-4 min-w-0">
             <RoundHistory
-              canDelete={isAuthor}
+              canDelete={isHost}
               onDelete={handleDeleteRound}
               rounds={rounds}
             />
@@ -959,7 +1060,7 @@ export default function PokerSessionClient() {
         </div>
       </main>
 
-      {isAuthor && (
+      {isHost && (
         <NextRoundDialog
           currentStory={session.current_story}
           isSubmitting={!!pendingActions.nextRound}

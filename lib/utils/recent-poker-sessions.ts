@@ -43,3 +43,8 @@ export function removeRecentPokerSession(slug: string) {
 }
 
 export type { RecentPokerSession };
+
+/** Forgets every recent poker session, for example when signing out. */
+export function clearRecentPokerSessions() {
+  document.cookie = "recent_poker_sessions=; max-age=0; path=/";
+}

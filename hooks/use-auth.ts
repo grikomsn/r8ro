@@ -11,6 +11,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { getGitHubProfile } from "@/lib/auth/profile";
 import {
   clearSessionAndRecreateClient,
   createClient,
@@ -33,11 +34,26 @@ interface LinkIdentityResult {
 
 interface AuthContextValue {
   authError: string | null;
+  /** GitHub avatar of a linked account; null for guests. */
+  avatarUrl: string | null;
   displayName: string;
+  /** GitHub handle of a linked account; null for guests. */
+  githubUsername: string | null;
   isAnonymous: boolean;
+  /**
+   * True when the account has a GitHub identity. Organizations require it;
+   * "not anonymous" alone is not enough.
+   */
+  isGitHubLinked: boolean;
   isInitialized: boolean;
   isLoading: boolean;
   linkGitHubIdentity: () => Promise<LinkIdentityResult>;
+  /**
+   * Ends a linked account's session in this browser only. The browser then
+   * continues as a new guest. Guests cannot sign out: they would lose
+   * everything they own.
+   */
+  signOut: () => Promise<LinkIdentityResult>;
   updateDisplayName: (newName: string) => Promise<boolean>;
   user: User | null;
   userId: string | null;
@@ -89,6 +105,55 @@ function rememberIdentity(user: User) {
   }
 }
 
+function forgetIdentity() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    localStorage.removeItem(KNOWN_IDENTITY_KEY);
+  } catch {
+    // Nothing to forget when storage is unavailable.
+  }
+}
+
+// Set by the tab that signs out, so that the other open tabs, which receive
+// the same SIGNED_OUT event, wait for the guest account that tab creates
+// instead of each creating one of their own.
+const SIGNING_OUT_KEY = "r8ro:signing-out";
+const SIGNING_OUT_WINDOW_MS = 30_000;
+// How long another tab waits for that guest session before reloading.
+const SIGN_OUT_FOLLOW_TIMEOUT_MS = 8000;
+
+function markSigningOut() {
+  try {
+    localStorage.setItem(SIGNING_OUT_KEY, String(Date.now()));
+  } catch {
+    // Without storage other tabs fall back to their own recovery.
+  }
+}
+
+function clearSigningOut() {
+  try {
+    localStorage.removeItem(SIGNING_OUT_KEY);
+  } catch {
+    // Nothing to clear.
+  }
+}
+
+function isAnotherTabSigningOut() {
+  try {
+    const startedAt = Number(localStorage.getItem(SIGNING_OUT_KEY));
+    return (
+      Number.isFinite(startedAt) &&
+      startedAt > 0 &&
+      Date.now() - startedAt < SIGNING_OUT_WINDOW_MS
+    );
+  } catch {
+    return false;
+  }
+}
+
 function hasKnownIdentity() {
   if (typeof window === "undefined") {
     return false;
@@ -116,6 +181,9 @@ function useAuthState(): AuthContextValue {
 
   const supabaseRef = useRef(createClient());
   const isRecoveringRef = useRef(false);
+  // True only in the tab whose signOut() is running.
+  const isSigningOutRef = useRef(false);
+  const followSignOutTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -314,6 +382,31 @@ function useAuthState(): AuthContextValue {
 
       updateTimeoutRef.current = setTimeout(async () => {
         if (event === "SIGNED_OUT") {
+          if (isSigningOutRef.current) {
+            // This tab signed out on purpose: it creates the new guest.
+            isSigningOutRef.current = false;
+            await signInAnonymously(supabaseRef.current, mounted);
+            clearSigningOut();
+            return;
+          }
+
+          if (isAnotherTabSigningOut()) {
+            // Another tab signed out and is creating the guest account. Its
+            // SIGNED_IN event reaches this tab too; reload if it never does.
+            setState((previous) => ({
+              ...previous,
+              isLoading: true,
+              isInitialized: false,
+            }));
+            if (followSignOutTimeoutRef.current) {
+              clearTimeout(followSignOutTimeoutRef.current);
+            }
+            followSignOutTimeoutRef.current = setTimeout(() => {
+              window.location.reload();
+            }, SIGN_OUT_FOLLOW_TIMEOUT_MS);
+            return;
+          }
+
           // A sign out for a browser that already had an identity is a
           // failure, not a fresh visit. Minting a replacement account here
           // would strand the boards the previous account owned.
@@ -325,6 +418,11 @@ function useAuthState(): AuthContextValue {
           await signInAnonymously(supabaseRef.current, mounted);
         } else if (session?.user) {
           const isAnonymous = !!session.user.is_anonymous;
+
+          if (followSignOutTimeoutRef.current) {
+            clearTimeout(followSignOutTimeoutRef.current);
+            followSignOutTimeoutRef.current = null;
+          }
 
           if (!isAnonymous) {
             clearGitHubLinkPendingState();
@@ -350,6 +448,9 @@ function useAuthState(): AuthContextValue {
       mounted = false;
       if (updateTimeoutRef.current) {
         clearTimeout(updateTimeoutRef.current);
+      }
+      if (followSignOutTimeoutRef.current) {
+        clearTimeout(followSignOutTimeoutRef.current);
       }
       subscription.unsubscribe();
     };
@@ -470,7 +571,58 @@ function useAuthState(): AuthContextValue {
       }
     }, [state.isAnonymous]);
 
+  const signOut = useCallback(async (): Promise<LinkIdentityResult> => {
+    if (state.isAnonymous) {
+      return { success: false, error: "Guests cannot sign out" };
+    }
+
+    const previousUser = state.user;
+    // A SIGNED_OUT event for a remembered identity is otherwise reported as a
+    // lost session. Forgetting it first lets the listener start a new guest.
+    forgetIdentity();
+    clearGitHubLinkPendingState();
+    markSigningOut();
+    isSigningOutRef.current = true;
+    setState((previous) => ({
+      ...previous,
+      isLoading: true,
+      isInitialized: false,
+    }));
+
+    // "local" ends this browser's session only; the default signs out of
+    // every device.
+    const { error } = await supabaseRef.current.auth.signOut({
+      scope: "local",
+    });
+
+    if (error) {
+      isSigningOutRef.current = false;
+      clearSigningOut();
+      if (previousUser) {
+        rememberIdentity(previousUser);
+      }
+      setState((previous) => ({
+        ...previous,
+        isLoading: false,
+        isInitialized: true,
+      }));
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  }, [state.isAnonymous, state.user]);
+
+  const {
+    avatarUrl,
+    isLinked: isGitHubLinked,
+    username: githubUsername,
+  } = getGitHubProfile(state.user);
+
   return {
+    avatarUrl,
+    githubUsername,
+    isGitHubLinked,
+    signOut,
     user: state.user,
     userId: state.userId,
     displayName: state.displayName,

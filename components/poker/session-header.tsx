@@ -1,6 +1,8 @@
 "use client";
 
 import {
+  Archive,
+  ArchiveRestore,
   ClipboardCopy,
   Download,
   Glasses,
@@ -18,6 +20,10 @@ import {
   type PresenceParticipant,
 } from "@/components/shared/presence-button";
 import { SessionCodeButton } from "@/components/shared/session-code-button";
+import {
+  ArchivedChip,
+  OrganizationChip,
+} from "@/components/shared/session-owner-chips";
 import { SessionTopbar } from "@/components/shared/session-topbar";
 import { ShareMenu, ShareMenuItems } from "@/components/shared/share-menu";
 import {
@@ -54,6 +60,7 @@ import {
   type VotingScaleType,
 } from "@/lib/constants/poker-scales";
 import type { PokerSession } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 interface SessionHeaderProps {
   currentUserId: string | null;
@@ -63,9 +70,12 @@ interface SessionHeaderProps {
   onDeleteSession: () => void;
   onDownloadMarkdown: () => void;
   onTitleUpdate: (newTitle: string) => void;
+  onToggleArchive: () => void;
   onToggleObserver: () => void;
   onToggleVisibility: () => void;
   onUpdateScale: (scale: string[]) => void;
+  /** The owning organization, when you are a member of it. */
+  organization: { name: string; slug: string } | null;
   participants: PresenceParticipant[];
   roundNumber: number;
   session: PokerSession;
@@ -79,14 +89,17 @@ export function SessionHeader({
   onDeleteSession,
   onDownloadMarkdown,
   onTitleUpdate,
+  onToggleArchive,
   onToggleObserver,
   onToggleVisibility,
   onUpdateScale,
+  organization,
   participants,
   roundNumber,
   session,
 }: SessionHeaderProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const hasOwnerChips = !!organization || !!session.archived_at;
   const isWide = useMediaQuery(SM_QUERY);
   const scaleType = detectScaleType(session.voting_scale);
 
@@ -118,6 +131,7 @@ export function SessionHeader({
             <PresenceButton
               authorId={session.author_id}
               currentUserId={currentUserId}
+              hostOrgId={organization ? session.org_id : null}
               participants={participants}
             />
             {isWide && <ShareMenu {...shareOptions} />}
@@ -200,8 +214,30 @@ export function SessionHeader({
                         {session.is_public ? "Make private" : "Make public"}
                         <span className="text-muted-foreground text-xs">
                           {session.is_public
-                            ? "Only people already here keep access"
+                            ? organization
+                              ? `Only ${organization.name} and people already here`
+                              : "Only people already here keep access"
                             : "Anyone with the link can join"}
+                        </span>
+                      </span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={onToggleArchive}>
+                      {session.archived_at ? (
+                        <ArchiveRestore
+                          aria-hidden="true"
+                          className="mr-2 h-4 w-4"
+                        />
+                      ) : (
+                        <Archive aria-hidden="true" className="mr-2 h-4 w-4" />
+                      )}
+                      <span className="flex flex-col">
+                        {session.archived_at
+                          ? "Restore session"
+                          : "Archive session"}
+                        <span className="text-muted-foreground text-xs">
+                          {session.archived_at
+                            ? "Back to the active sessions"
+                            : "File it away; nothing else changes"}
                         </span>
                       </span>
                     </DropdownMenuItem>
@@ -223,8 +259,26 @@ export function SessionHeader({
         meta={
           <>
             <SessionCodeButton slug={session.slug} />
-            <span aria-hidden="true">·</span>
-            <span>Round {roundNumber}</span>
+            {/* Ownership comes first: the line never wraps, so whatever is
+                last is the first to be cut off on a phone. */}
+            {organization && <OrganizationChip organization={organization} />}
+            {session.archived_at && <ArchivedChip />}
+            {/* On a phone the round number makes room for the ownership
+                chips. */}
+            <span
+              aria-hidden="true"
+              className={cn(hasOwnerChips && "max-sm:hidden")}
+            >
+              ·
+            </span>
+            <span
+              className={cn(
+                "min-w-0 truncate",
+                hasOwnerChips && "max-sm:hidden"
+              )}
+            >
+              Round {roundNumber}
+            </span>
             <span aria-hidden="true" className="max-sm:hidden">
               ·
             </span>

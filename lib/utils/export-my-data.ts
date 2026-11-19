@@ -14,9 +14,16 @@ interface ExportPokerSession {
   votes: Record<string, unknown>[];
 }
 
+interface ExportOrganization {
+  members: Record<string, unknown>[];
+  organization: Record<string, unknown>;
+  role: string;
+}
+
 interface ExportPayload {
   exported_at: string;
   generator: string;
+  organizations: ExportOrganization[];
   poker_sessions: ExportPokerSession[];
   retro_boards: ExportBoard[];
   user: {
@@ -257,9 +264,39 @@ export async function exportMyData(): Promise<void> {
     pokerSessions.push({ session, participants, rounds, votes });
   }
 
+  // Organizations you belong to, with their member lists. Guests cannot be in
+  // one, so this is empty for them. The sessions an organization owns are
+  // included above when you created or joined them.
+  const organizations: ExportOrganization[] = [];
+  if (!user.is_anonymous) {
+    const { data: orgRows, error: orgError } = await supabase.rpc(
+      "list_my_organizations"
+    );
+    if (orgError) {
+      throw orgError;
+    }
+    for (const org of (orgRows ?? []) as Record<string, unknown>[]) {
+      // biome-ignore lint/performance/noAwaitInLoops: one organization at a time
+      const { data: members, error: membersError } = await supabase.rpc(
+        "list_organization_members",
+        { p_org_id: org.id }
+      );
+      if (membersError) {
+        throw membersError;
+      }
+      const { role, ...organization } = org;
+      organizations.push({
+        organization,
+        role: String(role),
+        members: (members ?? []) as Record<string, unknown>[],
+      });
+    }
+  }
+
   const payload: ExportPayload = {
     exported_at: new Date().toISOString(),
     generator: "r8ro export",
+    organizations,
     retro_boards: retroBoards,
     poker_sessions: pokerSessions,
     user: {

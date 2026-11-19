@@ -4,6 +4,9 @@
 
 - `app/poker/client-page.tsx` creates sessions and inserts the author into
   `poker_participants`.
+- A linked user who belongs to an organization can choose which
+  organization the session belongs to ("Belongs to"); see
+  [organizations.md](organizations.md).
 - Available presets are defined in `lib/constants/poker-scales.ts`: Fibonacci,
   T-shirt sizes, and linear 1–10.
 - Joining accepts a session code or a pasted link, verifies that the session
@@ -67,3 +70,12 @@ and vote changes on `poker-${slug}`. Supabase Presence and
 
 The table definitions and policies originate in
 `supabase/migrations/20250101000000_create_poker_tables.sql`.
+
+## Hosts and Archive
+
+- The host is the author, or an owner or admin of the organization that owns
+  the session. Everything described above for "the author" applies to every
+  host, including clearing votes, completing rounds and deleting rounds.
+- A private session of an organization stays open to its members.
+- "Archive session" in the session menu files it away; see
+  [account.md](account.md#archive).

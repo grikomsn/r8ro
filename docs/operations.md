@@ -54,6 +54,16 @@ pnpm check-types
 pnpm build
 ```
 
+Database checks for organizations and organization-owned sessions run
+against the local stack in one transaction that rolls back:
+
+```bash
+supabase migration up --local
+psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
+  -v ON_ERROR_STOP=1 -f supabase/checks/organizations_rls.sql
+# expected last line: 131 passed, 0 failed
+```
+
 The standalone type check is required because `next.config.mjs` sets
 `typescript.ignoreBuildErrors`.
 
@@ -94,8 +104,26 @@ The hosted Supabase project is being terminated. Before it is deleted:
      public.retro_card_votes,
      public.poker_sessions,
      public.poker_participants,
-     public.poker_votes
+     public.poker_votes,
+     public.poker_rounds
    FROM anon, authenticated;
+
+   -- The organization tables have no write grants; they change only
+   -- through these functions. The read functions stay available so the
+   -- export keeps working.
+   REVOKE EXECUTE ON FUNCTION
+     public.create_organization(text),
+     public.update_organization(uuid, text),
+     public.delete_organization(uuid),
+     public.set_organization_member_role(uuid, uuid, text),
+     public.remove_organization_member(uuid, uuid),
+     public.rotate_organization_invite(uuid, integer),
+     public.revoke_organization_invite(uuid),
+     public.accept_organization_invite(text),
+     public.set_session_organization(text, uuid, uuid),
+     public.clear_poker_votes(uuid),
+     public.complete_poker_round(uuid, text, text)
+   FROM authenticated;
    ```
 
 5. Serve a closing page once the project is gone, so visitors get an
@@ -118,6 +146,44 @@ through the export and the database dump.
 1. Create and join a public session in separate contexts.
 2. Vote, change a vote, reveal, and start or stop voting.
 3. Verify presence, story, scale, and visibility updates.
+
+### Organizations
+
+GitHub OAuth is usually not configured locally. To act as a linked user,
+mark a local guest as registered and give it a GitHub identity (organizations
+require one), then change the display name once in the app so the browser's
+session picks it up. Use a different `provider_id` for each user:
+
+```sql
+update auth.users set is_anonymous = false where id = '<uid>';
+insert into auth.identities
+  (provider_id, user_id, identity_data, provider,
+   created_at, updated_at, last_sign_in_at)
+values
+  ('9001', '<uid>', '{"sub":"9001","user_name":"local-dev"}', 'github',
+   now(), now(), now());
+```
+
+The timestamps are required: the Auth server fails to load a user whose
+identity has a null `created_at`.
+
+1. Linked user A creates an organization and an invite link.
+2. A guest opens the link: they see the organization and are asked to link
+   GitHub, and cannot join.
+3. Linked user B joins, sees Sessions and Members, and no invite panel.
+4. B creates a private retro in the organization; A opens it without the
+   private notice and has host controls; a guest gets "Board not found".
+5. A makes B an admin, then an owner; A cannot leave while sole owner.
+6. Remove a member who joined a private board; reloading it shows "not
+   found" for them.
+
+### Account and Sessions
+
+1. A guest sees "Continue with GitHub" on `/account` and no Sign out.
+2. On `/account/sessions`: rename, lock, archive (gone from the landing
+   "Yours" list), restore, move into an organization and back, leave, delete.
+3. A linked user signs out and lands on `/` as a new guest with no error
+   screen.
 
 ### Authentication
 

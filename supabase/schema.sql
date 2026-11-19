@@ -7,6 +7,10 @@
 -- migrations that follow it. Do not apply this file on top of the migration
 -- history: the helper function below is created before its tables, which
 -- PostgreSQL rejects.
+--
+-- Not covered here: organizations, the org_id and archived_at columns, and
+-- the policies replaced for organization-owned sessions. See
+-- 20261119090000_organizations.sql and 20261119090100_session_org_ownership.sql.
 
 -- ============================================================================
 -- HELPER FUNCTIONS

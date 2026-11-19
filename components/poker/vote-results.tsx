@@ -1,6 +1,13 @@
 "use client";
 
-import { Check, Crown, Glasses, Lightbulb, PartyPopper } from "lucide-react";
+import {
+  Check,
+  Crown,
+  Glasses,
+  Lightbulb,
+  PartyPopper,
+  ShieldCheck,
+} from "lucide-react";
 import { useMemo } from "react";
 import { Avatar } from "@/components/shared/avatar";
 import type { PokerParticipant, PokerVote } from "@/lib/types";
@@ -9,6 +16,8 @@ import { computePokerStats } from "@/lib/utils/poker-stats";
 
 interface VoteResultsProps {
   authorId: string;
+  /** Owners and admins of the session's organization, shown as co-hosts. */
+  coHostIds?: ReadonlySet<string>;
   currentUserId: string | null;
   participants: PokerParticipant[];
   scale: string[];
@@ -29,6 +38,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 export function VoteResults({
   authorId,
+  coHostIds,
   currentUserId,
   participants,
   scale,
@@ -213,11 +223,20 @@ export function VoteResults({
                   </span>
                 )}
               </span>
-              {participant.user_id === authorId && (
+              {participant.user_id === authorId ? (
                 <Crown
                   aria-label="Host"
                   className="h-4 w-4 shrink-0 fill-primary text-primary"
+                  role="img"
                 />
+              ) : (
+                coHostIds?.has(participant.user_id) && (
+                  <ShieldCheck
+                    aria-label="Co-host"
+                    className="h-4 w-4 shrink-0 text-brand-text"
+                    role="img"
+                  />
+                )
               )}
               {showValue ? (
                 <span

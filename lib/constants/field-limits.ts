@@ -4,6 +4,7 @@
 
 export const FIELD_LIMITS = {
   cardContent: 10_000,
+  organizationName: 80,
   participantName: 80,
   sessionTitle: 200,
   story: 10_000,

@@ -1,6 +1,6 @@
 "use client";
 
-import { Crown, Glasses, Users } from "lucide-react";
+import { Crown, Glasses, ShieldCheck, Users } from "lucide-react";
 import { Avatar } from "@/components/shared/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -8,6 +8,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { useOrgManagerIds } from "@/hooks/use-org-role";
 import { cn } from "@/lib/utils";
 
 export interface PresenceParticipant {
@@ -21,6 +22,11 @@ export interface PresenceParticipant {
 interface PresenceButtonProps {
   authorId: string;
   currentUserId: string | null;
+  /**
+   * The organization that owns the session, when the viewer is a member.
+   * Its owners and admins are shown as co-hosts.
+   */
+  hostOrgId?: string | null;
   participants: PresenceParticipant[];
 }
 
@@ -29,8 +35,10 @@ const MAX_FACES = 3;
 export function PresenceButton({
   authorId,
   currentUserId,
+  hostOrgId = null,
   participants,
 }: PresenceButtonProps) {
+  const coHostIds = useOrgManagerIds(hostOrgId);
   const sorted = [...participants].sort(
     (a, b) =>
       Number(b.is_online) - Number(a.is_online) ||
@@ -75,11 +83,20 @@ export function PresenceButton({
                   className="h-4 w-4 shrink-0 text-muted-foreground"
                 />
               )}
-              {p.user_id === authorId && (
+              {p.user_id === authorId ? (
                 <Crown
                   aria-label="Host"
                   className="h-4 w-4 shrink-0 fill-primary text-primary"
+                  role="img"
                 />
+              ) : (
+                coHostIds.has(p.user_id) && (
+                  <ShieldCheck
+                    aria-label="Co-host"
+                    className="h-4 w-4 shrink-0 text-brand-text"
+                    role="img"
+                  />
+                )
               )}
             </li>
           ))}
