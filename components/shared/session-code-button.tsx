@@ -17,7 +17,7 @@ export function SessionCodeButton({ slug }: { slug: string }) {
   return (
     <button
       aria-label={`Session code ${slug}. Click to copy`}
-      className="group flex max-w-full items-center gap-1 rounded font-mono text-muted-foreground text-xs outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+      className="group flex min-w-0 max-w-full items-center gap-1 rounded font-mono text-muted-foreground text-xs outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
       onClick={copy}
       type="button"
     >

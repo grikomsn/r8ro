@@ -3,6 +3,7 @@
 import { formatDistanceToNow } from "date-fns";
 import {
   ArrowRight,
+  Building2,
   History,
   LogIn,
   type LucideIcon,
@@ -20,6 +21,13 @@ import { SiteHeader } from "@/components/shared/site-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/hooks/use-auth";
 import { ERROR_MESSAGES } from "@/lib/constants/error-messages";
@@ -28,7 +36,9 @@ import {
   USERNAME_MAX_LENGTH,
   validateUsername,
 } from "@/lib/constants/username";
+import { listMyOrganizations } from "@/lib/organizations";
 import { createClient } from "@/lib/supabase/client";
+import type { OrganizationSummary } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { parseSessionCode } from "@/lib/utils/session-code";
 
@@ -50,6 +60,8 @@ export interface SessionLandingProps {
   createLabel: string;
   /** Creates the session and returns its slug. */
   createSession: (input: {
+    /** Organization that will own the session, or null for a personal one. */
+    orgId: string | null;
     title: string;
     userId: string;
     username: string;
@@ -71,6 +83,8 @@ export interface SessionLandingProps {
   table: "retro_boards" | "poker_sessions";
   titlePlaceholder: string;
 }
+
+const PERSONAL_OWNER = "personal";
 
 function relativeTime(timestamp?: string) {
   if (!timestamp) {
@@ -172,10 +186,13 @@ export function SessionLanding({
     authError,
     userId,
     displayName,
+    isGitHubLinked,
     updateDisplayName,
     isLoading: authLoading,
     isInitialized,
   } = useAuth();
+  const [organizations, setOrganizations] = useState<OrganizationSummary[]>([]);
+  const [ownerOrgId, setOwnerOrgId] = useState<string>(PERSONAL_OWNER);
   const [username, setUsername] = useState("");
   const [isEditingName, setIsEditingName] = useState(false);
   const [title, setTitle] = useState("");
@@ -204,6 +221,40 @@ export function SessionLanding({
     );
   }, [recent]);
 
+  // Only GitHub-linked accounts can be in an organization.
+  // `?org=<slug>` preselects an organization, for links from its page. It is
+  // read in an effect so that the page needs no Suspense boundary.
+  useEffect(() => {
+    if (!(userId && isGitHubLinked)) {
+      setOrganizations([]);
+      setOwnerOrgId(PERSONAL_OWNER);
+      return;
+    }
+
+    let isMounted = true;
+    listMyOrganizations()
+      .then((rows) => {
+        if (!isMounted) {
+          return;
+        }
+        setOrganizations(rows);
+        const requested = new URLSearchParams(window.location.search).get(
+          "org"
+        );
+        const match = rows.find((org) => org.slug === requested);
+        if (match) {
+          setOwnerOrgId(match.id);
+        }
+      })
+      .catch((orgError) => {
+        console.error("Failed to load organizations:", orgError);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [userId, isGitHubLinked]);
+
   // Sessions the user created are read from the database rather than the
   // recent-visits cookie, so they stay reachable after the cookie expires.
   useEffect(() => {
@@ -219,6 +270,7 @@ export function SessionLanding({
       .from(table)
       .select("slug, title, updated_at")
       .eq("author_id", userId)
+      .is("archived_at", null)
       .order("updated_at", { ascending: false })
       .limit(20)
       .then(({ data, error: fetchError }) => {
@@ -284,6 +336,7 @@ export function SessionLanding({
       }
       const finalTitle = title.trim();
       const slug = await createSession({
+        orgId: ownerOrgId === PERSONAL_OWNER ? null : ownerOrgId,
         title: finalTitle,
         userId: prepared.userId,
         username: prepared.trimmed,
@@ -461,6 +514,46 @@ export function SessionLanding({
                       value={title}
                     />
                   </div>
+                  {organizations.length > 0 && (
+                    <div className="space-y-2">
+                      <Label
+                        className="font-bold text-sm"
+                        htmlFor="create-owner"
+                      >
+                        Belongs to
+                      </Label>
+                      <Select onValueChange={setOwnerOrgId} value={ownerOrgId}>
+                        <SelectTrigger
+                          className="h-11 w-full rounded-xl border-2 border-border bg-background px-4 text-base"
+                          id="create-owner"
+                        >
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={PERSONAL_OWNER}>
+                            Only me (personal)
+                          </SelectItem>
+                          {organizations.map((org) => (
+                            <SelectItem key={org.id} value={org.id}>
+                              <span className="flex items-center gap-2">
+                                <Building2
+                                  aria-hidden="true"
+                                  className="h-4 w-4"
+                                />
+                                {org.name}
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {ownerOrgId !== PERSONAL_OWNER && (
+                        <p className="text-muted-foreground text-xs">
+                          Members can open it even when private, and owners and
+                          admins can host it.
+                        </p>
+                      )}
+                    </div>
+                  )}
                   {createExtras}
                   {errorBox}
                   <Button
@@ -586,6 +679,15 @@ export function SessionLanding({
               />
             </TabsContent>
           </Tabs>
+          <div className="border-border border-t-2 px-4 py-3">
+            <Link
+              className="flex items-center justify-between gap-2 font-bold text-sm hover:text-brand-text"
+              href="/account/sessions"
+            >
+              Manage all sessions
+              <ArrowRight aria-hidden="true" className="h-4 w-4" />
+            </Link>
+          </div>
         </aside>
       </main>
     </div>

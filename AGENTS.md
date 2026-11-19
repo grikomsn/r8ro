@@ -16,7 +16,7 @@ Operating contract for OpenCode sessions. Every line answers: "would an agent mi
 
 ## Tests
 
-No Jest/Vitest/Playwright configured. Validation chain: `pnpm check-types` → `pnpm dlx ultracite check` → `pnpm build`. Manual QA in two browser tabs for realtime features.
+No Jest/Vitest/Playwright configured. Validation chain: `pnpm check-types` → `pnpm dlx ultracite check` → `pnpm build`. Database changes: also run `supabase/checks/organizations_rls.sql` (see `docs/operations.md`). Manual QA in two browser tabs for realtime features.
 
 ## Architecture
 
@@ -24,6 +24,10 @@ No Jest/Vitest/Playwright configured. Validation chain: `pnpm check-types` → `
 - `app/client-page.tsx`, `app/poker/client-page.tsx`: landing pages; both render `components/shared/session-landing.tsx` (create/join UI, your sessions, recent)
 - `app/retro/[slug]/RetroPageClient.tsx`: retro orchestration (client)
 - `app/poker/[slug]/PokerSessionClient.tsx`: poker orchestration (client)
+- `app/account/`, `app/account/sessions/`: account page and "My sessions" (client, `list_my_sessions()`)
+- `app/orgs/`, `app/orgs/[slug]/`, `app/orgs/join/[code]/`: organizations, organization page, invite page
+- `components/orgs/`, `components/sessions/`: organization UI and the managed session list
+- `lib/organizations.ts`, `lib/sessions.ts`: typed wrappers for the organization and session RPCs; `hooks/use-org-role.ts` gives the viewer's role in a session's organization (owners and admins co-host)
 - `app/new/route.ts`: retro board creation (server); poker sessions are created client-side
 - `app/auth/callback/route.ts`, `app/auth/link/start/route.ts`: OAuth callback and account-linking API routes
 - `components/retro/`, `components/poker/`: feature modules
@@ -36,6 +40,7 @@ No Jest/Vitest/Playwright configured. Validation chain: `pnpm check-types` → `
 - `lib/utils/`: slug generation, recent-session cookie helpers
 - `lib/constants/`: error messages and poker voting scales
 - `supabase/migrations/`: all schema/RLS changes. Also `supabase/schema.sql` and `supabase/RLS_POLICIES.md` as static references
+- `supabase/checks/organizations_rls.sql`: psql behavioural checks for organization RLS (run against `supabase start`)
 - `docs/`: product behavior source of truth
 
 ## Realtime Playbook

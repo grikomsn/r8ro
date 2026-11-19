@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 // Wayfindr's flat accents and tints of them, all readable with navy ink.
@@ -42,22 +45,51 @@ interface AvatarProps {
   className?: string;
   name: string;
   online?: boolean;
-  size?: "sm" | "md";
+  size?: "sm" | "md" | "lg";
+  /** Photo, such as a GitHub avatar. Initials show when it fails to load. */
+  src?: string | null;
 }
 
-export function Avatar({ className, name, online, size = "md" }: AvatarProps) {
+const SIZE_CLASSES = {
+  sm: "h-7 w-7 text-[11px]",
+  md: "h-8 w-8 text-xs",
+  lg: "h-16 w-16 text-xl",
+} as const;
+
+export function Avatar({
+  className,
+  name,
+  online,
+  size = "md",
+  src,
+}: AvatarProps) {
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
   const color = COLORS[hashName(name) % COLORS.length];
+  const showImage = !!src && failedSrc !== src;
   return (
     <span
       aria-hidden="true"
       className={cn(
         "relative inline-flex shrink-0 select-none items-center justify-center rounded-full font-bold text-ink ring-2 ring-background",
-        size === "sm" ? "h-7 w-7 text-[11px]" : "h-8 w-8 text-xs",
+        SIZE_CLASSES[size],
         className
       )}
       style={{ backgroundColor: color }}
     >
-      {initialsOf(name)}
+      {showImage ? (
+        // biome-ignore lint/performance/noImgElement: a remote avatar in a fixed circle needs no image optimisation, and images are unoptimized
+        <img
+          alt=""
+          className="h-full w-full rounded-full object-cover"
+          height={64}
+          onError={() => setFailedSrc(src)}
+          referrerPolicy="no-referrer"
+          src={src}
+          width={64}
+        />
+      ) : (
+        initialsOf(name)
+      )}
       {online !== undefined && (
         <span
           className={cn(

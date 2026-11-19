@@ -5,6 +5,9 @@
 - `app/client-page.tsx` creates boards directly through the browser Supabase
   client (the landing UI is shared with poker in
   `components/shared/session-landing.tsx`) and inserts the author into `retro_participants`.
+- A linked user who belongs to an organization can choose which
+  organization the board belongs to ("Belongs to"); see
+  [organizations.md](organizations.md).
 - `/new` is a separate GET route that creates an untitled board for the
   authenticated user.
 - Joining accepts a session code or a pasted link, verifies that the board
@@ -87,3 +90,12 @@ The current SQL rules are summarized in
 [../data-model/supabase.md](../data-model/supabase.md) and defined in
 `supabase/migrations/20241231000000_create_retro_tables.sql` plus
 `supabase/migrations/20260106123000_update_retro_policies.sql`.
+
+## Hosts and Archive
+
+- The host is the author, or an owner or admin of the organization that owns
+  the board. Hosts get the timer, lock, visibility, archive and delete
+  controls. Card lock exemptions stay with the author.
+- A private board of an organization stays open to its members.
+- "Archive board" in the board menu files the board away; see
+  [account.md](account.md#archive).

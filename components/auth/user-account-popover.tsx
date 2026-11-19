@@ -1,21 +1,23 @@
 "use client";
 
 import {
+  Building2,
   Check,
-  Code,
   Download,
-  Monitor,
-  Moon,
+  LayoutList,
   Pencil,
   ShieldCheck,
-  Sun,
+  UserRound,
   X,
 } from "lucide-react";
-import { useTheme } from "next-themes";
+import Link from "next/link";
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
+import { LinkGitHubCard } from "@/components/auth/link-github-card";
+import { SignOutButton } from "@/components/auth/sign-out-button";
 import { Avatar } from "@/components/shared/avatar";
+import { ThemeSwitcher } from "@/components/shared/theme-switcher";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -36,59 +38,25 @@ interface UserAccountPopoverProps {
   variant?: "default" | "compact";
 }
 
-const THEMES = [
-  { value: "light", label: "Light", icon: Sun },
-  { value: "dark", label: "Dark", icon: Moon },
-  { value: "system", label: "Auto", icon: Monitor },
+const ACCOUNT_LINKS = [
+  { href: "/account", label: "Account", icon: UserRound },
+  { href: "/account/sessions", label: "My sessions", icon: LayoutList },
+  { href: "/orgs", label: "Organizations", icon: Building2 },
 ] as const;
-
-function ThemeSwitcher() {
-  const { theme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-
-  return (
-    <div
-      aria-label="Theme"
-      className="grid grid-cols-3 gap-1 rounded-lg bg-muted p-1"
-      role="radiogroup"
-    >
-      {THEMES.map(({ value, label, icon: Icon }) => {
-        const active = mounted && theme === value;
-        return (
-          <button
-            aria-checked={active}
-            className={cn(
-              "flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 font-semibold text-xs transition-colors",
-              active
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-            key={value}
-            onClick={() => setTheme(value)}
-            role="radio"
-            type="button"
-          >
-            <Icon aria-hidden="true" className="h-3.5 w-3.5" />
-            {label}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
 
 export function UserAccountPopover({
   variant = "default",
 }: UserAccountPopoverProps) {
   const {
+    avatarUrl,
+    githubUsername,
+    isGitHubLinked,
     userId,
     displayName,
     isAnonymous,
-    linkGitHubIdentity,
-    isLoading,
     updateDisplayName,
   } = useAuth();
+  const [isOpen, setIsOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [isRenaming, setIsRenaming] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
@@ -127,15 +95,6 @@ export function UserAccountPopover({
     setIsRenaming(false);
   };
 
-  const handleLinkGitHub = async () => {
-    const result = await linkGitHubIdentity();
-    if (!result.success) {
-      toast.error("Could not start GitHub linking", {
-        description: result.error,
-      });
-    }
-  };
-
   const handleExport = async () => {
     setIsExporting(true);
     try {
@@ -149,7 +108,7 @@ export function UserAccountPopover({
   };
 
   return (
-    <Popover>
+    <Popover onOpenChange={setIsOpen} open={isOpen}>
       <PopoverTrigger asChild>
         <button
           aria-label={`Account and settings for ${name}`}
@@ -159,7 +118,7 @@ export function UserAccountPopover({
           )}
           type="button"
         >
-          <Avatar name={name} size="md" />
+          <Avatar name={name} size="md" src={avatarUrl} />
           {variant === "default" && (
             <span className="hidden max-w-28 truncate font-semibold text-sm sm:inline">
               {name}
@@ -167,9 +126,12 @@ export function UserAccountPopover({
           )}
         </button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-80 rounded-xl p-0">
+      <PopoverContent
+        align="end"
+        className="max-h-[calc(100dvh-5rem)] w-80 overflow-y-auto rounded-xl p-0"
+      >
         <div className="flex items-center gap-3 border-border border-b-2 p-4">
-          <Avatar name={name} />
+          <Avatar name={name} src={avatarUrl} />
           <div className="min-w-0 flex-1">
             {isRenaming ? (
               <form className="space-y-1" onSubmit={saveName}>
@@ -228,7 +190,11 @@ export function UserAccountPopover({
                   ) : (
                     <>
                       <ShieldCheck aria-hidden="true" className="h-3.5 w-3.5" />
-                      Linked to GitHub
+                      {githubUsername
+                        ? `GitHub @${githubUsername}`
+                        : isGitHubLinked
+                          ? "Linked to GitHub"
+                          : "Registered account"}
                     </>
                   )}
                 </p>
@@ -245,23 +211,29 @@ export function UserAccountPopover({
             <ThemeSwitcher />
           </div>
 
+          <nav aria-label="Account">
+            <ul className="grid gap-1">
+              {ACCOUNT_LINKS.map(({ href, label, icon: Icon }) => (
+                <li key={href}>
+                  <Link
+                    className="flex items-center gap-2 rounded-lg px-3 py-2 font-semibold text-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    href={href}
+                    onClick={() => setIsOpen(false)}
+                  >
+                    <Icon aria-hidden="true" className="h-4 w-4" />
+                    {label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+
           {isAnonymous && (
-            <div className="space-y-2 rounded-xl bg-muted p-3">
-              <p className="text-muted-foreground text-xs">
-                <strong className="text-foreground">Keep your boards</strong> on
-                any device by linking GitHub. Your boards and votes move with
-                you.
-              </p>
-              <Button
-                className="w-full rounded-lg"
-                disabled={isLoading}
-                onClick={handleLinkGitHub}
-                size="sm"
-              >
-                <Code aria-hidden="true" className="mr-2 h-4 w-4" />
-                Link GitHub account
-              </Button>
-            </div>
+            <LinkGitHubCard
+              body="Link GitHub to keep your boards on any device and to join organizations."
+              className="p-3"
+              title="Keep your boards"
+            />
           )}
 
           <Button
@@ -274,6 +246,8 @@ export function UserAccountPopover({
             <Download aria-hidden="true" className="mr-2 h-4 w-4" />
             {isExporting ? "Preparing…" : "Export all my data (JSON)"}
           </Button>
+
+          <SignOutButton className="w-full justify-start" variant="ghost" />
         </div>
       </PopoverContent>
     </Popover>

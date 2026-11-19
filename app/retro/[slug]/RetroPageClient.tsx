@@ -22,7 +22,9 @@ import {
 import { JoinSessionModal } from "@/components/shared/join-session-modal";
 import { PrivateAccessOverlay } from "@/components/shared/private-access-overlay";
 import { useAuth } from "@/hooks/use-auth";
+import { useOrgRole } from "@/hooks/use-org-role";
 import { computeRemainingSeconds, getTimerBase } from "@/hooks/use-retro-timer";
+import { isOrgManager } from "@/lib/constants/organizations";
 import { createClient } from "@/lib/supabase/client";
 import type {
   ColumnType,
@@ -35,6 +37,7 @@ import { downloadTextFile } from "@/lib/utils/download";
 import {
   getErrorMessage,
   reportActionError,
+  throwIfNoRows,
   throwIfSupabaseError,
 } from "@/lib/utils/errors";
 import { retroToMarkdown } from "@/lib/utils/export-markdown";
@@ -120,6 +123,14 @@ export default function RetroPageClient() {
   myVotesRef.current = myVotes;
 
   const isAuthor = !!board && userId === board.author_id;
+  // Owners and admins of the organization that owns the board host it too.
+  const {
+    isLoading: orgRoleLoading,
+    organization,
+    refresh: refreshOrgRole,
+    role: orgRole,
+  } = useOrgRole(board?.org_id ?? null);
+  const isHost = isAuthor || isOrgManager(orgRole);
 
   const setPending = useCallback((key: string, value: boolean) => {
     setPendingActions((prev) => ({ ...prev, [key]: value }));
@@ -319,11 +330,10 @@ export default function RetroPageClient() {
           if (payload.eventType === "UPDATE" && payload.new) {
             const updated = payload.new as RetroBoard;
             const previous = boardRef.current;
-            if (
-              previous &&
-              updated.author_id !== userId &&
-              previous.is_locked !== updated.is_locked
-            ) {
+            // The client that changed the lock already shows it
+            // optimistically, so only the other clients, other hosts
+            // included, see a difference here.
+            if (previous && previous.is_locked !== updated.is_locked) {
               toast.info(
                 updated.is_locked
                   ? "The host locked the board"
@@ -492,11 +502,18 @@ export default function RetroPageClient() {
       setPending(key, true);
       setBoard((b) => (b ? { ...b, ...patch } : b));
       try {
-        const { error: updateError } = await createClient()
+        const { data: updated, error: updateError } = await createClient()
           .from("retro_boards")
           .update(patch)
-          .eq("id", current.id);
+          .eq("id", current.id)
+          .select("id");
         throwIfSupabaseError(updateError, failureLabel);
+        // Zero rows means you are no longer a host, for example because an
+        // organization owner changed your role while the board was open.
+        if (!updated || updated.length === 0) {
+          refreshOrgRole();
+        }
+        throwIfNoRows(updated, "You can no longer change this board.");
         return true;
       } catch (updateError) {
         reportActionError(failureLabel, updateError);
@@ -506,7 +523,7 @@ export default function RetroPageClient() {
         setPending(key, false);
       }
     },
-    [setPending]
+    [setPending, refreshOrgRole]
   );
 
   const handleToggleVisibility = useCallback(async () => {
@@ -546,6 +563,26 @@ export default function RetroPageClient() {
         description: b.is_locked
           ? "Everyone can add, move and vote on cards again."
           : "Cards and votes are frozen for everyone.",
+      });
+    }
+  }, [updateBoard]);
+
+  const handleToggleArchive = useCallback(async () => {
+    const b = boardRef.current;
+    if (!b) {
+      return;
+    }
+    const archiving = !b.archived_at;
+    const ok = await updateBoard(
+      "archive",
+      { archived_at: archiving ? new Date().toISOString() : null },
+      archiving ? "Could not archive the board" : "Could not restore the board"
+    );
+    if (ok) {
+      toast.success(archiving ? "Board archived" : "Board restored", {
+        description: archiving
+          ? "It moves to Archived in your sessions. Everyone can still open it."
+          : "It is back in your active sessions.",
       });
     }
   }, [updateBoard]);
@@ -625,11 +662,16 @@ export default function RetroPageClient() {
     }
     setPending("deleteBoard", true);
     try {
-      const { error: deleteError } = await createClient()
+      const { data: deleted, error: deleteError } = await createClient()
         .from("retro_boards")
         .delete()
-        .eq("id", b.id);
+        .eq("id", b.id)
+        .select("id");
       throwIfSupabaseError(deleteError, "Failed to delete board");
+      if (!deleted || deleted.length === 0) {
+        refreshOrgRole();
+      }
+      throwIfNoRows(deleted, "You can no longer delete this board.");
       toast.success("Board deleted");
       router.push("/");
     } catch (deleteError) {
@@ -637,7 +679,7 @@ export default function RetroPageClient() {
     } finally {
       setPending("deleteBoard", false);
     }
-  }, [router, setPending]);
+  }, [router, setPending, refreshOrgRole]);
 
   const handleAddCard = useCallback(
     async (columnType: ColumnType, content: string) => {
@@ -930,7 +972,18 @@ export default function RetroPageClient() {
   // the client gate has to match it.
   const isParticipant = participants.some((p) => p.user_id === userId);
 
-  if (!(board.is_public || isAuthor || isParticipant)) {
+  // Members of the owning organization may open a private board before they
+  // have a participant row, so wait for their role instead of flashing the
+  // private notice.
+  if (
+    board.org_id &&
+    orgRoleLoading &&
+    !(board.is_public || isAuthor || isParticipant)
+  ) {
+    return <FullPageLoading label="Loading board…" />;
+  }
+
+  if (!(board.is_public || isAuthor || isParticipant || orgRole)) {
     return (
       <PrivateAccessOverlay
         description="The host made this board private. Only people who joined before then can open it. Ask the host to make it public again."
@@ -971,7 +1024,7 @@ export default function RetroPageClient() {
         board={board}
         cardCount={cards.length}
         currentUserId={userId}
-        isAuthor={isAuthor}
+        isAuthor={isHost}
         onCopyMarkdown={handleCopyMarkdown}
         onDeleteBoard={handleDeleteBoard}
         onDownloadMarkdown={handleDownloadMarkdown}
@@ -981,8 +1034,10 @@ export default function RetroPageClient() {
         onTimerReset={handleTimerReset}
         onTimerToggle={handleTimerToggle}
         onTitleUpdate={handleEditBoardTitle}
+        onToggleArchive={handleToggleArchive}
         onToggleLock={handleToggleLock}
         onToggleVisibility={handleToggleVisibility}
+        organization={organization}
         participants={participants}
         sortMode={sortMode}
         voteCount={voteCount}
@@ -998,7 +1053,7 @@ export default function RetroPageClient() {
             <strong>Locked for discussion.</strong>{" "}
             <span className="max-sm:hidden">Cards and votes are frozen.</span>
           </span>
-          {isAuthor && (
+          {isHost && (
             <button
               className="shrink-0 rounded font-bold underline underline-offset-2"
               onClick={handleToggleLock}

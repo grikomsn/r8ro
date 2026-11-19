@@ -9,7 +9,11 @@
 - `migrations/20250101000000_create_poker_tables.sql`: poker schema and RLS.
 - Later migrations: poker default state, Realtime replication, retro policy
   changes, guest-account merging, retro timer pause/resume, poker vote status
-  (`has_voted`), and poker round history (`poker_rounds`).
+  (`has_voted`), poker round history (`poker_rounds`), and organizations
+  with organization-owned sessions (`20261119090000`-`20261119090200`).
+- `checks/organizations_rls.sql`: behavioural checks for organizations and
+  organization-owned sessions; run with `psql` against the local stack (see
+  `docs/operations.md`). It runs in one transaction and rolls back.
 - `schema.sql`: static reference dump of the retro schema.
 - `RLS_POLICIES.md`: concise policy reference.
 
@@ -33,6 +37,9 @@ its tables and would fail.
 - `poker_participants`
 - `poker_votes`
 - `poker_rounds`
+- `organizations`
+- `organization_members`
+- `organization_invites`
 
 All tables have RLS enabled. Realtime configuration is defined by
 `20260106120000_enable_realtime_replication.sql`.

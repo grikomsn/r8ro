@@ -43,3 +43,8 @@ export function removeRecentBoard(slug: string) {
 }
 
 export type { RecentBoard };
+
+/** Forgets every recent board, for example when signing out. */
+export function clearRecentBoards() {
+  document.cookie = "recent_boards=; max-age=0; path=/";
+}

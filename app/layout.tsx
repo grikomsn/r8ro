@@ -1,6 +1,6 @@
-import { Analytics } from "@vercel/analytics/next";
 import type { Metadata } from "next";
 import type React from "react";
+import { Analytics } from "@/components/analytics";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/hooks/use-auth";

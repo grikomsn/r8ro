@@ -1,6 +1,8 @@
 "use client";
 
 import {
+  Archive,
+  ArchiveRestore,
   ClipboardCopy,
   Download,
   Globe,
@@ -18,6 +20,10 @@ import {
   type PresenceParticipant,
 } from "@/components/shared/presence-button";
 import { SessionCodeButton } from "@/components/shared/session-code-button";
+import {
+  ArchivedChip,
+  OrganizationChip,
+} from "@/components/shared/session-owner-chips";
 import { SessionTopbar } from "@/components/shared/session-topbar";
 import { ShareMenu, ShareMenuItems } from "@/components/shared/share-menu";
 import {
@@ -44,6 +50,7 @@ import {
 import { SM_QUERY, useMediaQuery } from "@/hooks/use-media-query";
 import { FIELD_LIMITS } from "@/lib/constants/field-limits";
 import type { RetroBoard } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 export type CardSortMode = "auto" | "added" | "votes";
 
@@ -61,8 +68,11 @@ interface BoardHeaderProps {
   onTimerReset: () => void;
   onTimerToggle: () => void;
   onTitleUpdate: (newTitle: string) => void;
+  onToggleArchive: () => void;
   onToggleLock: () => void;
   onToggleVisibility: () => void;
+  /** The owning organization, when you are a member of it. */
+  organization: { name: string; slug: string } | null;
   participants: PresenceParticipant[];
   sortMode: CardSortMode;
   voteCount: number;
@@ -82,13 +92,16 @@ export function BoardHeader({
   onTimerReset,
   onTimerToggle,
   onTitleUpdate,
+  onToggleArchive,
   onToggleLock,
   onToggleVisibility,
+  organization,
   participants,
   sortMode,
   voteCount,
 }: BoardHeaderProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const hasOwnerChips = !!organization || !!board.archived_at;
   const isWide = useMediaQuery(SM_QUERY);
 
   const shareOptions = {
@@ -127,6 +140,7 @@ export function BoardHeader({
             <PresenceButton
               authorId={board.author_id}
               currentUserId={currentUserId}
+              hostOrgId={organization ? board.org_id : null}
               participants={participants}
             />
             {isWide && <ShareMenu {...shareOptions} />}
@@ -203,8 +217,28 @@ export function BoardHeader({
                         {board.is_public ? "Make private" : "Make public"}
                         <span className="text-muted-foreground text-xs">
                           {board.is_public
-                            ? "Only people already here keep access"
+                            ? organization
+                              ? `Only ${organization.name} and people already here`
+                              : "Only people already here keep access"
                             : "Anyone with the link can join"}
+                        </span>
+                      </span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={onToggleArchive}>
+                      {board.archived_at ? (
+                        <ArchiveRestore
+                          aria-hidden="true"
+                          className="mr-2 h-4 w-4"
+                        />
+                      ) : (
+                        <Archive aria-hidden="true" className="mr-2 h-4 w-4" />
+                      )}
+                      <span className="flex flex-col">
+                        {board.archived_at ? "Restore board" : "Archive board"}
+                        <span className="text-muted-foreground text-xs">
+                          {board.archived_at
+                            ? "Back to the active sessions"
+                            : "File it away; nothing else changes"}
                         </span>
                       </span>
                     </DropdownMenuItem>
@@ -226,8 +260,23 @@ export function BoardHeader({
         meta={
           <>
             <SessionCodeButton slug={board.slug} />
-            <span aria-hidden="true">·</span>
-            <span>
+            {/* Ownership comes first: the line never wraps, so whatever is
+                last is the first to be cut off on a phone. */}
+            {organization && <OrganizationChip organization={organization} />}
+            {board.archived_at && <ArchivedChip />}
+            {/* On a phone the counts make room for the ownership chips. */}
+            <span
+              aria-hidden="true"
+              className={cn(hasOwnerChips && "max-sm:hidden")}
+            >
+              ·
+            </span>
+            <span
+              className={cn(
+                "min-w-0 truncate",
+                hasOwnerChips && "max-sm:hidden"
+              )}
+            >
               {cardCount} card{cardCount === 1 ? "" : "s"}
               <span className="max-sm:hidden">
                 {" "}

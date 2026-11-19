@@ -38,10 +38,12 @@ const FEATURES = [
 ];
 
 async function createRetroBoard({
+  orgId,
   title,
   userId,
   username,
 }: {
+  orgId: string | null;
   title: string;
   userId: string;
   username: string;
@@ -59,6 +61,7 @@ async function createRetroBoard({
         title: finalTitle,
         author_id: userId,
         author_name: username,
+        org_id: orgId,
         is_public: true,
         timer_running: false,
         timer_seconds: DEFAULT_TIMER_SECONDS,

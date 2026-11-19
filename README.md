@@ -35,6 +35,15 @@ Supabase. The deployed app is [r8ro.app](https://r8ro.app).
   can be exported as Markdown.
 - Observer mode for people who watch without voting.
 
+### Accounts and Organizations
+
+- An account page with your profile, GitHub identity, and sign-out.
+- "My sessions" lists every retro and poker session you created or joined,
+  with rename, visibility, lock, archive, move, leave, and delete.
+- Organizations for teams (GitHub-linked accounts): invite by link, owner,
+  admin, and member roles, and shared sessions that members can open even
+  when private and that owners and admins can host.
+
 Every visitor signs in through Supabase anonymous authentication. An anonymous
 account can optionally be linked to GitHub. A private board or session stays
 visible to the people already on it, and everybody else is treated as if it did
@@ -115,6 +124,8 @@ TypeScript errors.
 - [Architecture overview](docs/overview.md)
 - [Retro behavior](docs/features/retro.md)
 - [Poker behavior](docs/features/poker.md)
+- [Organizations](docs/features/organizations.md)
+- [Account and session management](docs/features/account.md)
 - [Supabase data model and RLS](docs/data-model/supabase.md)
 - [Operations](docs/operations.md)
 - [Deployment](docs/deployment.md)
