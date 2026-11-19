@@ -61,7 +61,7 @@ against the local stack in one transaction that rolls back:
 supabase migration up --local
 psql postgresql://postgres:postgres@127.0.0.1:54322/postgres \
   -v ON_ERROR_STOP=1 -f supabase/checks/organizations_rls.sql
-# expected last line: 131 passed, 0 failed
+# expected last line: 139 passed, 0 failed
 ```
 
 The standalone type check is required because `next.config.mjs` sets

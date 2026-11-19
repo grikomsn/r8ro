@@ -323,6 +323,22 @@ SELECT public.set_session_organization('retro', (SELECT id FROM public.retro_boa
 RESET ROLE;
 SELECT t.ok((SELECT org_id IS NULL FROM public.retro_boards WHERE slug = 'org-public-retro'), '5.42 admin detaches a board from the organization');
 
+-- link previews (get_session_preview)
+SELECT t.login(NULL, 'anon');
+SELECT t.ok((SELECT title = 'Org public retro' AND host_name = 'Carol' AND to_improve_count = 1 FROM public.get_session_preview('retro', 'org-public-retro')), '5.43 anyone, signed out included, previews a public board');
+SELECT t.ok((SELECT count(*) FROM public.get_session_preview('retro', 'org-private-retro')) = 0, '5.44 signed out gets no preview of a private board');
+SELECT t.ok((SELECT count(*) FROM public.get_session_preview('poker', 'org-private-poker')) = 0, '5.45 signed out gets no preview of a private poker session');
+SELECT t.ok((SELECT count(*) FROM public.get_session_preview('retro', 'no-such-board')) = 0, '5.46 a missing board looks the same as a private one');
+SELECT t.ok((SELECT count(*) FROM public.get_session_preview('poker', 'org-public-retro')) = 0, '5.47 the kind must match the session');
+SELECT t.login(:erin);
+SELECT t.ok((SELECT count(*) FROM public.get_session_preview('retro', 'org-private-retro')) = 0, '5.48 a signed-in stranger gets no preview of a private board');
+SELECT t.login(:carol);
+-- org-private-retro was archived by its manager above; archiving hides it
+-- from lists, not from people who can open it.
+SELECT t.ok((SELECT went_well_count = 1 AND NOT is_public FROM public.get_session_preview('retro', 'org-private-retro')), '5.49 a member previews a private (archived) organization board');
+SELECT t.ok((SELECT title = 'Org private poker' AND NOT is_public AND participant_count >= 1 FROM public.get_session_preview('poker', 'org-private-poker')), '5.50 a member previews a private organization poker session');
+RESET ROLE;
+
 -- ===========================================================================
 -- 6. Removing members and leaving
 -- ===========================================================================

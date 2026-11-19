@@ -1,36 +1,34 @@
 import type { Metadata } from "next";
+import { RETRO_LANDING, SITE_NAME, SITE_URL } from "@/lib/site";
+import { landingJsonLd } from "@/lib/structured-data";
 import RetroClientPage from "./client-page";
 
+const title = `${RETRO_LANDING.title} | ${SITE_NAME}`;
+
 export const metadata: Metadata = {
-  title: "Realtime retrospective boards",
-  description:
-    "Create retrospective boards with realtime cards, voting, presence, and a shared timer.",
+  // The root layout's title template only applies to nested segments.
+  title: { absolute: title },
+  description: RETRO_LANDING.description,
+  alternates: { canonical: SITE_URL },
   openGraph: {
-    title: "r8ro retrospective boards",
-    description:
-      "Realtime retrospective boards with cards, voting, presence, and a shared timer.",
+    title,
+    description: RETRO_LANDING.description,
     type: "website",
-    url: "https://r8ro.app",
-    images: [
-      {
-        url: "/opengraph.png",
-        width: 1200,
-        height: 630,
-        alt: "r8ro retrospective board",
-      },
-    ],
+    locale: "en_US",
+    url: SITE_URL,
+    siteName: SITE_NAME,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title,
+    description: RETRO_LANDING.description,
   },
 };
 
-const jsonLd = JSON.stringify({
-  "@context": "https://schema.org",
-  "@type": "WebApplication",
-  name: "r8ro",
-  description:
-    "Realtime retrospective boards with cards, voting, presence, a shared timer and Markdown export.",
-  url: "https://r8ro.app",
-  applicationCategory: "BusinessApplication",
-  operatingSystem: "Web",
+const jsonLd = landingJsonLd({
+  name: `${SITE_NAME} retrospective board`,
+  description: RETRO_LANDING.description,
+  path: "",
   featureList: [
     "Realtime cards and votes",
     "Participant presence",
@@ -38,7 +36,6 @@ const jsonLd = JSON.stringify({
     "Public, private, and locked boards",
     "Markdown and image export",
   ],
-  browserRequirements: "Requires JavaScript. Requires HTML5.",
 });
 
 export default function Page() {

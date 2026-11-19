@@ -31,8 +31,11 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  // Refresh session - important for anonymous auth to persist
-  await supabase.auth.getUser();
+  // Refreshes an expiring session so that server code sees a valid one.
+  // getClaims verifies the token locally when the project uses asymmetric
+  // signing keys, so most requests no longer wait on a round trip to the
+  // auth server; with a shared secret it falls back to getUser.
+  await supabase.auth.getClaims();
 
   return supabaseResponse;
 }

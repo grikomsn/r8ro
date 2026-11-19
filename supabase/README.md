@@ -10,9 +10,10 @@
 - Later migrations: poker default state, Realtime replication, retro policy
   changes, guest-account merging, retro timer pause/resume, poker vote status
   (`has_voted`), poker round history (`poker_rounds`), and organizations
-  with organization-owned sessions (`20261119090000`-`20261119090200`).
-- `checks/organizations_rls.sql`: behavioural checks for organizations and
-  organization-owned sessions; run with `psql` against the local stack (see
+  with organization-owned sessions (`20261119090000`-`20261119090200`), and
+  link previews (`20261119120000_session_preview.sql`).
+- `checks/organizations_rls.sql`: behavioural checks for organizations,
+  organization-owned sessions and `get_session_preview`; run with `psql` against the local stack (see
   `docs/operations.md`). It runs in one transaction and rolls back.
 - `schema.sql`: static reference dump of the retro schema.
 - `RLS_POLICIES.md`: concise policy reference.

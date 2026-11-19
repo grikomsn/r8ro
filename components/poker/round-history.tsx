@@ -1,9 +1,9 @@
 "use client";
 
-import { formatDistanceToNow } from "date-fns";
 import { History, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { PokerRound } from "@/lib/types";
+import { formatRelativeTime } from "@/lib/utils/relative-time";
 
 interface RoundHistoryProps {
   canDelete: boolean;
@@ -70,10 +70,7 @@ export function RoundHistory({
                   {round.votes.length} vote{round.votes.length === 1 ? "" : "s"}
                   {round.votes.length > 0 &&
                     `: ${round.votes.map((v) => v.value).join(", ")}`}{" "}
-                  ·{" "}
-                  {formatDistanceToNow(new Date(round.created_at), {
-                    addSuffix: true,
-                  })}
+                  · {formatRelativeTime(new Date(round.created_at))}
                 </p>
               </div>
               <span className="min-w-9 shrink-0 rounded-lg border-2 border-primary bg-primary/15 px-2 py-0.5 text-center font-black font-mono">

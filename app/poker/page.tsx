@@ -1,43 +1,39 @@
 import type { Metadata } from "next";
+import { POKER_LANDING, SITE_NAME, SITE_URL } from "@/lib/site";
+import { landingJsonLd } from "@/lib/structured-data";
 import PokerClientPage from "./client-page";
 
+const url = `${SITE_URL}/poker`;
+
 export const metadata: Metadata = {
-  title: "Planning poker",
-  description:
-    "Create planning poker sessions with realtime voting, presence, and vote reveal.",
+  title: POKER_LANDING.title,
+  description: POKER_LANDING.description,
+  alternates: { canonical: url },
   openGraph: {
-    title: "r8ro planning poker",
-    description:
-      "Realtime planning poker with configurable scales and vote reveal.",
+    title: `${POKER_LANDING.title} | ${SITE_NAME}`,
+    description: POKER_LANDING.description,
     type: "website",
-    url: "https://r8ro.app/poker",
-    images: [
-      {
-        url: "/opengraph.png",
-        width: 1200,
-        height: 630,
-        alt: "r8ro planning poker",
-      },
-    ],
+    locale: "en_US",
+    url,
+    siteName: SITE_NAME,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: `${POKER_LANDING.title} | ${SITE_NAME}`,
+    description: POKER_LANDING.description,
   },
 };
 
-const jsonLd = JSON.stringify({
-  "@context": "https://schema.org",
-  "@type": "WebApplication",
-  name: "r8ro",
-  description:
-    "Realtime planning poker with hidden votes, reveal, statistics and round history.",
-  url: "https://r8ro.app/poker",
-  applicationCategory: "BusinessApplication",
-  operatingSystem: "Web",
+const jsonLd = landingJsonLd({
+  name: `${SITE_NAME} planning poker`,
+  description: POKER_LANDING.description,
+  path: "/poker",
   featureList: [
     "Votes hidden until reveal",
     "Fibonacci, T-shirt, and linear scales",
     "Consensus and suggested estimate",
     "Round history with Markdown export",
   ],
-  browserRequirements: "Requires JavaScript. Requires HTML5.",
 });
 
 export default function PokerPage() {

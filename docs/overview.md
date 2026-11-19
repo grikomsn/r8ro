@@ -19,7 +19,9 @@ r8ro has two session experiences, plus account and organization pages:
 - `hooks/use-auth.ts` creates an anonymous Supabase session when no valid
   session exists and exposes optional GitHub identity linking.
 - Browser clients use `lib/supabase/client.ts`; server components and route
-  handlers use `lib/supabase/server.ts`.
+  handlers use `lib/supabase/server.ts`. `lib/supabase/public.ts` is a
+  session-less server client for output that is shared and cached, such as
+  Open Graph images.
 - `proxy.ts` refreshes Supabase auth cookies through
   `lib/supabase/proxy.ts`.
 - Session clients load rows from Supabase, subscribe to Postgres changes, and
@@ -32,6 +34,24 @@ r8ro has two session experiences, plus account and organization pages:
   [features/organizations.md](features/organizations.md).
 - Database authorization is defined by ordered migrations in
   `supabase/migrations/`.
+
+## Search and Link Previews
+
+- Only `/` (retro) and `/poker` are indexable. `app/robots.ts` and
+  `app/sitemap.ts` list them; every session, account and organization page
+  sends `noindex`. Preview deployments disallow everything.
+- Site name, production URL and landing copy live in `lib/site.ts`. Canonical
+  URLs always point at `https://r8ro.app`; `metadataBase` is the running
+  deployment so that previews link to their own images.
+- The landing pages render in full on the server; only the create and join
+  actions wait for the anonymous session.
+- Open Graph images are generated with `next/og` from `lib/og/render.tsx`:
+  static ones for the two landing pages, and per-session ones at
+  `/retro/[slug]/opengraph-image` and `/poker/[slug]/opengraph-image` that
+  show the title, host and counts of a public session (from
+  `get_session_preview`) and a generic invitation otherwise. The fonts in
+  `lib/og/fonts/` are Latin subsets from Google Fonts (OFL); the colours
+  repeat the light tokens of `app/globals.css`.
 
 See the feature documents for behavior and
 [data-model/supabase.md](data-model/supabase.md) for database details.

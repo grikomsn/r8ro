@@ -1,6 +1,5 @@
 "use client";
 
-import { formatDistanceToNow } from "date-fns";
 import { Check, Copy, Link2, Link2Off, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -33,6 +32,7 @@ import {
 } from "@/lib/organizations";
 import type { OrganizationInvite } from "@/lib/types";
 import { reportActionError } from "@/lib/utils/errors";
+import { formatRelativeTime } from "@/lib/utils/relative-time";
 
 const NEVER = "never";
 
@@ -44,7 +44,7 @@ function expiryText(invite: OrganizationInvite) {
   if (expires.getTime() <= Date.now()) {
     return "Expired. Reset the link to invite people again.";
   }
-  return `Expires ${formatDistanceToNow(expires, { addSuffix: true })}.`;
+  return `Expires ${formatRelativeTime(expires)}.`;
 }
 
 /** The organization's invite link, for owners and admins. */

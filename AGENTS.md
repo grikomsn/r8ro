@@ -34,7 +34,9 @@ No Jest/Vitest/Playwright configured. Validation chain: `pnpm check-types` → `
 - `components/shared/`: cross-feature components (session topbar, presence button, share menu, join screen, session landing, avatars)
 - `components/ui/`: shadcn primitives (linter disabled — treat as vendor)
 - `hooks/use-auth.ts`: central auth hook (anonymous-first + GitHub binding)
-- `lib/supabase/`: four clients — `client.ts` (browser singleton), `server.ts` (RSC), `proxy.ts` (middleware), `admin.ts` (service role)
+- `lib/supabase/`: five clients — `client.ts` (browser singleton), `server.ts` (RSC), `proxy.ts` (middleware), `admin.ts` (service role), `public.ts` (server, no session; for cached output such as OG images)
+- `lib/site.ts`: site name, production URL and landing copy for metadata; `lib/session-metadata.ts` + `lib/session-preview.ts`: session page metadata via `get_session_preview()`
+- `lib/og/render.tsx`: Open Graph image frame, fonts and palette (`app/**/opengraph-image.tsx`). Satori cannot read CSS variables, so its colours mirror `app/globals.css`; fonts must be static TTFs without extension lookups (Google Fonts API builds work, the GitHub `google/fonts` Lato does not)
 - `lib/auth/linking.ts`: signed cookie helpers for secure guest-to-GitHub account merging
 - `lib/types.ts`: shared domain types (RetroBoard, RetroCard, PokerSession, etc.)
 - `lib/utils/`: slug generation, recent-session cookie helpers
@@ -67,7 +69,7 @@ No Jest/Vitest/Playwright configured. Validation chain: `pnpm check-types` → `
 
 ## Design Tokens
 
-- Colours come from the Wayfindr websites (wayfindr.io, bundle.wayfindr.io) and live only in `app/globals.css`; never hard-code hex values in components.
+- Colours come from the Wayfindr websites (wayfindr.io, bundle.wayfindr.io) and live only in `app/globals.css`; never hard-code hex values in components. Exceptions, where CSS variables cannot be read: `lib/og/render.tsx` (`OG_COLORS`), `viewport.themeColor` in `app/layout.tsx` and `app/manifest.ts`. Keep them in step with `globals.css`.
 - Navy `foreground` ink on white `background` panels over a grey `canvas` page. Amber `primary` is the one brand and action colour; use `text-brand-text` when amber must be readable as text.
 - Category accents: `success` (went well), `mauve` (to improve), `periwinkle` (action items, "revealed"), plus `sky`, `pink`, `sage`. Text on pastels uses `text-ink`.
 - Dark mode is navy-based (`.dark` block). Check every change in both themes.

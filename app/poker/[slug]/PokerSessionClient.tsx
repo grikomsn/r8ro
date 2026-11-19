@@ -133,47 +133,63 @@ export default function PokerSessionClient() {
     setVotes(data ?? []);
   }, []);
 
-  const refetchAll = useCallback(
-    async (sessionId: string) => {
-      const supabase = createClient();
-      const [sessionRes, participantsRes, roundsRes] = await Promise.all([
-        supabase
-          .from("poker_sessions")
-          .select("*")
-          .eq("id", sessionId)
-          .maybeSingle(),
-        supabase
-          .from("poker_participants")
-          .select("*")
-          .eq("session_id", sessionId),
-        supabase
-          .from("poker_rounds")
-          .select("*")
-          .eq("session_id", sessionId)
-          .order("created_at", { ascending: true }),
-      ]);
-      throwIfSupabaseError(sessionRes.error, "Failed to load session");
-      throwIfSupabaseError(
-        participantsRes.error,
-        "Failed to load participants"
-      );
-      throwIfSupabaseError(roundsRes.error, "Failed to load history");
+  // Reads the session with its participants, rounds and visible votes in one
+  // round trip and applies it. Used on the initial load (by slug) and again
+  // whenever the socket reconnects (by id), because Postgres changes are not
+  // replayed for a reconnect. RLS applies to every embedded table as usual,
+  // so hidden votes stay hidden.
+  const loadSnapshot = useCallback(
+    async (column: "id" | "slug", value: string) => {
+      const { data, error: fetchError } = await createClient()
+        .from("poker_sessions")
+        .select("*, poker_participants(*), poker_rounds(*), poker_votes(*)")
+        .eq(column, value)
+        .order("created_at", {
+          referencedTable: "poker_rounds",
+          ascending: true,
+        })
+        .maybeSingle();
+      throwIfSupabaseError(fetchError, "Failed to load session");
 
-      if (sessionRes.data) {
-        setSession(sessionRes.data);
+      if (!data) {
+        return null;
       }
+
+      const {
+        poker_participants: embeddedParticipants,
+        poker_rounds: embeddedRounds,
+        poker_votes: embeddedVotes,
+        ...sessionData
+      } = data as PokerSession & {
+        poker_participants: PokerParticipant[] | null;
+        poker_rounds: PokerRound[] | null;
+        poker_votes: PokerVote[] | null;
+      };
+      const loadedParticipants = embeddedParticipants ?? [];
+
+      setSession(sessionData as PokerSession);
       setParticipants((previous) => {
         const online = new Map(previous.map((p) => [p.user_id, p.is_online]));
-        return (participantsRes.data ?? []).map((p) => ({
+        return loadedParticipants.map((p) => ({
           ...p,
           is_online: online.get(p.user_id) ?? p.is_online,
         }));
       });
-      setRounds((roundsRes.data ?? []) as PokerRound[]);
-      await refetchVotes(sessionId);
-      return participantsRes.data ?? [];
+      setRounds(embeddedRounds ?? []);
+      setVotes(embeddedVotes ?? []);
+
+      return {
+        participants: loadedParticipants,
+        session: sessionData as PokerSession,
+      };
     },
-    [refetchVotes]
+    []
+  );
+
+  const refetchAll = useCallback(
+    async (sessionId: string) =>
+      (await loadSnapshot("id", sessionId))?.participants ?? [],
+    [loadSnapshot]
   );
 
   useEffect(() => {
@@ -205,31 +221,21 @@ export default function PokerSessionClient() {
 
     async function load() {
       try {
-        const { data: sessionData, error: sessionError } = await supabase
-          .from("poker_sessions")
-          .select("*")
-          .eq("slug", slug)
-          .maybeSingle();
+        const loaded = await loadSnapshot("slug", slug);
 
         if (cancelled) {
           return;
         }
 
-        throwIfSupabaseError(sessionError, "Failed to load session");
-
-        if (!sessionData) {
+        if (!loaded) {
           setError("not-found");
           setLoading(false);
           return;
         }
 
-        setSession(sessionData);
+        const { session: sessionData, participants: loadedParticipants } =
+          loaded;
         addRecentPokerSession(sessionData.slug, sessionData.title);
-
-        const loadedParticipants = await refetchAll(sessionData.id);
-        if (cancelled) {
-          return;
-        }
 
         const existing = loadedParticipants.find((p) => p.user_id === userId);
         if (!existing) {
@@ -273,7 +279,7 @@ export default function PokerSessionClient() {
     return () => {
       cancelled = true;
     };
-  }, [slug, userId, userName, refetchAll]);
+  }, [slug, userId, userName, loadSnapshot]);
 
   // Set up realtime subscriptions after the session is loaded.
   useEffect(() => {

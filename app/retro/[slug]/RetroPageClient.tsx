@@ -161,48 +161,51 @@ export default function RetroPageClient() {
   const refetchBoard = useCallback(async () => {
     const supabase = createClient();
 
-    const { data: boardData, error: boardError } = await supabase
-      .from("retro_boards")
-      .select("*")
-      .eq("slug", slug)
-      .maybeSingle();
+    // One round trip: the board embeds its cards and participants, and the
+    // viewer's votes are joined to the board by slug, so neither query waits
+    // for the board id. RLS applies to every embedded table as usual.
+    const [boardRes, votesRes] = await Promise.all([
+      supabase
+        .from("retro_boards")
+        .select("*, retro_cards(*), retro_participants(*)")
+        .eq("slug", slug)
+        .order("created_at", {
+          referencedTable: "retro_cards",
+          ascending: true,
+        })
+        .maybeSingle(),
+      userId
+        ? supabase
+            .from("retro_card_votes")
+            .select("card_id, retro_cards!inner(retro_boards!inner(slug))")
+            .eq("user_id", userId)
+            .eq("retro_cards.retro_boards.slug", slug)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
 
-    throwIfSupabaseError(boardError, "Failed to load board");
+    throwIfSupabaseError(boardRes.error, "Failed to load board");
 
-    if (!boardData) {
+    if (!boardRes.data) {
       return null;
     }
 
-    const [cardsRes, participantsRes] = await Promise.all([
-      supabase
-        .from("retro_cards")
-        .select("*")
-        .eq("board_id", boardData.id)
-        .order("created_at", { ascending: true }),
-      supabase
-        .from("retro_participants")
-        .select("*")
-        .eq("board_id", boardData.id),
-    ]);
+    throwIfSupabaseError(votesRes.error, "Failed to load your votes");
 
-    throwIfSupabaseError(cardsRes.error, "Failed to load cards");
-    throwIfSupabaseError(participantsRes.error, "Failed to load participants");
-
-    const loadedCards: RetroCard[] = cardsRes.data ?? [];
-    let votedCardIds = new Set<string>();
-
-    if (userId && loadedCards.length > 0) {
-      const { data: votes, error: votesError } = await supabase
-        .from("retro_card_votes")
-        .select("card_id")
-        .eq("user_id", userId)
-        .in(
-          "card_id",
-          loadedCards.map((card) => card.id)
-        );
-      throwIfSupabaseError(votesError, "Failed to load your votes");
-      votedCardIds = new Set((votes ?? []).map((vote) => vote.card_id));
-    }
+    const {
+      retro_cards: embeddedCards,
+      retro_participants: embeddedParticipants,
+      ...boardData
+    } = boardRes.data as RetroBoard & {
+      retro_cards: RetroCard[] | null;
+      retro_participants: RetroParticipant[] | null;
+    };
+    const loadedCards: RetroCard[] = embeddedCards ?? [];
+    const loadedParticipants: RetroParticipant[] = embeddedParticipants ?? [];
+    const votedCardIds = new Set<string>(
+      ((votesRes.data ?? []) as { card_id: string }[]).map(
+        (vote) => vote.card_id
+      )
+    );
 
     // The vote count is maintained in the database by
     // public.sync_retro_card_vote_count, so the card row is authoritative.
@@ -211,13 +214,13 @@ export default function RetroPageClient() {
     setParticipants((previous) => {
       // Keep presence-derived online state for rows that already exist.
       const online = new Map(previous.map((p) => [p.user_id, p.is_online]));
-      return (participantsRes.data ?? []).map((p) => ({
+      return loadedParticipants.map((p) => ({
         ...p,
         is_online: online.get(p.user_id) ?? p.is_online,
       }));
     });
 
-    return { board: boardData, participants: participantsRes.data ?? [] };
+    return { board: boardData as RetroBoard, participants: loadedParticipants };
   }, [slug, userId]);
 
   useEffect(() => {

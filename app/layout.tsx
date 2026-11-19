@@ -1,9 +1,17 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import type React from "react";
 import { Analytics } from "@/components/analytics";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { ThemeProvider } from "@/components/theme-provider";
 import { AuthProvider } from "@/hooks/use-auth";
+import {
+  getDeploymentUrl,
+  isIndexableDeployment,
+  SITE_DESCRIPTION,
+  SITE_NAME,
+  SITE_TAGLINE,
+  SITE_URL,
+} from "@/lib/site";
 import "./globals.css";
 
 import { Lato, Space_Mono } from "next/font/google";
@@ -21,56 +29,61 @@ const spaceMono = Space_Mono({
   weight: ["400", "700"],
   variable: "--font-space-mono",
   display: "swap",
+  // Only session codes and the wordmark use it; keep it off the critical path.
+  preload: false,
 });
 
 export const metadata: Metadata = {
   title: {
-    default: "r8ro — Realtime retrospectives and planning poker",
-    template: "%s | r8ro",
+    default: `${SITE_NAME} — ${SITE_TAGLINE}`,
+    template: `%s | ${SITE_NAME}`,
   },
-  description:
-    "Realtime retrospective boards and planning poker with voting, presence, and timers.",
-  applicationName: "r8ro",
-  metadataBase: new URL("https://r8ro.app"),
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
+  metadataBase: getDeploymentUrl(),
+  keywords: [
+    "retrospective board",
+    "sprint retrospective",
+    "online retro",
+    "planning poker",
+    "scrum poker",
+    "agile estimation",
+  ],
   openGraph: {
-    title: "r8ro — Realtime retrospectives and planning poker",
-    description:
-      "Realtime retrospective boards and planning poker with voting, presence, and timers.",
+    title: `${SITE_NAME} — ${SITE_TAGLINE}`,
+    description: SITE_DESCRIPTION,
     type: "website",
     locale: "en_US",
-    url: "https://r8ro.app",
-    siteName: "r8ro",
-    images: [
-      {
-        url: "/opengraph.png",
-        width: 1200,
-        height: 630,
-        alt: "r8ro",
-      },
-    ],
+    url: SITE_URL,
+    siteName: SITE_NAME,
   },
   twitter: {
     card: "summary_large_image",
-    title: "r8ro — Realtime retrospectives and planning poker",
-    description:
-      "Realtime retrospective boards and planning poker with voting, presence, and timers.",
-    images: ["/opengraph.png"],
+    title: `${SITE_NAME} — ${SITE_TAGLINE}`,
+    description: SITE_DESCRIPTION,
   },
-  robots: {
-    index: true,
-    follow: true,
-    googleBot: {
-      index: true,
-      follow: true,
-      "max-video-preview": -1,
-      "max-image-preview": "large",
-      "max-snippet": -1,
-    },
-  },
-  icons: {
-    icon: "/favicon.ico",
-    apple: "/favicon.ico",
-  },
+  robots: isIndexableDeployment()
+    ? {
+        index: true,
+        follow: true,
+        googleBot: {
+          index: true,
+          follow: true,
+          "max-video-preview": -1,
+          "max-image-preview": "large",
+          "max-snippet": -1,
+        },
+      }
+    : { index: false, follow: false },
+  formatDetection: { telephone: false },
+};
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#101828" },
+  ],
+  colorScheme: "light dark",
 };
 
 export default function RootLayout({

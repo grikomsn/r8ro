@@ -125,6 +125,15 @@ All three tables are read-only to API roles; writes go through
 - `organization_invites_select_manager`: owners and admins only. Everyone
   else previews an invite through `get_organization_invite(code)`.
 
+## Link Previews
+
+`get_session_preview(kind, slug)` is not a policy but bypasses them, so it is
+listed here. It is `SECURITY DEFINER` and executable by `anon`, and returns a
+row only when `can_access_board` / `can_access_poker_session` allows the
+caller: public sessions for everyone, private ones for their author,
+participants and organization members. It returns counts, never card text,
+votes or participant names.
+
 ## Realtime
 
 `20260106120000_enable_realtime_replication.sql` gives all application tables

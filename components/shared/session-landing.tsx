@@ -1,6 +1,5 @@
 "use client";
 
-import { formatDistanceToNow } from "date-fns";
 import {
   ArrowRight,
   Building2,
@@ -16,7 +15,6 @@ import { useRouter } from "next/navigation";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { AuthErrorNotice } from "@/components/shared/auth-error-notice";
-import { FullPageLoading } from "@/components/shared/full-page-status";
 import { SiteHeader } from "@/components/shared/site-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,6 +38,7 @@ import { listMyOrganizations } from "@/lib/organizations";
 import { createClient } from "@/lib/supabase/client";
 import type { OrganizationSummary } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { formatRelativeTime } from "@/lib/utils/relative-time";
 import { parseSessionCode } from "@/lib/utils/session-code";
 
 export interface SessionListItem {
@@ -94,7 +93,7 @@ function relativeTime(timestamp?: string) {
   if (Number.isNaN(date.getTime())) {
     return null;
   }
-  return formatDistanceToNow(date, { addSuffix: true });
+  return formatRelativeTime(date);
 }
 
 function SessionList({
@@ -394,15 +393,14 @@ export function SessionLanding({
     }
   };
 
-  if (!isInitialized) {
-    return <FullPageLoading />;
-  }
-
   if (authError) {
     return <AuthErrorNotice message={authError} />;
   }
 
+  // The page renders in full on the server and while the session loads, so
+  // the content is visible (and indexable) at once; only the actions wait.
   const isDisabled = isSubmitting || authLoading || !userId;
+  const isMineLoading = !isInitialized || mineState === "loading";
 
   const nameField = (id: string) =>
     displayName && !isEditingName ? (
@@ -621,11 +619,10 @@ export function SessionLanding({
           aria-label={`Your ${noun}s`}
           className={cn(
             "h-fit overflow-hidden rounded-2xl border-2 border-border bg-background shadow-md max-lg:order-3 lg:sticky lg:top-6",
-            // A first visit on a phone has nothing to list yet.
-            mine.length === 0 &&
-              recentItems.length === 0 &&
-              mineState !== "loading" &&
-              "max-lg:hidden"
+            // A first visit on a phone has nothing to list yet. It stays
+            // hidden while loading too, rather than appearing and vanishing
+            // and shifting the page under the visitor.
+            mine.length === 0 && recentItems.length === 0 && "max-lg:hidden"
           )}
         >
           <Tabs className="w-full gap-0" defaultValue="mine">
@@ -647,7 +644,7 @@ export function SessionLanding({
             <TabsContent
               className={cn(
                 "mt-0 max-h-[28rem] overflow-y-auto p-4",
-                mineState === "loading" && "animate-pulse"
+                isMineLoading && "animate-pulse"
               )}
               value="mine"
             >
@@ -655,7 +652,7 @@ export function SessionLanding({
                 <p className="text-destructive text-sm" role="alert">
                   Could not load your {noun}s right now.
                 </p>
-              ) : mineState === "loading" && mine.length === 0 ? (
+              ) : isMineLoading && mine.length === 0 ? (
                 <p className="text-muted-foreground text-sm">Loading…</p>
               ) : (
                 <SessionList

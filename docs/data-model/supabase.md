@@ -16,8 +16,9 @@ SQL files are authoritative when this document differs.
 Every migration that creates a table states its grants explicitly. The
 `20261021090000_grant_table_privileges.sql` migration gives the
 `authenticated` role full DML on the seven application tables, `service_role`
-the same, and the `anon` role `SELECT` on the parent tables only, because the
-server-rendered metadata queries run without a session.
+the same, and the `anon` role `SELECT` on the parent tables only. The select
+policies still require `auth.uid()`, so a signed-out request reads nothing
+from them; link previews use `get_session_preview` instead.
 
 `20261119090000_organizations.sql` grants `authenticated` `SELECT` only on the
 three organization tables; every write goes through a `SECURITY DEFINER`
@@ -68,6 +69,15 @@ The `protect_session_ownership` trigger rejects a direct change to
 - `list_my_sessions(org_id)` (`SECURITY INVOKER`) lists the sessions you
   created or joined, or with an id every session of that organization, with
   `can_manage` and counts.
+- `get_session_preview(kind, slug)` (`SECURITY DEFINER`, executable by
+  `anon`) returns a link-preview summary of a retro board or poker session:
+  title, host name, whether it is public or locked, the participant count,
+  card counts per column or the round count, and the voting scale. It never
+  returns card text, votes or participant names. A row comes back only when
+  `can_access_board` / `can_access_poker_session` allows the caller, so a
+  signed-out caller sees public sessions only, and a private session looks
+  exactly like a missing one. Page metadata calls it with the visitor's
+  session; Open Graph images call it signed out, so they can be cached.
 - `merge_guest_account_into_current_user(source_user_id, target_user_id)`
   migrates retro and poker ownership, participation, votes, and organization
   memberships (keeping the higher role) during the

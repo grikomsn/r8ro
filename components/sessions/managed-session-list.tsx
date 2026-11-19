@@ -1,6 +1,5 @@
 "use client";
 
-import { formatDistanceToNow } from "date-fns";
 import {
   Archive,
   ArchiveRestore,
@@ -71,6 +70,7 @@ import {
 import type { ManagedSession } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { reportActionError } from "@/lib/utils/errors";
+import { formatRelativeTime } from "@/lib/utils/relative-time";
 
 const PERSONAL = "personal";
 /** `list_my_sessions` returns at most this many rows, newest first. */
@@ -105,7 +105,7 @@ function relativeTime(timestamp: string) {
   if (Number.isNaN(date.getTime())) {
     return null;
   }
-  return formatDistanceToNow(date, { addSuffix: true });
+  return formatRelativeTime(date);
 }
 
 function Chip({
