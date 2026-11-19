@@ -245,7 +245,9 @@ SELECT t.throws($$INSERT INTO public.poker_sessions (slug, title, author_id, aut
 SELECT t.ok((SELECT count(*) FROM public.retro_boards WHERE slug = 'org-private-retro') = 0, '5.4 non-member cannot read a private organization board');
 SELECT t.ok((SELECT count(*) FROM public.retro_boards WHERE slug = 'org-public-retro') = 1, '5.5 anyone signed in can still read a public organization board by link');
 SELECT t.ok((SELECT count(*) FROM public.poker_sessions WHERE slug = 'org-private-poker') = 0, '5.6 non-member cannot read a private organization poker session');
-SELECT t.ok((SELECT count(*) FROM public.retro_cards) = 0, '5.7 non-member cannot read cards of a private organization board');
+-- Scoped to this board's card: a populated database has public cards that
+-- every signed-in user can read.
+SELECT t.ok((SELECT count(*) FROM public.retro_cards WHERE author_id = :carol AND content = 'Shipped it') = 0, '5.7 non-member cannot read cards of a private organization board');
 SELECT t.affects($$INSERT INTO public.retro_participants (board_id, user_id, username) SELECT id, auth.uid(), 'Dave' FROM public.retro_boards WHERE slug = 'org-private-retro'$$, 0, '5.8 non-member cannot join a private organization board (board is invisible)');
 SELECT t.ok((SELECT count(*) FROM public.list_my_sessions((SELECT acme FROM ids))) = 0, '5.9 non-member gets nothing from the organization session list, public boards included');
 INSERT INTO public.retro_participants (board_id, user_id, username)
